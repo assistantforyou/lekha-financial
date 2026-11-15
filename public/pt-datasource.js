@@ -32,11 +32,48 @@
     if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
     return asText ? r.text() : r.json();
   }
+  /* ---- your holdings -> free-tier prices ----
+     The tickers go to the server in a POST body (not the URL) so they are not written into request logs; nothing is stored.
+     The returned history also gives live quote fields, published as window.PT_LIVE for the holdings table. US-listed USD holdings only. */
+  function holdingSymbols() {
+    try {
+      var v = JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all") || "null");
+      return ((v && v.items) || []).filter(function (h) { return h && h.tk && h.tk !== "CASH" && h.cur === "USD"; }).map(function (h) { return h.tk; });
+    } catch (e) { return []; }
+  }
+  function parseCsvLine(l) { return l.split(","); }
+  function computeLive(text, syms) {
+    var lines = String(text).split("\n"), head = parseCsvLine(lines[0] || ""), live = {}, newest = 0;
+    for (var j = 0; j < head.length; j += 2) {
+      var m = /^D\|(.+)$/.exec(head[j] || ""); if (!m || syms.indexOf(m[1]) < 0) continue;
+      var pts = [];
+      for (var i = 2; i < lines.length; i++) { var c = parseCsvLine(lines[i]), d = parseFloat(c[j]), v = parseFloat(c[j + 1]); if (isFinite(d) && isFinite(v) && v > 0) pts.push([(Math.floor(d) - 25569) * 864e5, v]); }
+      if (pts.length < 2) continue;
+      var n = pts.length, px = pts[n - 1][1], at = function (back) { return n - 1 - back >= 0 ? pts[n - 1 - back][1] : null; };
+      var yr = new Date(pts[n - 1][0]).getUTCFullYear(), prevYear = null;
+      for (var q = n - 1; q >= 0; q--) if (new Date(pts[q][0]).getUTCFullYear() < yr) { prevYear = pts[q][1]; break; }
+      var hi = 0; for (var r2 = Math.max(0, n - 252); r2 < n; r2++) if (pts[r2][1] > hi) hi = pts[r2][1];
+      var rel = function (base) { return base ? px / base - 1 : null; };
+      live[m[1]] = { px: px, prev: at(1), hi52: hi, day: rel(at(1)), w1: rel(at(5)), m1: rel(at(21)), ytd: rel(prevYear), from52: rel(hi) };
+      if (pts[n - 1][0] > newest) newest = pts[n - 1][0];
+    }
+    var sig = JSON.stringify(live), changed = sig !== window.PT_LIVE_SIG;
+    window.PT_LIVE = live; window.PT_LIVE_SIG = sig; window.PT_LIVE_AT = Date.now(); window.PT_LIVE_ASOF = newest ? new Date(newest).toISOString().slice(0, 10) : null;
+    if (changed) (function again(tries) { if (window.PT_HOLD) window.PT_HOLD.apply(); else if (tries < 20) setTimeout(function () { again(tries + 1); }, 250); })(0);
+  }
+  async function freeHistory() {
+    var syms = holdingSymbols();
+    var r = await fetch(location.origin + "/api/free/csv/HISTORY", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
+    if (r.status === 204 || r.status === 404) return null;
+    if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
+    var t = await r.text(); computeLive(t, syms); return t;
+  }
+
   var cfg = load();
   window.PT_SOURCE_LABEL = cfg.type === "av" ? "Alpha Vantage" : cfg.type === "free" ? "free public data" : cfg.type === "custom" ? "custom data source" : "";
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
-      fetchCsv: function (k) { return get(cfg, "/csv/" + encodeURIComponent(k), true); },
+      fetchCsv: function (k) { return cfg.type === "free" && k === "HISTORY" ? freeHistory() : get(cfg, "/csv/" + encodeURIComponent(k), true); },
       getDoc: async function (p) { var v = await get(cfg, "/doc?path=" + encodeURIComponent(p), false); return v && typeof v === "object" && !Array.isArray(v) ? v : null; },
       getCollection: async function (n) {
         /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */

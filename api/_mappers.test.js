@@ -85,3 +85,15 @@ const lo = csvO.split("\n");
 assert.strictEqual(lo[0], "Ticker,Group,Industry,Codes,Closes,Calculated at (sheet time)");
 assert.strictEqual(lo[2], "SPY,ETF,,,261112:757.12;261113:754.37,2026-11-16 12:00 UTC");
 console.log("obos ok");
+
+// --- history ---
+const { weeklyFrom, historyCsv } = require("./_mappers");
+const days = [["2026-11-09", 1], ["2026-11-10", 2], ["2026-11-13", 3], ["2026-11-16", 4], ["2026-11-17", 5]]; // Mon..Fri, then next Mon/Tue
+assert.deepStrictEqual(weeklyFrom(days), [["2026-11-13", 3], ["2026-11-17", 5]]);
+const hc = historyCsv({ NVDA: [["2026-11-12", 150], ["2026-11-13", 151]], "INDEXSP:.INX": [["2026-11-13", 754.27]] }, 5.13);
+const hl = hc.split("\n");
+assert.strictEqual(hl[0], "D|NVDA,,W|NVDA,,D|INDEXSP:.INX,,W|INDEXSP:.INX,,LIVE|TNX10Y,");
+assert.strictEqual(hl[1].split(",")[8], "5.13"); // LIVE|TNX10Y value sits under its header
+assert.strictEqual(hl[2].split(",")[1], "150");
+assert.strictEqual(historyCsv({}, 4), null);
+console.log("history ok");

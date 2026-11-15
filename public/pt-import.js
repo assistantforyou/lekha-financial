@@ -50,7 +50,22 @@
   function $(id) { return document.getElementById(id); }
   function say(t, bad) { var m = $("imp-msg"); m.textContent = t; m.style.color = bad ? "var(--down)" : "var(--muted)"; }
 
-  btn.addEventListener("click", function () { $("imp-pass").value = getPass(); $("imp-file").value = ""; $("imp-ok").checked = false; $("imp-review").hidden = true; $("imp-go").hidden = false; say(""); dlg.showModal(); });
+  function openDlg() { $("imp-pass").value = getPass(); $("imp-file").value = ""; $("imp-ok").checked = false; $("imp-review").hidden = true; $("imp-go").hidden = false; say(""); dlg.showModal(); }
+  btn.addEventListener("click", openDlg);
+  /* also offer it where people look first: the panel header and the empty-state message */
+  var head = document.getElementById("h-hold");
+  if (head && head.parentNode) {
+    var top = document.createElement("button");
+    top.className = "btn"; top.type = "button"; top.textContent = "Import from statement (PDF / CSV / screenshot)";
+    top.style.cssText = "border-color:var(--accent);color:var(--accent);margin-left:auto";
+    top.addEventListener("click", openDlg); head.parentNode.appendChild(top);
+  }
+  var empty = document.getElementById("ph-empty");
+  if (empty) {
+    var inEmpty = document.createElement("button");
+    inEmpty.className = "btn"; inEmpty.type = "button"; inEmpty.textContent = "Import from a statement"; inEmpty.style.cssText = "margin-left:8px";
+    inEmpty.addEventListener("click", openDlg); empty.appendChild(inEmpty);
+  }
   $("imp-cancel").addEventListener("click", function () { dlg.close(); });
 
   function readFile(f) {

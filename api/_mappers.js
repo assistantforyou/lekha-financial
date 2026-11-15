@@ -232,4 +232,41 @@ function obosCsv(stocks, etf, calcAt, etfBars = 260) {
   return lines.join("\n");
 }
 
-module.exports = { wilderRSI, obCodes, obosCsv, breadthFlags, breadthCsv, fredRows, yoyRows, macroFromFred, fredHistFrom, series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };
+// ---- HISTORY: daily + weekly closes per symbol, in the layout parseHistory() reads ----
+const serial = (d) => Math.round(Date.parse(d + "T00:00:00Z") / 864e5) + 25569;
+// last close of each ISO week, ascending
+function weeklyFrom(rows) {
+  const out = [];
+  let key = null;
+  for (const [d, c] of rows) {
+    const t = new Date(d + "T00:00:00Z");
+    const wk = new Date(t); wk.setUTCDate(wk.getUTCDate() - ((t.getUTCDay() + 6) % 7)); // Monday of that week
+    const k = wk.toISOString().slice(0, 10);
+    if (k === key) out[out.length - 1] = [d, c]; else { out.push([d, c]); key = k; }
+  }
+  return out;
+}
+// labelled: {LABEL: [[date, close]]} (label is the symbol the page asks for), tnx: live 10y yield or null.
+// Columns come in pairs: header "D|LABEL" / "W|LABEL" then closes in the next column; row 2 holds LIVE values.
+function historyCsv(labelled, tnx) {
+  const cols = [];
+  for (const [label, rows] of Object.entries(labelled)) {
+    if (!rows || !rows.length) continue;
+    cols.push({ h: "D|" + label, rows }); cols.push({ h: "W|" + label, rows: weeklyFrom(rows) });
+  }
+  if (!cols.length) return null;
+  const n = Math.max(...cols.map((c) => c.rows.length));
+  const header = [], live = [];
+  for (const c of cols) { header.push(c.h, ""); live.push("", ""); }
+  if (tnx != null) { header.push("LIVE|TNX10Y", ""); live.push(String(tnx), ""); }
+  const lines = [header.join(","), live.join(",")];
+  for (let i = 0; i < n; i++) {
+    const row = [];
+    for (const c of cols) { const r = c.rows[i]; row.push(r ? String(serial(r[0])) : "", r ? String(r[1]) : ""); }
+    if (tnx != null) row.push("", "");
+    lines.push(row.join(","));
+  }
+  return lines.join("\n");
+}
+
+module.exports = { weeklyFrom, historyCsv, wilderRSI, obCodes, obosCsv, breadthFlags, breadthCsv, fredRows, yoyRows, macroFromFred, fredHistFrom, series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };

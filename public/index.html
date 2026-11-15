@@ -2032,7 +2032,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
     else{const c=ev.error&&ev.error.code;setPill("st-prices","Prices: "+handleErr(ev.error,"prices"),["needs_reauth","server_not_connected","not_in_manifest","approval_required","blocked_by_policy"].includes(c)?"err":"stale")}
   },{cache:{staleTime:120000,gcTime:3600000},refetchInterval:600000});
   let unwatch=watchEngine();
-  $("refresh").onclick=async()=>{setPill("st-prices","Prices: refreshing…","");try{const r=await mcp.callTool(DRIVE,TOOL,{fileId:ENGINE_ID,exportMimeType:"text/csv"},{cache:{refresh:true,staleTime:0,gcTime:3600000}});
+  $("refresh").onclick=async()=>{setPill("st-prices","Prices: refreshing…","");if(window.PT_DATA_SOURCE)loadHist(true);try{const r=await mcp.callTool(DRIVE,TOOL,{fileId:ENGINE_ID,exportMimeType:"text/csv"},{cache:{refresh:true,staleTime:0,gcTime:3600000}});
       const t=extractText(r,"Broker,");if(t&&applyEngine(t,"live",Date.now())){setPill("st-prices","Prices: live · "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}),"live");renderAll()}}
     catch(e){setPill("st-prices","Prices: "+handleErr(e,"prices"),"err")}};
   const loadHist=async(refresh)=>{try{const r=await mcp.callTool(DRIVE,TOOL,{fileId:HISTORY_ID,exportMimeType:"text/csv"},{cache:{staleTime:6*3600000,gcTime:24*3600000,refresh:!!refresh}});
@@ -2040,6 +2040,10 @@ function handleErr(err,what){const c=err&&err.code;let msg;
     catch(e){S.histErr=e&&e.code==="parse"?"Price history export could not be read.":handleErr(e,"history");renderPortfolioChart();
       if(e&&e.retryable&&!refresh)setTimeout(()=>loadHist(true),(e.retryAfterMs||2000)+Math.random()*1500)}};
   loadHist(false);
+  /* re-pull history when the set of US-listed tickers changes, so new holdings get prices and charts */
+  const histSigOf=items=>(items||[]).filter(h=>h&&h.tk!=="CASH"&&h.cur==="USD").map(h=>h.tk).sort().join(",");
+  let histSig=histSigOf((()=>{try{return JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all")).items}catch(e){return[]}})());
+  window.PT_ONHOLD=()=>{const sig=histSigOf(phLoad().items);if(sig!==histSig){histSig=sig;if(window.PT_DATA_SOURCE)loadHist(true)}};
   mcp.watchTool(DRIVE,TOOL,{fileId:ROT_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"D|SPY");if(!t){if(!S.rot){S.rotErr="Rotation data export could not be read.";renderRotation()}return}
       const R=parseRotation(t);if(!R.D.SPY||!R.D.SPY.length){if(!S.rot){S.rotErr="Rotation data is empty.";renderRotation()}return}
@@ -2096,11 +2100,11 @@ function ptHoldingsCsv(){const st=phLoad();if(!st.items.length)return null;
   const q=v=>{const t=v==null?"":String(v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
   const now=new Date().toISOString().slice(0,16).replace("T"," ");
   const lines=[H.join(",")];
-  st.items.forEach((h,i)=>{const cash=h.tk==="CASH";const fx=phFx(h.cur,st);const px=cash?1:(h.px>0?h.px:null);
+  st.items.forEach((h,i)=>{const cash=h.tk==="CASH";const fx=phFx(h.cur,st);const lv=!cash&&h.cur==="USD"&&window.PT_LIVE?window.PT_LIVE[h.tk]:null;const px=cash?1:(lv?lv.px:(h.px>0?h.px:null));
     const vl=px!=null?h.qty*px:null;const vu=vl!=null&&fx!=null?vl*fx:null;const cu=h.cost!=null&&fx!=null?h.cost*fx:null;
     const pnl=vu!=null&&cu!=null&&!cash?vu-cu:null;
     const row={"Broker":h.acct||"Account","Ticker":h.tk,"Symbol":cash?"":h.tk,"Theme":cash?"Cash":h.theme,"Currency":h.cur,"Shares used":cash?"":h.qty,"Shares status":"Actual",
-      "Total cost (local)":cash?vl:h.cost,"Price":cash?"":px,"Avg cost":!cash&&h.cost!=null&&h.qty>0?h.cost/h.qty:"","Value (local)":vl,"FX to USD":fx,"Value (USD)":vu,"Cost (USD)":cash?vu:cu,
+      "Total cost (local)":cash?vl:h.cost,"Price":cash?"":px,"Avg cost":!cash&&h.cost!=null&&h.qty>0?h.cost/h.qty:"","Prev close":lv?lv.prev:"","52W high":lv?lv.hi52:"","Day %":lv?lv.day:"","1W %":lv?lv.w1:"","1M %":lv?lv.m1:"","YTD %":lv?lv.ytd:"","% from 52W high":lv?lv.from52:"","Value (local)":vl,"FX to USD":fx,"Value (USD)":vu,"Cost (USD)":cash?vu:cu,
       "P&L (USD)":pnl,"P&L %":pnl!=null&&cu?pnl/cu:"","USD/THB":i===0?st.usdthb:"","HKD/USD":i===0?st.hkdusd:"","Recalculated at":i===0?now:""};
     lines.push(H.map(k=>q(row[k])).join(","))});
   return lines.join("\n")}
@@ -2112,9 +2116,9 @@ function phRender(){const st=phLoad();const tb=document.querySelector("#ph-table
   tb.innerHTML=st.items.map((h,i)=>`<tr><td class="l">${esc(h.acct||"Account")}</td><td class="l"><span class="tk">${esc(h.tk)}</span></td><td class="l muted">${esc(h.tk==="CASH"?"Cash":h.theme)}</td><td>${esc(h.cur)}</td><td>${f(h.qty)}</td><td>${f(h.cost)}</td><td>${h.tk==="CASH"?"–":f(h.px)}</td><td>${f(h.tk==="CASH"?h.qty:(h.px>0?h.qty*h.px:null))}</td><td><button class="btn" data-del="${i}" type="button">Remove</button></td></tr>`).join("");
   const missFx=st.items.some(h=>phFx(h.cur,st)==null),missPx=st.items.some(h=>h.tk!=="CASH"&&!(h.px>0));
   $("ph-msg").textContent=(missFx?"Enter an exchange rate for non-USD holdings. ":"")+(missPx?"Positions without a price are not valued.":"")}
-function phApply(){const csv=ptHoldingsCsv();phRender();
+function phApply(){const csv=ptHoldingsCsv();phRender();if(window.PT_ONHOLD)window.PT_ONHOLD();
   if(!csv){if(S.rows.length){location.reload();return}setPill("st-prices","Prices: add holdings to begin","stale");return}
-  if(applyEngine(csv,"manual",Date.now())){setPill("st-prices","Prices: manual · entered by you","stale");renderAll()}}
+  if(applyEngine(csv,"manual",Date.now())){if(window.PT_LIVE_AT)setPill("st-prices","Prices: "+(window.PT_SOURCE_LABEL||"live")+(window.PT_LIVE_ASOF?" · close "+window.PT_LIVE_ASOF:""),"live");else setPill("st-prices","Prices: manual · entered by you","stale");renderAll()}}
 (function phInit(){const form=$("ph-form");if(!form)return;
   form.addEventListener("submit",e=>{e.preventDefault();const d=new FormData(form);const st=phLoad();
     const tk=String(d.get("tk")||"").trim().toUpperCase().replace(/[^A-Z0-9.\-:]/g,"");const qty=parseFloat(d.get("qty"));
