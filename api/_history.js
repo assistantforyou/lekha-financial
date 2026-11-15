@@ -1,12 +1,15 @@
 // Free-tier HISTORY dataset for the user's own holdings: daily + weekly closes, benchmark proxies and the live 10y yield.
 // Tickers arrive in a POST body (never in the URL) and are not stored or logged; each request is a fresh Alpaca read.
+const crypto = require("crypto");
 const { getSeries } = require("./_prices");
-const { cached } = require("./_lib");
+const { cached, cacheGet, cacheSet } = require("./_lib");
 const { fredSeries } = require("./_fred");
 const { historyCsv } = require("./_mappers");
 
 const SYMBOL = /^[A-Z0-9][A-Z0-9.\-]{0,9}$/;
-const MAX_SYMBOLS = 40;
+const MAX_SYMBOLS = 25;
+const RATE = { windowMs: 10 * 60 * 1000, max: 12 };   // per client, per 10 minutes
+const MEM_TTL = 10 * 60 * 1000, MEM_MAX = 200;            // per-instance symbol cache
 const BENCH = { "INDEXSP:.INX": "SPY", "INDEXNASDAQ:.IXIC": "QQQ" }; // price-return ETF proxies for the page's two benchmark lines
 
 function cleanSymbols(list) {
@@ -29,11 +32,36 @@ async function tnx() {
   } catch (e) { return null; }
 }
 
+// best-effort per-client limiter: hashed IP + 10-minute bucket counted in the cache table
+function clientId(req) {
+  const ip = String((req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "").split(",")[0]).trim() || "unknown";
+  return crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
+}
+async function rateLimited(req) {
+  const key = `rl/hist/${clientId(req)}/${Math.floor(Date.now() / RATE.windowMs)}`;
+  const n = ((await cacheGet(key)) || { payload: { n: 0 } }).payload.n || 0;
+  if (n >= RATE.max) return true;
+  await cacheSet(key, { n: n + 1 });
+  return false;
+}
+
+const mem = new Map(); // symbol -> {at, rows}
+async function seriesFor(symbols) {
+  const now = Date.now(), data = {}, need = [];
+  for (const s of symbols) { const m = mem.get(s); if (m && now - m.at < MEM_TTL) data[s] = m.rows; else need.push(s); }
+  if (need.length) {
+    const r = (await getSeries(need, 2000, { fallback: false })).data;
+    for (const s of need) if (r[s] && r[s].length) { data[s] = r[s]; if (mem.size >= MEM_MAX) mem.delete(mem.keys().next().value); mem.set(s, { at: now, rows: r[s] }); }
+  }
+  return data;
+}
+
 async function history(req, res) {
+  if (await rateLimited(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(429).end(); }
   const body = req.method === "POST" && req.body && typeof req.body === "object" ? req.body : {};
   const symbols = cleanSymbols(body.symbols);
   const fetchList = [...new Set([...symbols, ...Object.values(BENCH)])];
-  const [{ data }, y] = await Promise.all([getSeries(fetchList, 2000), tnx()]);
+  const [data, y] = await Promise.all([seriesFor(fetchList), tnx()]);
   const labelled = {};
   for (const s of symbols) if (data[s] && data[s].length) labelled[s] = data[s];
   for (const [label, etf] of Object.entries(BENCH)) if (data[etf] && data[etf].length) labelled[label] = data[etf];
@@ -44,4 +72,4 @@ async function history(req, res) {
   return res.status(200).send(csv);
 }
 
-module.exports = { history, cleanSymbols };
+module.exports = { history, cleanSymbols, MAX_SYMBOLS };

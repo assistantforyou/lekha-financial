@@ -38,11 +38,13 @@ async function twelveSeries(symbols, outputsize) {
 const daysAgoISO = (d) => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
 
 // Alpaca first; Twelve Data (credit per symbol) only if Alpaca fails or returns nothing.
-async function getSeries(symbols, calendarDays) {
+// opts.fallback === false disables Twelve Data (used by endpoints reachable by anyone, so they cannot drain its daily credits).
+async function getSeries(symbols, calendarDays, opts = {}) {
   try {
     const r = await alpacaBars(symbols, daysAgoISO(calendarDays));
     if (Object.keys(r).length) return { data: r, via: "alpaca" };
   } catch (e) { /* fall back */ }
+  if (opts.fallback === false) return { data: {}, via: "none" };
   const bars = Math.round(calendarDays * 0.69);
   return { data: await twelveSeries(symbols, bars), via: "twelvedata" };
 }

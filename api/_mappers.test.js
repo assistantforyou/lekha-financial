@@ -97,3 +97,28 @@ assert.strictEqual(hl[1].split(",")[8], "5.13"); // LIVE|TNX10Y value sits under
 assert.strictEqual(hl[2].split(",")[1], "150");
 assert.strictEqual(historyCsv({}, 4), null);
 console.log("history ok");
+
+// --- history endpoint guards (mocked network) ---
+{
+  const Module = require("module"); const orig = Module._load;
+  let alpacaCalls = 0, counters = {};
+  Module._load = function (req) {
+    if (req === "./_prices") return { getSeries: async (syms, d, opts) => { alpacaCalls++; assert.strictEqual(opts && opts.fallback, false, "no paid fallback on a public endpoint"); const o = {}; for (const s of syms) o[s] = [["2026-11-12", 10], ["2026-11-13", 11]]; return { data: o }; } };
+    if (req === "./_lib") return { cached: async () => [["2026-11-13", 5.1]], cacheGet: async (k) => (counters[k] ? { payload: counters[k] } : null), cacheSet: async (k, v) => { counters[k] = v; } };
+    if (req === "./_fred") return { fredSeries: async () => [] };
+    return orig.apply(this, arguments);
+  };
+  const { history, cleanSymbols, MAX_SYMBOLS } = require("./_history");
+  assert.strictEqual(cleanSymbols(Array.from({ length: 60 }, (_, i) => "T" + i)).length, MAX_SYMBOLS);
+  const run = async (ip) => { const out = {}; await history({ method: "POST", headers: { "x-forwarded-for": ip }, body: { symbols: ["ZZZ1"] } }, { setHeader() {}, status(c) { out.status = c; return this; }, send(b) { out.body = b; return this; }, end() { return this; } }); return out; };
+  (async () => {
+    assert.strictEqual((await run("1.2.3.4")).status, 200);
+    const before = alpacaCalls; await run("1.2.3.4");
+    assert.strictEqual(alpacaCalls, before, "second request served from the in-memory cache");
+    for (let i = 0; i < 12; i++) await run("9.9.9.9");
+    assert.strictEqual((await run("9.9.9.9")).status, 429, "13th request in the window is rate limited");
+    assert.strictEqual((await run("5.5.5.5")).status, 200, "another client is unaffected");
+    Module._load = orig;
+    console.log("history guards ok");
+  })();
+}
