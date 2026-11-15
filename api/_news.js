@@ -36,7 +36,7 @@ const SCHEMA = {
   type: "OBJECT",
   properties: {
     macro: { type: "STRING" },
-    items: { type: "ARRAY", items: { type: "OBJECT", properties: {
+    items: { type: "ARRAY", minItems: 6, maxItems: 10, items: { type: "OBJECT", properties: {
       i: { type: "NUMBER" }, impact: { type: "STRING", enum: ["Bullish", "Bearish", "Mixed"] },
       summary: { type: "STRING" }, why: { type: "STRING" }, bull: { type: "STRING", nullable: true }, bear: { type: "STRING", nullable: true },
       tickers: { type: "ARRAY", items: { type: "STRING" } } }, required: ["i", "impact", "summary"] } },
@@ -91,7 +91,7 @@ async function buildNews() {
   const items = await collectItems();
   if (items.length < 5) throw new Error("few_items");
   const list = items.map((it, i) => `${i}. [${it.source}] ${it.headline}${it.desc ? " — " + it.desc : ""}`).join("\n");
-  const ai = await generateJson({ system: SYSTEM, user: "News items:\n" + list, schema: SCHEMA });
+  const ai = await generateJson({ system: SYSTEM, user: `Return between 6 and 10 distinct items (as many relevant ones as the list supports, never fewer than 6 when the list has 6 or more).\n\nNews items:\n${list}`, schema: SCHEMA });
   const date = new Date().toISOString().slice(0, 10);
   const today = briefingDoc(items, ai, date);
   if (!today) throw new Error("empty_briefing");
