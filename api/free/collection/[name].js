@@ -1,10 +1,12 @@
 const { newsDocs } = require("../../_news");
+const { etfCollection } = require("../../_etf");
 const { fundCollection } = require("../../_valuation");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const name = String((req.query && req.query.name) || "");
   try {
+    if (name === "etf") return res.status(200).json(await etfCollection());
     if (name === "fund") return await fundCollection(req, res);
     if (name === "news") {
       const docs = await newsDocs();
