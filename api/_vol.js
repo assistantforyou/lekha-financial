@@ -27,9 +27,9 @@ const pairs = (rows) => rows.map(([d, v]) => `${y6(d)}:${v}`).join(";");
 function volatilityCsv(vix, vixeq, calcAt) {
   if (!vix.length || !vixeq.length) return null;
   const since = vixeq[0][0];
-  const lines = ["Ticker,Data (yymmdd:close),Calculated at (sheet time)"];
-  lines.push(`VIX,${pairs(vix.filter((r) => r[0] >= since))},${calcAt}`);
-  lines.push(`VIXEQ,${pairs(vixeq.filter((r) => r[0] >= LAUNCH))},${calcAt}`);
+  const lines = ["Ticker,Segment,Data (yymmdd:close),Calculated at (sheet time)"]; // the page looks for the "Ticker,Segment" header
+  lines.push(`VIX,Index,${pairs(vix.filter((r) => r[0] >= since))},${calcAt}`);
+  lines.push(`VIXEQ,Index,${pairs(vixeq.filter((r) => r[0] >= LAUNCH))},${calcAt}`);
   return lines.join("\n");
 }
 
