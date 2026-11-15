@@ -34,10 +34,10 @@ async function extractWithGemini({ mime, base64, text }) {
 module.exports = { extractWithGemini };
 
 // Generic structured-JSON call (no tools, no web access): used where the facts are supplied in the prompt.
-async function generateJson({ system, user, schema, timeoutMs = 55000 }) {
+async function generateJson({ system, user, schema, model: modelOverride, timeoutMs = 55000 }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw Object.assign(new Error("not_configured"), { status: 503 });
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const model = modelOverride || process.env.GEMINI_MODEL || "gemini-3.5-flash";
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
