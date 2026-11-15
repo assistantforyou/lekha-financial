@@ -855,7 +855,7 @@ function renderRRG(){
   $("rrg-read").innerHTML=`<p>${tagObs} Leading: <b>${list(by("Leading"))}</b> · Improving: <b>${list(by("Improving"))}</b> · Weakening: <b>${list(by("Weakening"))}</b> · Lagging: <b>${list(by("Lagging"))}</b>.</p>
     <p>${tagObs} Over the last ${lb} ${unit}s: ${moves.length?esc(moves.join("; ")):"no quadrant changes"}. Entered leadership: <b>${list(entering)}</b>. Left leadership: <b>${list(leaving)}</b>.</p>
     <p>${tagSpec} RRG rotations usually move clockwise (Improving → Leading → Weakening → Lagging). If that tendency holds, ${by("Improving").length?`<b>${by("Improving").join(", ")}</b> ${by("Improving").length>1?"are":"is"} the next candidate${by("Improving").length>1?"s":""} to lead`:"no ETF is currently in Improving"}${by("Weakening").length?` and <b>${by("Weakening").join(", ")}</b> ${by("Weakening").length>1?"risk":"risks"} sliding into Lagging`:""}. This is a historical pattern, not a forecast; trails can reverse without completing the cycle.</p>`;
-  $("rrg-asof-note").textContent=`${S.rrgFreq==="W"?"Weekly":"Daily"} closes through ${fmtD(S.rot.D.SPY[S.rot.D.SPY.length-1][0])}${S.rotAt?" · updated "+fmtT(S.rotAt):""} · Google Finance`}
+  $("rrg-asof-note").textContent=`${S.rrgFreq==="W"?"Weekly":"Daily"} closes through ${fmtD(S.rot.D.SPY[S.rot.D.SPY.length-1][0])}${S.rotAt?" · updated "+fmtT(S.rotAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`}
 
 /* ===================== Quant models (v11): factor-adjusted strength, macro regimes, revisions, valuation expectations ===================== */
 const FACTOR_ID="FACTOR",PEER_ID="PEER",VOL_ID="VOLATILITY";
