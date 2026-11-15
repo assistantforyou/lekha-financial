@@ -41,3 +41,5 @@ assert.ok(normalizeResult(null).warnings.length >= 1);
 assert.strictEqual(maskDigits("acct 123456789012 qty 100"), "acct ********9012 qty 100");
 assert.ok(RESPONSE_SCHEMA.properties.positions.items.required.includes("quantity"));
 console.log("import ok");
+assert.strictEqual(normalizeResult({ account: "Demo Account 123456789012", positions: [] }).account, "Demo Account ********9012");
+console.log("account mask ok");

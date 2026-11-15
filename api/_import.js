@@ -52,12 +52,14 @@ function checkUpload({ mime, size }) {
   return null;
 }
 
+// Mask long digit runs (account numbers): applied to text uploads and to the returned account label.
+const maskDigits = (t) => String(t).replace(/\b\d{8,}\b/g, (m) => "*".repeat(m.length - 4) + m.slice(-4));
 const num = (v) => { const n = typeof v === "number" ? v : parseFloat(v); return Number.isFinite(n) ? n : null; };
 const clean = (s, n) => String(s == null ? "" : s).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
 
 // Re-validate whatever the model returned into holdings items {tk, cur, qty, cost, px, name, evidence}.
 function normalizeResult(raw) {
-  const out = { account: clean(raw && raw.account, 40), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], warnings: [] };
+  const out = { account: maskDigits(clean(raw && raw.account, 40)), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], warnings: [] };
   const warn = (w) => { if (out.warnings.length < 30) out.warnings.push(clean(w, 200)); };
   for (const w of Array.isArray(raw && raw.warnings) ? raw.warnings.slice(0, 10) : []) warn(w);
   const items = Array.isArray(raw && raw.positions) ? raw.positions.slice(0, 300) : [];
@@ -96,7 +98,5 @@ function normalizeResult(raw) {
   return out;
 }
 
-// For text/CSV uploads: mask long digit runs (account numbers) before the text leaves the browser or server.
-const maskDigits = (t) => String(t).replace(/\b\d{8,}\b/g, (m) => "*".repeat(m.length - 4) + m.slice(-4));
 
 module.exports = { MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };

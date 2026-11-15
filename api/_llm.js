@@ -24,7 +24,10 @@ async function extractWithGemini({ mime, base64, text }) {
     const j = await r.json();
     const t = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
     if (!t) throw Object.assign(new Error(j.promptFeedback && j.promptFeedback.blockReason ? "blocked" : "empty"), { status: 502 });
-    return JSON.parse(t);
+    try { return JSON.parse(t); } catch (e) { throw Object.assign(new Error("bad_json"), { status: 502 }); }
+  } catch (e) {
+    if (e && e.name === "AbortError") throw Object.assign(new Error("aborted"), { status: 502 });
+    throw e;
   } finally { clearTimeout(timer); }
 }
 

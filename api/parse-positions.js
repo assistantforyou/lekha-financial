@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(normalizeResult(raw));
   } catch (e) {
-    console.error("parse-positions upstream:", e.message); // error code only, never statement content
+    console.error("parse-positions failed:", /^(upstream_\d+|blocked|empty|not_configured|bad_json|aborted)$/.test(e.message) ? e.message : "other"); // fixed codes only, never statement content
     const msg = e.status === 429 ? "The AI service is rate-limited right now. Try again in a minute."
       : e.status === 503 ? "Statement import is not configured on this site."
       : "The AI service could not read this file. Try a clearer PDF or a CSV export.";
