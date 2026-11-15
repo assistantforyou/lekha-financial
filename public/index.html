@@ -773,7 +773,7 @@ function renderRotation(){
     ${bookLine?`<p class="muted">${esc(bookLine)}</p>`:""}
     <p class="muted">Rising ratio = ${P.k} outperforming SPY · falling ratio = underperforming. The percentage is relative performance, not ${P.k}'s own return.</p>`;
   const R=S.rot;const sp=R.D.SPY;const liveNew=R.tdate&&sp.length&&R.tdate>sp[sp.length-1][0]&&R.live[P.k]&&R.live.SPY;
-  $("rot-asof").textContent=`${liveNew?"Live prices":"Daily closes through"} ${new Date(lastT).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"})} · refreshes every 15 min · Google Finance`}
+  $("rot-asof").textContent=`${liveNew?"Live prices":"Daily closes through"} ${new Date(lastT).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"})} · refreshes every 15 min · ${window.PT_SOURCE_LABEL||'market data source'}${(S.rot&&S.rot.D.SPY||[]).length&&S.rot.D.SPY.length<240?` · only ${S.rot.D.SPY.length} trading days of history, so ranges longer than about ${Math.round(S.rot.D.SPY.length/21)} months show less than their label`:''}`}
 
 /* ---------- sector rotation intelligence ---------- */
 const RRG_KEYS=["RSP","SMH","XLF","XLV","XLP","ITA","XLE"];
@@ -1598,7 +1598,7 @@ function renderRiskApp(){
     <p>${tagObs} The ratio (${rfmt(r)}) is ${r>=a?"above":"below"} its 20-day (${rfmt(a)}), ${r>=b?"above":"below"} its 50-day (${rfmt(b)}) and ${r>=c?"above":"below"} its 200-day (${rfmt(c)}). ${ch>=0?"Consumer discretionary has outperformed staples over this period, consistent with stronger cyclical risk appetite.":"Defensive staples have outperformed discretionary over this period, consistent with a more defensive market."}</p>
     <p>${tagObs} Last 20/50 cross: ${l1?`<b class="${l1.dir==="up"?"up":"down"}">${l1.dir==="up"?"bullish":"bearish"}</b> on ${fmtD(l1.t)} (${ago(l1)})`:"none in the data"}. Last 50/200 cross: ${l2?`<b class="${l2.dir==="up"?"up":"down"}">${l2.dir==="up"?"golden cross":"death cross"}</b> on ${fmtD(l2.t)} (${ago(l2)})`:"none in the data"}.</p>
     <p>${tagSpec} Moving-average crosses lag price and often whipsaw in sideways markets. A ${l2&&l2.dir==="down"?"death cross that holds":"golden cross that holds"} has tended to accompany a ${l2&&l2.dir==="down"?"longer defensive phase":"longer risk-on phase"}, but it does not predict the next move.</p>`;
-  $("ra-asof").textContent=`Daily closes through ${fmtD(lastT)}${S.raAt?" · updated "+fmtT(S.raAt):""} · Google Finance`}
+  $("ra-asof").textContent=`Daily closes through ${fmtD(lastT)}${S.raAt?" · updated "+fmtT(S.raAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`}
 function renderIntel(){renderRRG();renderLead();renderBreadth();renderRiskApp();renderVix()}
 
 /* ---------- intrinsic value engine (pure functions; tested in node against engine.py) ---------- */

@@ -27,6 +27,7 @@
     return asText ? r.text() : r.json();
   }
   var cfg = load();
+  window.PT_SOURCE_LABEL = cfg.type === "builtin" ? "Alpha Vantage" : cfg.type === "custom" ? "custom data source" : "";
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
       fetchCsv: function (k) { return get(cfg, "/csv/" + encodeURIComponent(k), true); },
