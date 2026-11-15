@@ -10,8 +10,10 @@ module.exports = async (req, res) => {
     if (name === "fund") return await fundCollection(req, res);
     if (name === "news") {
       const docs = await newsDocs();
-      res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
-      return res.status(200).json(Array.isArray(docs) ? docs : []);
+      const list = Array.isArray(docs) ? docs : [];
+      // never let the CDN hold an empty answer: only successful briefings are cacheable
+      if (list.length) res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
+      return res.status(200).json(list);
     }
   } catch (e) { /* fall through: the panel stays in its "no source" state */ }
   return res.status(200).json([]);
