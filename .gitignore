@@ -1,0 +1,5 @@
+private-tools/
+.env*
+.vercel
+node_modules
+.DS_Store
