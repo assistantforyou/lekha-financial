@@ -69,4 +69,4 @@ async function history(req, res) {
   return res.status(200).send(csv);
 }
 
-module.exports = { history, cleanSymbols, MAX_SYMBOLS, seriesFor, rateLimited };
+module.exports = { history, cleanSymbols, MAX_SYMBOLS, seriesFor, rateLimited, clientId };
