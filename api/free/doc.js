@@ -1,5 +1,6 @@
 const { cached } = require("../_lib");
 const { fredSeries } = require("../_fred");
+const { fetchCftc, fetchTic } = require("../_flows");
 const { macroFromFred, fredHistFrom } = require("../_mappers");
 
 const H12 = 12 * 36e5;
@@ -24,6 +25,8 @@ module.exports = async (req, res) => {
       });
       return res.status(200).json(doc || null);
     }
+    if (path === "meta/cftc") return res.status(200).json((await cached("free/meta/cftc", H12, fetchCftc)) || null);
+    if (path === "meta/tic") return res.status(200).json((await cached("free/meta/tic", H12, fetchTic)) || null);
     return res.status(200).json(null);
   } catch (e) {
     return res.status(200).json(null);
