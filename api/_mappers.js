@@ -183,4 +183,53 @@ function breadthCsv(rows, calcAt) {
   return lines.join("\n");
 }
 
-module.exports = { breadthFlags, breadthCsv, fredRows, yoyRows, macroFromFred, fredHistFrom, series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };
+// ---- overbought/oversold: per-session RSI bucket + above-50d codes ----
+// Wilder RSI(14): seed = simple mean of the first 14 gains/losses, then (prev*13+x)/14. null until 15 closes.
+function wilderRSI(c) {
+  const n = c.length, r = new Array(n).fill(null);
+  if (n < 15) return r;
+  let ag = 0, al = 0;
+  for (let i = 1; i <= 14; i++) { const d = c[i] - c[i - 1]; ag += Math.max(d, 0); al += Math.max(-d, 0); }
+  ag /= 14; al /= 14;
+  r[14] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  for (let i = 15; i < n; i++) {
+    const d = c[i] - c[i - 1];
+    ag = (ag * 13 + Math.max(d, 0)) / 14; al = (al * 13 + Math.max(-d, 0)) / 14;
+    r[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  return r;
+}
+
+// bars [[date, close]] ascending, cal = SPY session dates ascending (the window to encode).
+// Two chars per session: RSI bucket (o < 30, b > 70, n otherwise, x unavailable) then close above its 50d average (1/0/x).
+// A session with no bar for this stock is "xx". Returns "lastDate|n|chars" as parseObos() reads it.
+function obCodes(bars, cal) {
+  const closes = bars.map((b) => b[1]);
+  const rsi = wilderRSI(closes);
+  const at = new Map(bars.map((b, i) => [b[0], i]));
+  let chars = "";
+  for (const d of cal) {
+    const i = at.get(d);
+    if (i === undefined) { chars += "xx"; continue; }
+    chars += rsi[i] == null ? "x" : rsi[i] < 30 ? "o" : rsi[i] > 70 ? "b" : "n";
+    if (i < 49) { chars += "x"; continue; }
+    let sum = 0;
+    for (let k = i - 49; k <= i; k++) sum += closes[k];
+    chars += closes[i] > sum / 50 ? "1" : "0";
+  }
+  return `${cal[cal.length - 1]}|${cal.length}|${chars}`;
+}
+
+// stocks [[tk, sector, industry, codes]], etf {SYM: [[date, close]]} -> CSV parseObos() reads
+function obosCsv(stocks, etf, calcAt, etfBars = 260) {
+  const lines = ["Ticker,Group,Industry,Codes,Closes,Calculated at (sheet time)"];
+  const q = (v) => (/[",]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v);
+  for (const [tk, sec, ind, codes] of stocks) lines.push(`${tk},${q(sec)},${q(ind || "")},${codes},,${calcAt}`);
+  for (const [sym, rows] of Object.entries(etf)) {
+    const closes = rows.slice(-etfBars).map(([d, c]) => `${d.slice(2, 4)}${d.slice(5, 7)}${d.slice(8, 10)}:${c}`).join(";");
+    lines.push(`${sym},ETF,,,${closes},${calcAt}`);
+  }
+  return lines.join("\n");
+}
+
+module.exports = { wilderRSI, obCodes, obosCsv, breadthFlags, breadthCsv, fredRows, yoyRows, macroFromFred, fredHistFrom, series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };

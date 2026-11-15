@@ -62,3 +62,26 @@ assert.strictEqual(breadthFlags(short)[8], "x"); // 126 days ago: no 50d average
 const csvB = breadthCsv([["AAA", "Energy", 330, 429, "1111111111", "2026-11-13"]], "2026-11-16 12:00");
 assert.strictEqual(csvB.split("\n")[1], "AAA,Energy,330;429;1111111111,2026-11-13,2026-11-16 12:00");
 console.log("breadth ok");
+
+// --- overbought/oversold ---
+const { wilderRSI, obCodes, obosCsv } = require("./_mappers");
+const flat = Array.from({ length: 20 }, () => 100);
+assert.strictEqual(wilderRSI(flat)[14], 100);                       // no losses -> RSI 100
+const rise = Array.from({ length: 60 }, (_, i) => 100 + i);
+assert.strictEqual(wilderRSI(rise)[59], 100);
+const fall = Array.from({ length: 60 }, (_, i) => 200 - i);
+assert.ok(wilderRSI(fall)[59] < 1);
+assert.strictEqual(wilderRSI([1, 2, 3])[2], null);
+const dates = Array.from({ length: 70 }, (_, i) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10));
+const barsUp = dates.map((d, i) => [d, 100 + i]);
+const cal = dates.slice(-3);
+assert.strictEqual(obCodes(barsUp, cal), `${dates[69]}|3|b1b1b1`);  // RSI 100 -> overbought, above rising 50d
+const missing = barsUp.filter((b) => b[0] !== dates[68]);
+assert.strictEqual(obCodes(missing, cal), `${dates[69]}|3|b1xxb1`); // a session with no bar for the stock is xx
+const early = obCodes(barsUp.slice(0, 20), dates.slice(17, 20));    // too little history for the 50d average
+assert.ok(early.endsWith("|3|bxbxbx"));
+const csvO = obosCsv([["AAA", "Information Technology", "", `${dates[69]}|3|b1b1b1`]], { SPY: [["2026-11-12", 757.12], ["2026-11-13", 754.37]] }, "2026-11-16 12:00 UTC");
+const lo = csvO.split("\n");
+assert.strictEqual(lo[0], "Ticker,Group,Industry,Codes,Closes,Calculated at (sheet time)");
+assert.strictEqual(lo[2], "SPY,ETF,,,261112:757.12;261113:754.37,2026-11-16 12:00 UTC");
+console.log("obos ok");

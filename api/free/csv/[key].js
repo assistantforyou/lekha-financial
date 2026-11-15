@@ -3,6 +3,7 @@
 const { cacheGetMany, cacheSet } = require("../../_lib");
 const { getSeries } = require("../../_prices");
 const { rotationCsv, breadthFlags, breadthCsv } = require("../../_mappers");
+const { obos } = require("../../_obos");
 const SP500 = require("../../_data/sp500.json").stocks;
 
 const SETS = {
@@ -80,6 +81,7 @@ module.exports = async (req, res) => {
   try {
     if (SETS[key]) return await rotationLike(key, res);
     if (key === "BREADTH") return await breadth(res);
+    if (key === "OBOS") return await obos(res);
   } catch (e) { /* fall through */ }
   return res.status(204).end();
 };
