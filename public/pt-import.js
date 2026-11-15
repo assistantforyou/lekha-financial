@@ -107,7 +107,7 @@
         "<td><select data-f='theme'" + (cash ? " disabled" : "") + ">" + themeHtml + "</select></td>" +
         "<td class='imp-ev' title='" + esc(r.ev) + "'>" + esc(r.ev) + "</td></tr>";
     });
-    h += "</tbody></table></div><div class='imp-row'><span class='muted' style='font-size:12px;margin-right:auto'>Check quantities against your statement. Lines without a price are not valued until you add one.</span><button class='btn' id='imp-add' type='button' style='border-color:var(--accent);color:var(--accent)'>Import selected</button></div>";
+    h += "</tbody></table></div><div class='imp-row'><span class='muted' style='font-size:12px;margin-right:auto'>Check quantities against your statement. Lines without a price are not valued, and lines without a total cost count as pure gain in P&amp;L, until you fill them in.</span><button class='btn' id='imp-add' type='button' style='border-color:var(--accent);color:var(--accent)'>Import selected</button></div>";
     var box = $("imp-review"); box.innerHTML = h; box.hidden = false; $("imp-go").hidden = true;
     say(rows.length ? "Review the lines below, edit anything that looks wrong, then import." : "No holdings were found in this file.", !rows.length);
     $("imp-add").addEventListener("click", doImport);
