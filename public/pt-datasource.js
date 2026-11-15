@@ -30,8 +30,25 @@
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
       fetchCsv: function (k) { return get(cfg, "/csv/" + encodeURIComponent(k), true); },
-      getDoc: function (p) { return get(cfg, "/doc?path=" + encodeURIComponent(p), false); },
-      getCollection: async function (n) { var v = await get(cfg, "/collection/" + encodeURIComponent(n), false); return Array.isArray(v) ? v : []; }
+      getDoc: async function (p) { var v = await get(cfg, "/doc?path=" + encodeURIComponent(p), false); return v && typeof v === "object" && !Array.isArray(v) ? v : null; },
+      getCollection: async function (n) {
+        /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */
+        var v = await get(cfg, "/collection/" + encodeURIComponent(n), false);
+        if (!Array.isArray(v)) return [];
+        return v.filter(function (d) {
+          if (!d || typeof d.id !== "string" || !d.data || typeof d.data !== "object") return false;
+          if (n === "news" && !/^\d{4}-\d{2}-\d{2}$/.test(String(d.data.date))) return false;
+          return true;
+        }).map(function (d) {
+          if (n === "news" && Array.isArray(d.data.items)) {
+            d.data.items = d.data.items.filter(function (it) { return it && typeof it === "object"; }).map(function (it) {
+              if (!/^https?:\/\//i.test(String(it.url || ""))) it.url = "";
+              return it;
+            });
+          }
+          return d;
+        });
+      }
     };
   }
 

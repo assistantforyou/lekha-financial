@@ -1943,11 +1943,11 @@ function renderFoot(){const est=S.rows.filter(r=>r.status==="Estimated").length;
 /* ---------- news ---------- */
 function renderNews(){const sel=$("news-day");const days=S.news.map(n=>n.date).sort().reverse();
   if(!days.length){sel.hidden=true;return}sel.hidden=false;if(!S.newsDay||!days.includes(S.newsDay))S.newsDay=days[0];
-  sel.innerHTML=days.map(d=>`<option value="${d}"${d===S.newsDay?" selected":""}>${new Date(d+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}</option>`).join("");
+  sel.innerHTML=days.map(d=>`<option value="${esc(d)}"${d===S.newsDay?" selected":""}>${new Date(d+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}</option>`).join("");
   const n=S.news.find(x=>x.date===S.newsDay);$("news-macro").textContent=n.macro||"";
   const items=(n.items||[]);
   $("news").innerHTML=items.length?items.map(it=>{const imp=(it.impact||"").toLowerCase();const c=imp.startsWith("bull")?"bull":imp.startsWith("bear")?"bear":"mixed";
-    return `<article class="story"><div class="head"><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.headline)}</a><span class="chip ${c}">${esc(it.impact||"Mixed")}</span>${(it.tickers||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join("")}<span class="note">${esc(it.source||"")}</span></div>
+    return `<article class="story"><div class="head"><a href="${/^https?:\/\//i.test(String(it.url||""))?esc(it.url):"#"}" target="_blank" rel="noopener">${esc(it.headline)}</a><span class="chip ${c}">${esc(it.impact||"Mixed")}</span>${(it.tickers||[]).map(t=>`<span class="chip">${esc(t)}</span>`).join("")}<span class="note">${esc(it.source||"")}</span></div>
       <p>${esc(it.summary)}</p><p class="why"><b>Why it matters:</b> ${esc(it.why)}${it.bull?` <b class="up">Bull:</b> ${esc(it.bull)}`:""}${it.bear?` <b class="down">Bear:</b> ${esc(it.bear)}`:""}</p></article>`}).join(""):'<div class="empty">No stories recorded for this day.</div>'}
 $("news-day").addEventListener("change",e=>{S.newsDay=e.target.value;renderNews()});
 
