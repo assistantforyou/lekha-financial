@@ -70,15 +70,25 @@
     var t = await r.text(); if (key === "HISTORY") computeLive(t, syms); return t;
   }
 
+  /* Intrinsic value inputs for your own holdings: tickers in a POST body, never the URL; nothing stored. */
+  async function holdPost(path, asText) {
+    var syms = holdingSymbols().slice(0, 12);
+    if (!syms.length) return asText ? null : [];
+    var r = await fetch(location.origin + "/api/free/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
+    if (r.status === 204 || r.status === 404) return asText ? null : [];
+    if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
+    return asText ? r.text() : r.json();
+  }
+
   var cfg = load();
   window.PT_SOURCE_LABEL = cfg.type === "av" ? "Alpha Vantage" : cfg.type === "free" ? "free public data" : cfg.type === "custom" ? "custom data source" : "";
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
-      fetchCsv: function (k) { return cfg.type === "free" && (k === "HISTORY" || k === "FACTOR") ? freePost(k) : get(cfg, "/csv/" + encodeURIComponent(k), true); },
+      fetchCsv: function (k) { return cfg.type === "free" && (k === "HISTORY" || k === "FACTOR") ? freePost(k) : cfg.type === "free" && k === "VALIN" ? holdPost("csv/VALIN", true) : get(cfg, "/csv/" + encodeURIComponent(k), true); },
       getDoc: async function (p) { var v = await get(cfg, "/doc?path=" + encodeURIComponent(p), false); return v && typeof v === "object" && !Array.isArray(v) ? v : null; },
       getCollection: async function (n) {
         /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */
-        var v = await get(cfg, "/collection/" + encodeURIComponent(n), false);
+        var v = cfg.type === "free" && n === "fund" ? await holdPost("collection/fund", false) : await get(cfg, "/collection/" + encodeURIComponent(n), false);
         if (!Array.isArray(v)) return [];
         return v.filter(function (d) {
           if (!d || typeof d.id !== "string" || !d.data || typeof d.data !== "object") return false;

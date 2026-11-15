@@ -7,6 +7,8 @@ const { obos } = require("../../_obos");
 const { history } = require("../../_history");
 const { volData, volatilityCsv } = require("../../_vol");
 const { factor } = require("../../_factor");
+const { valinCsvHandler } = require("../../_valuation");
+const { peerHandler } = require("../../_peer");
 const SP500 = require("../../_data/sp500.json").stocks;
 
 const SETS = {
@@ -87,6 +89,8 @@ module.exports = async (req, res) => {
     if (key === "OBOS") return await obos(res);
     if (key === "HISTORY") return await history(req, res);
     if (key === "FACTOR") return await factor(req, res);
+    if (key === "VALIN") return await valinCsvHandler(req, res);
+    if (key === "PEER") return await peerHandler(res);
     if (key === "VOLATILITY") {
       const d = await volData();
       const csv = d && volatilityCsv(d.vix, d.vixeq, new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC");
