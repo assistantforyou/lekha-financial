@@ -157,4 +157,30 @@ function fredHistFrom(byId) {
   return Object.values(series).some((m) => Object.keys(m).length) ? { series, source: "FRED", asOf: new Date().toISOString().slice(0, 10) } : null;
 }
 
-module.exports = { fredRows, yoyRows, macroFromFred, fredHistFrom, series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };
+// ---- breadth: per-stock "above the 50/200-day average" flags ----
+// closes ascending. Flags are 10 chars: for offsets [0,5,21,63,126] trading days ago, [above 50d, above 200d];
+// "x" = not enough history for that average. This is the encoding the page's parseBreadth() reads.
+const BREADTH_OFFSETS = [0, 5, 21, 63, 126];
+function breadthFlags(closes) {
+  const L = closes.length;
+  let flags = "";
+  for (const off of BREADTH_OFFSETS) {
+    const i = L - 1 - off;
+    for (const n of [50, 200]) {
+      if (i < n - 1) { flags += "x"; continue; }
+      let sum = 0;
+      for (let k = i - n + 1; k <= i; k++) sum += closes[k];
+      flags += closes[i] > sum / n ? "1" : "0";
+    }
+  }
+  return flags;
+}
+
+// [[ticker, sector, n, lastClose, flags, lastDate]] -> CSV in the layout parseBreadth() reads
+function breadthCsv(rows, calcAt) {
+  const lines = ["Ticker,Sector,Data,Last close date,Calculated at (sheet time)"];
+  for (const [tk, sec, n, last, flags, date] of rows) lines.push(`${tk},${sec},${n};${last};${flags},${date},${calcAt}`);
+  return lines.join("\n");
+}
+
+module.exports = { breadthFlags, breadthCsv, fredRows, yoyRows, macroFromFred, fredHistFrom, series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };

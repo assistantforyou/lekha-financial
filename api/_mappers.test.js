@@ -48,3 +48,17 @@ const fh = fredHistFrom({ UNRATE: [["2026-09-01", 4.3]], USREC: [] });
 assert.strictEqual(fh.series.UNRATE["2026-09"], 4.3);
 assert.strictEqual(fredHistFrom({ A: [] }), null);
 console.log("fred ok");
+
+// --- breadth flags ---
+const { breadthFlags, breadthCsv } = require("./_mappers");
+const up = Array.from({ length: 330 }, (_, i) => 100 + i);      // steadily rising: always above both averages
+assert.strictEqual(breadthFlags(up), "1111111111");
+const down = Array.from({ length: 330 }, (_, i) => 500 - i);    // steadily falling: below both
+assert.strictEqual(breadthFlags(down), "0000000000");
+const short = Array.from({ length: 120 }, (_, i) => 100 + i);   // enough for 50d at offsets <=63, never for 200d
+assert.strictEqual(breadthFlags(short)[0], "1"); // now vs 50d is computable with 120 bars
+assert.strictEqual(breadthFlags(short)[1], "x");
+assert.strictEqual(breadthFlags(short)[8], "x"); // 126 days ago: no 50d average yet either
+const csvB = breadthCsv([["AAA", "Energy", 330, 429, "1111111111", "2026-11-13"]], "2026-11-16 12:00");
+assert.strictEqual(csvB.split("\n")[1], "AAA,Energy,330;429;1111111111,2026-11-13,2026-11-16 12:00");
+console.log("breadth ok");
