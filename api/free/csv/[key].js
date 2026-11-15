@@ -5,6 +5,8 @@ const { getSeries } = require("../../_prices");
 const { rotationCsv, breadthFlags, breadthCsv } = require("../../_mappers");
 const { obos } = require("../../_obos");
 const { history } = require("../../_history");
+const { volData, volatilityCsv } = require("../../_vol");
+const { factor } = require("../../_factor");
 const SP500 = require("../../_data/sp500.json").stocks;
 
 const SETS = {
@@ -84,6 +86,15 @@ module.exports = async (req, res) => {
     if (key === "BREADTH") return await breadth(res);
     if (key === "OBOS") return await obos(res);
     if (key === "HISTORY") return await history(req, res);
+    if (key === "FACTOR") return await factor(req, res);
+    if (key === "VOLATILITY") {
+      const d = await volData();
+      const csv = d && volatilityCsv(d.vix, d.vixeq, new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC");
+      if (!csv) return res.status(204).end();
+      res.setHeader("Cache-Control", "public, s-maxage=900, stale-while-revalidate=3600");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      return res.status(200).send(csv);
+    }
   } catch (e) { /* fall through */ }
   return res.status(204).end();
 };

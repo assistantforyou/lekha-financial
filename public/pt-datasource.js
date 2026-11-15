@@ -61,19 +61,20 @@
     window.PT_LIVE = live; window.PT_LIVE_SIG = sig; window.PT_LIVE_AT = Date.now(); window.PT_LIVE_ASOF = newest ? new Date(newest).toISOString().slice(0, 10) : null;
     if (changed) (function again(tries) { if (window.PT_HOLD) window.PT_HOLD.apply(); else if (tries < 20) setTimeout(function () { again(tries + 1); }, 250); })(0);
   }
-  async function freeHistory() {
+  /* HISTORY and FACTOR both take your tickers in a POST body (never the URL) */
+  async function freePost(key) {
     var syms = holdingSymbols();
-    var r = await fetch(location.origin + "/api/free/csv/HISTORY", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
+    var r = await fetch(location.origin + "/api/free/csv/" + key, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
     if (r.status === 204 || r.status === 404) return null;
     if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
-    var t = await r.text(); computeLive(t, syms); return t;
+    var t = await r.text(); if (key === "HISTORY") computeLive(t, syms); return t;
   }
 
   var cfg = load();
   window.PT_SOURCE_LABEL = cfg.type === "av" ? "Alpha Vantage" : cfg.type === "free" ? "free public data" : cfg.type === "custom" ? "custom data source" : "";
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
-      fetchCsv: function (k) { return cfg.type === "free" && k === "HISTORY" ? freeHistory() : get(cfg, "/csv/" + encodeURIComponent(k), true); },
+      fetchCsv: function (k) { return cfg.type === "free" && (k === "HISTORY" || k === "FACTOR") ? freePost(k) : get(cfg, "/csv/" + encodeURIComponent(k), true); },
       getDoc: async function (p) { var v = await get(cfg, "/doc?path=" + encodeURIComponent(p), false); return v && typeof v === "object" && !Array.isArray(v) ? v : null; },
       getCollection: async function (n) {
         /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */
