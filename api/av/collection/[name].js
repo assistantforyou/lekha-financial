@@ -1,5 +1,5 @@
-const { av, cached } = require("../_lib");
-const { newsFrom } = require("../_mappers");
+const { av, cached } = require("../../_lib");
+const { newsFrom } = require("../../_mappers");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");

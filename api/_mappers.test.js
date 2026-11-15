@@ -36,3 +36,15 @@ assert.strictEqual(lines[3].split(",").slice(4, 6).join(","), ","); // shorter s
 const serial = Number(lines[2].split(",")[0]);
 assert.strictEqual(new Date(Math.floor(serial - 25569) * 86400000).toISOString().slice(0, 10), "2026-11-12");
 console.log("series + csv ok");
+
+// --- FRED ---
+const { fredRows, yoyRows, macroFromFred, fredHistFrom } = require("./_mappers");
+const fr = fredRows("observation_date,X\n2025-10-01,100\n2025-11-01,\n2026-10-01,103.5\nbad,1\n");
+assert.deepStrictEqual(fr, [["2025-10-01", 100], ["2026-10-01", 103.5]]);
+assert.deepStrictEqual(yoyRows(fr), [["2026-10-01", 3.5]]);
+const mf = macroFromFred(fr, [["2026-10-01", 4.1]], [["2026-10-01", 5.1]]);
+assert.strictEqual(mf.source, "FRED"); assert.ok(mf.sources.cpi.includes("fred.stlouisfed.org")); assert.deepStrictEqual(mf.cpiYoY, [["2026-10-01", 3.5]]);
+const fh = fredHistFrom({ UNRATE: [["2026-09-01", 4.3]], USREC: [] });
+assert.strictEqual(fh.series.UNRATE["2026-09"], 4.3);
+assert.strictEqual(fredHistFrom({ A: [] }), null);
+console.log("fred ok");

@@ -106,4 +106,55 @@ function rotationCsv(bySym) {
   return lines.map((r) => r.join(",")).join("\n");
 }
 
-module.exports = { series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };
+// ---- FRED (keyless fredgraph.csv) ----
+// "observation_date,ID\n2026-10-01,5.24\n2026-10-12,\n" -> ascending [[date, value]] (blank = missing, skipped)
+function fredRows(csv) {
+  const out = [];
+  for (const line of String(csv || "").split("\n").slice(1)) {
+    const [d, v] = line.trim().split(",");
+    const n = num(v);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d || "") && n !== null) out.push([d, n]);
+  }
+  return out.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+
+function yoyRows(rows) {
+  const byMonth = new Map(rows.map(([d, v]) => [d.slice(0, 7), v]));
+  const out = [];
+  for (const [d, v] of rows) {
+    const prev = byMonth.get(`${Number(d.slice(0, 4)) - 1}-${d.slice(5, 7)}`);
+    if (prev > 0) out.push([d, round((v / prev - 1) * 100)]);
+  }
+  return out;
+}
+
+// monthly CPI (NSA index), effective fed funds, 10y -> the meta/macro doc
+function macroFromFred(cpiRows, ffRows, tyRows) {
+  const cpiYoYS = tail(yoyRows(cpiRows), 180);
+  const fedFunds = tail(ffRows, 180).map(([d, v]) => [d, round(v)]);
+  const tenYear = tail(tyRows, 180).map(([d, v]) => [d, round(v)]);
+  if (!cpiYoYS.length && !fedFunds.length && !tenYear.length) return null;
+  return {
+    cpiYoY: cpiYoYS, fedFunds, tenYear, source: "FRED",
+    sources: {
+      cpi: "https://fred.stlouisfed.org/series/CPIAUCNS",
+      fedFunds: "https://fred.stlouisfed.org/series/FEDFUNDS",
+      tenYear: "https://fred.stlouisfed.org/series/GS10",
+    },
+    notes: "CPI is the not-seasonally-adjusted index (CPIAUCNS), shown as 12-month change; the 10-year line is the monthly average (GS10).",
+    asOf: new Date().toISOString().slice(0, 10),
+  };
+}
+
+// {ID: rows} -> meta/fredhist doc: {series:{ID:{"YYYY-MM": value}}}
+function fredHistFrom(byId) {
+  const series = {};
+  for (const [id, rows] of Object.entries(byId)) {
+    const m = {};
+    for (const [d, v] of rows) m[d.slice(0, 7)] = v;
+    series[id] = m;
+  }
+  return Object.values(series).some((m) => Object.keys(m).length) ? { series, source: "FRED", asOf: new Date().toISOString().slice(0, 10) } : null;
+}
+
+module.exports = { fredRows, yoyRows, macroFromFred, fredHistFrom, series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };

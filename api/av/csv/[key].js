@@ -1,5 +1,5 @@
-const { av, cacheGetMany, cacheSet } = require("../_lib");
-const { dailyFrom, rotationCsv } = require("../_mappers");
+const { av, cacheGetMany, cacheSet } = require("../../_lib");
+const { dailyFrom, rotationCsv } = require("../../_mappers");
 
 // Which daily series each dataset is built from (free tier: 1 call per symbol, compact = ~100 trading days).
 const SETS = {

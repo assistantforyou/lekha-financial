@@ -1,8 +1,10 @@
 /* Portfolio Terminal: data-source selector + PT_DATA_SOURCE router.
    Config lives only in this browser (localStorage "ptpub.v1.source"). Types:
      none     no market data (panels show "no market-data source connected")
-     builtin  this site's own /api proxy (Alpha Vantage, key held server-side)
+     free     this site's free tier: public sources (FRED, ...) through /api/free, no key needed
+     av       premium tier: Alpha Vantage through /api/av (key held server-side)
      custom   any HTTP endpoint implementing the contract below, optional bearer token
+   With nothing saved the free tier is the default; choosing "none" is stored explicitly.
    Endpoint contract (base = URL without trailing slash):
      GET base/health                -> {"ok":true,"name":"..."}
      GET base/csv/<KEY>             -> text/csv  (KEY: ROTATION BREADTH RISK OBOS FACTOR PEER VOLATILITY VALIN HISTORY); 204/404 = not available
@@ -11,10 +13,14 @@
    Entitlement checks belong on that server; nothing here is security. */
 (function () {
   var KEY = "ptpub.v1.source";
-  function load() { try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && v.type) return v; } catch (e) {} return { type: "none" }; }
-  function save(c) { try { if (!c || c.type === "none") localStorage.removeItem(KEY); else localStorage.setItem(KEY, JSON.stringify(c)); return true; } catch (e) { return false; } }
+  function load() {
+    try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && v.type) { if (v.type === "builtin") v.type = "av"; return v; } } catch (e) {}
+    return { type: "free" };
+  }
+  function save(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); return true; } catch (e) { return false; } }
   function baseOf(c) {
-    if (c.type === "builtin") return location.origin + "/api";
+    if (c.type === "free") return location.origin + "/api/free";
+    if (c.type === "av") return location.origin + "/api/av";
     if (c.type === "custom" && c.url) return String(c.url).trim().replace(/\/+$/, "");
     return null;
   }
@@ -27,7 +33,7 @@
     return asText ? r.text() : r.json();
   }
   var cfg = load();
-  window.PT_SOURCE_LABEL = cfg.type === "builtin" ? "Alpha Vantage" : cfg.type === "custom" ? "custom data source" : "";
+  window.PT_SOURCE_LABEL = cfg.type === "av" ? "Alpha Vantage" : cfg.type === "free" ? "free public data" : cfg.type === "custom" ? "custom data source" : "";
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
       fetchCsv: function (k) { return get(cfg, "/csv/" + encodeURIComponent(k), true); },
@@ -66,7 +72,7 @@
 
   var btn = document.createElement("button");
   btn.className = "btn"; btn.id = "ds-open";
-  var labels = { none: "Data source: none", builtin: "Data source: Alpha Vantage", custom: "Data source: custom" };
+  var labels = { none: "Data source: none", free: "Data source: free", av: "Data source: Alpha Vantage", custom: "Data source: custom" };
   btn.textContent = labels[cfg.type] || labels.none;
   var status = document.querySelector("header.bar .status");
   if (status) status.insertBefore(btn, status.firstChild);
@@ -76,7 +82,8 @@
   dlg.innerHTML =
     "<h3>Data source</h3><div class='muted' style='font-size:12px'>Where market panels get their data. Holdings never leave this browser.</div>" +
     "<label class='ds-opt'><input type='radio' name='ds-t' value='none'><span>None<small>Panels show what is missing. Manual prices only.</small></span></label>" +
-    "<label class='ds-opt'><input type='radio' name='ds-t' value='builtin'><span>Alpha Vantage (built-in)<small>This site's proxy. The API key stays on the server; free tier is rate-limited and cached.</small></span></label>" +
+    "<label class='ds-opt'><input type='radio' name='ds-t' value='free'><span>Free public data<small>FRED and other public sources through this site. No key, no account; coverage grows as sources are added.</small></span></label>" +
+    "<label class='ds-opt'><input type='radio' name='ds-t' value='av'><span>Alpha Vantage (premium)<small>Licensed market data through this site's proxy. The key stays on the server.</small></span></label>" +
     "<label class='ds-opt'><input type='radio' name='ds-t' value='custom'><span>Custom endpoint<small>Your own server implementing the endpoint contract.</small></span></label>" +
     "<div class='ds-f' id='ds-custom' hidden><input type='text' id='ds-url' placeholder='https://your-server.example.com/pt' autocomplete='off' spellcheck='false'>" +
     "<input type='password' id='ds-token' placeholder='Bearer token (optional, stored in this browser)' autocomplete='off'></div>" +
