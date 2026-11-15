@@ -69,4 +69,41 @@ function newsFrom(json) {
     .map(([date, items]) => ({ id: date, data: { date, macro: "Headlines and sentiment scores from Alpha Vantage News & Sentiment.", items } }));
 }
 
-module.exports = { series, cpiYoY, macroFrom, newsFrom, impactOf };
+// TIME_SERIES_DAILY -> ascending [[date, close]] (free tier returns the latest ~100 trading days)
+function dailyFrom(json) {
+  const ts = json && json["Time Series (Daily)"];
+  if (!ts || typeof ts !== "object") return null;
+  const rows = Object.entries(ts)
+    .map(([d, v]) => [d, num(v && v["4. close"])])
+    .filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r[0]) && r[1] !== null && r[1] > 0)
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  return rows.length ? rows : null;
+}
+
+// {SYM: [[date, close]]} -> the CSV layout parseRotation() reads:
+// header "D|SYM" at column j with closes at j+1 (spreadsheet date serials, data from row 3),
+// then LIVE|SYM / TDATE|SYM cells in row 2.
+function rotationCsv(bySym) {
+  const syms = Object.keys(bySym).filter((k) => bySym[k] && bySym[k].length);
+  if (!syms.length) return null;
+  const n = Math.max(...syms.map((k) => bySym[k].length));
+  const header = [], row1 = [];
+  for (const k of syms) {
+    const s = bySym[k];
+    header.push("D|" + k, ""); row1.push("", "");
+    header.push("LIVE|" + k); row1.push(String(s[s.length - 1][1]));
+    header.push("TDATE|" + k); row1.push(s[s.length - 1][0]);
+  }
+  const lines = [header, row1];
+  for (let i = 0; i < n; i++) {
+    const row = [];
+    for (const k of syms) {
+      const s = bySym[k][i];
+      row.push(s ? String(Math.round(Date.parse(s[0] + "T00:00:00Z") / 864e5) + 25569) : "", s ? String(s[1]) : "", "", "");
+    }
+    lines.push(row);
+  }
+  return lines.map((r) => r.join(",")).join("\n");
+}
+
+module.exports = { series, cpiYoY, macroFrom, newsFrom, impactOf, dailyFrom, rotationCsv };

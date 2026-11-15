@@ -19,3 +19,20 @@ assert.strictEqual(n[0].data.items.length, 1); // javascript: URL dropped
 assert.strictEqual(n[0].data.items[0].impact, "Bullish");
 assert.strictEqual(n[1].data.items[0].impact, "Bearish");
 console.log("mappers ok");
+
+// --- daily series + rotation CSV ---
+const { dailyFrom, rotationCsv } = require("./_mappers");
+const ts = { "Time Series (Daily)": { "2026-11-13": { "4. close": "754.37" }, "2026-11-12": { "4. close": "757.12" }, "2026-11-11": { "4. close": "0" } } };
+const d = dailyFrom(ts);
+assert.deepStrictEqual(d, [["2026-11-12", 757.12], ["2026-11-13", 754.37]]);
+assert.strictEqual(dailyFrom({}), null);
+const csv = rotationCsv({ SPY: d, XLK: [["2026-11-13", 200]] });
+const lines = csv.split("\n");
+assert.strictEqual(lines[0], "D|SPY,,LIVE|SPY,TDATE|SPY,D|XLK,,LIVE|XLK,TDATE|XLK");
+assert.strictEqual(lines[1], ",,754.37,2026-11-13,,,200,2026-11-13");
+assert.strictEqual(lines[2].split(",")[0], String(Math.round(Date.parse("2026-11-12T00:00:00Z") / 864e5) + 25569)); // 46308-ish serial
+assert.strictEqual(lines[3].split(",").slice(4, 6).join(","), ","); // shorter series padded blank
+// round-trip through the page's own expectations: serial -> same UTC day
+const serial = Number(lines[2].split(",")[0]);
+assert.strictEqual(new Date(Math.floor(serial - 25569) * 86400000).toISOString().slice(0, 10), "2026-11-12");
+console.log("series + csv ok");

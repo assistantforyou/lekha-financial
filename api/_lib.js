@@ -17,6 +17,15 @@ async function cacheGet(key) {
   return rows[0] ? { payload: rows[0].payload, fetchedAt: Date.parse(rows[0].fetched_at) } : null;
 }
 
+async function cacheGetMany(keys) {
+  const list = keys.map((k) => `"${k}"`).join(",");
+  const r = await sb(`pt_av_cache?key=in.(${encodeURIComponent(list)})&select=key,payload,fetched_at`);
+  const out = {};
+  if (!r.ok) return out;
+  for (const row of await r.json()) out[row.key] = { payload: row.payload, fetchedAt: Date.parse(row.fetched_at) };
+  return out;
+}
+
 async function cacheSet(key, payload) {
   await sb("pt_av_cache", {
     method: "POST",
@@ -60,4 +69,4 @@ async function cached(key, ttlMs, build) {
   return hit ? hit.payload : null;
 }
 
-module.exports = { av, cached, DAILY_LIMIT };
+module.exports = { av, cached, cacheGetMany, cacheSet, DAILY_LIMIT };
