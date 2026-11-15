@@ -568,7 +568,7 @@ function compact(usd){const v=usd*fx();const sym=S.cur==="THB"?"฿":"$";const a
 function pct(p,dp=1,sign=true){if(p===null||p===undefined||!isFinite(p))return"–";const v=p*100;return(sign&&v>0?"+":"")+(v<0?"−":"")+Math.abs(v).toFixed(dp)+"%"}
 const cls=v=>v===null||v===undefined?"":v>0?"up":v<0?"down":"";
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const priceFmt=(p,cur)=>p===null?"–":(cur==="HKD"?"HK$":"$")+p.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const priceFmt=(p,cur)=>p==null?"–":(cur==="HKD"?"HK$":"$")+p.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 
 /* ---------- derived ---------- */
 function goldOverride(r){return r}
