@@ -4,7 +4,7 @@
 const crypto = require("crypto");
 const { checkUpload, normalizeResult, maskDigits, MAX_BYTES } = require("./_import");
 const { extractWithGemini } = require("./_llm");
-const { cacheGet, cacheSet } = require("./_lib");
+const { rateHit } = require("./_lib");
 
 const DAILY_LIMIT = Number(process.env.IMPORT_DAILY_LIMIT) || 40;
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest();
@@ -31,11 +31,9 @@ module.exports = async (req, res) => {
     if (mime.startsWith("text/")) input = { text: maskDigits(Buffer.from(data, "base64").toString("utf8")) };
     else input = { mime, base64: data };
   }
-  // daily cap (best-effort counter in the cache table)
-  const day = new Date().toISOString().slice(0, 10), key = "import/day/" + day;
-  const used = ((await cacheGet(key)) || { payload: { n: 0 } }).payload.n || 0;
-  if (used >= DAILY_LIMIT) return fail(res, 429, "Daily import limit reached. Try again tomorrow.");
-  await cacheSet(key, { n: used + 1 });
+  // daily cap, counted atomically in the database (fails closed)
+  const day = new Date().toISOString().slice(0, 10);
+  if (!(await rateHit("import/day/" + day, DAILY_LIMIT))) return fail(res, 429, "Daily import limit reached. Try again tomorrow.");
   try {
     const raw = await extractWithGemini(input);
     res.setHeader("Cache-Control", "no-store");

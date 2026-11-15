@@ -2,7 +2,7 @@
 // Tickers arrive in a POST body (never in the URL) and are not stored or logged; each request is a fresh Alpaca read.
 const crypto = require("crypto");
 const { getSeries } = require("./_prices");
-const { cached, cacheGet, cacheSet } = require("./_lib");
+const { cached, rateHit } = require("./_lib");
 const { fredSeries } = require("./_fred");
 const { historyCsv } = require("./_mappers");
 
@@ -32,17 +32,14 @@ async function tnx() {
   } catch (e) { return null; }
 }
 
-// best-effort per-client limiter: hashed IP + 10-minute bucket counted in the cache table
+// per-client limiter: hashed IP + 10-minute bucket, counted atomically in the database
 function clientId(req) {
   const ip = String((req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "").split(",")[0]).trim() || "unknown";
   return crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
 }
 async function rateLimited(req) {
   const key = `rl/hist/${clientId(req)}/${Math.floor(Date.now() / RATE.windowMs)}`;
-  const n = ((await cacheGet(key)) || { payload: { n: 0 } }).payload.n || 0;
-  if (n >= RATE.max) return true;
-  await cacheSet(key, { n: n + 1 });
-  return false;
+  return !(await rateHit(key, RATE.max));
 }
 
 const mem = new Map(); // symbol -> {at, rows}

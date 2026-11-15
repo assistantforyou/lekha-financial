@@ -7,7 +7,7 @@ let calls = 0, counter = 0;
 Module._load = function (req, parent, isMain) {
   if (req === "./_llm") return { extractWithGemini: async (i) => { calls++; if (i.text && i.text.includes("FAIL")) throw Object.assign(new Error("x"), { status: 502 });
     return { account: "T", positions: [{ kind: "security", ticker: "SPY", quantity: 2, price: 100, currency: "USD", evidence: i.text ? i.text.slice(0, 30) : "pdf" }] }; } };
-  if (req === "./_lib") return { cacheGet: async () => ({ payload: { n: counter } }), cacheSet: async (k, v) => { counter = v.n; } };
+  if (req === "./_lib") return { rateHit: async (k, limit) => { if (counter >= limit) return false; counter++; return true; } };
   return orig.apply(this, arguments);
 };
 const handler = require("./parse-positions");

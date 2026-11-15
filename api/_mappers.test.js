@@ -104,7 +104,7 @@ console.log("history ok");
   let alpacaCalls = 0, counters = {};
   Module._load = function (req) {
     if (req === "./_prices") return { getSeries: async (syms, d, opts) => { alpacaCalls++; assert.strictEqual(opts && opts.fallback, false, "no paid fallback on a public endpoint"); const o = {}; for (const s of syms) o[s] = [["2026-11-12", 10], ["2026-11-13", 11]]; return { data: o }; } };
-    if (req === "./_lib") return { cached: async () => [["2026-11-13", 5.1]], cacheGet: async (k) => (counters[k] ? { payload: counters[k] } : null), cacheSet: async (k, v) => { counters[k] = v; } };
+    if (req === "./_lib") return { cached: async () => [["2026-11-13", 5.1]], rateHit: async (k, limit) => { counters[k] = (counters[k] || 0) + 1; return counters[k] <= limit; } };
     if (req === "./_fred") return { fredSeries: async () => [] };
     return orig.apply(this, arguments);
   };

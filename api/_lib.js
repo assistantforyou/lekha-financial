@@ -34,6 +34,14 @@ async function cacheSet(key, payload) {
   });
 }
 
+// Atomic per-key counter in the database (pt_rate_hit): true = allowed, false = over the limit. Fails closed on errors.
+async function rateHit(key, limit) {
+  try {
+    const r = await sb("rpc/pt_rate_hit", { method: "POST", body: JSON.stringify({ p_key: key, p_limit: limit }) });
+    return r.ok && (await r.json()) === true;
+  } catch (e) { return false; }
+}
+
 async function spend() {
   const r = await sb("rpc/pt_av_spend", { method: "POST", body: JSON.stringify({ p_limit: DAILY_LIMIT }) });
   return r.ok && (await r.json()) === true;
@@ -69,4 +77,4 @@ async function cached(key, ttlMs, build) {
   return hit ? hit.payload : null;
 }
 
-module.exports = { av, cached, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };
+module.exports = { av, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };
