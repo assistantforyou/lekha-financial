@@ -115,10 +115,12 @@
 
   /* Intrinsic value inputs for your own holdings: tickers in a POST body, never the URL; nothing stored. */
   async function holdPost(path, asText) {
-    var syms = holdingSymbols().slice(0, 12);
-    if (!syms.length) return asText ? null : [];
+    var all = holdingSymbols(), syms = all.slice(0, 12);
+    window.PT_VAL_SKIPPED = all.slice(12);
+    if (!syms.length) { if (asText) throw { code: "no_holdings" }; return []; }
     var r = await fetch(location.origin + "/api/free/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
-    if (r.status === 204 || r.status === 404) return asText ? null : [];
+    if (r.status === 429) throw { code: "rate_limited", message: "Too many valuation requests; wait a few minutes" };
+    if (r.status === 204 || r.status === 404) { if (asText) throw { code: "no_data", message: "The price source returned nothing for your holdings" }; return []; }
     if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
     return asText ? r.text() : r.json();
   }

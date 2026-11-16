@@ -62,7 +62,7 @@ header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .ph h2{margin:0;font-family:var(--f-display);font-size:15px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
 .note{font-size:12px;color:var(--muted);margin:0}
 
-.chart{position:relative;width:100%}
+.rrg-key{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;margin:6px 0}.rot-sum{list-style:none;padding:0;margin:4px 0 6px;display:grid;gap:4px;font-size:14px}.chart{position:relative;width:100%}
 .chart svg{display:block;width:100%;height:auto;overflow:visible}
 .chart .tip{position:absolute;pointer-events:none;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font-family:var(--f-mono);font-size:11px;white-space:nowrap;transform:translate(-50%,-110%)}
 
@@ -353,6 +353,8 @@ td{font-size:13.5px}
 
   <div class="intel-head" id="intel"><h2>Sector Rotation Intelligence</h2><p>Leadership, participation and risk appetite. <span class="sig obs">Observed</span> = measured from data. <span class="sig spec">Speculative</span> = a historical tendency, not a forecast.</p></div>
 
+  <section class="panel" id="rot-sum" aria-labelledby="h-sum"><div class="ph"><h2 id="h-sum">Right now</h2><span class="note">Where money is flowing, from the rotation graph below</span></div><div id="rot-sum-body"><div class="empty">Loading relative rotation data…</div></div></section>
+
   <section class="panel" aria-labelledby="h-rrg">
     <div class="ph"><h2 id="h-rrg">Relative rotation graph</h2><span class="note" id="rrg-asof-note"></span></div>
     <div class="ctrls">
@@ -361,6 +363,7 @@ td{font-size:13.5px}
       <span class="note">trail length (periods)</span>
       <label for="rrg-asof">Look back <input type="range" id="rrg-asof" min="0" max="52" step="1" value="0"></label><span class="note" id="rrg-asof-lbl"></span>
     </div>
+    <div class="rrg-key" id="rrg-key"><span style="color:var(--up)"><b>Leading</b> · stronger than the market and still gaining</span><span style="color:var(--warn)"><b>Weakening</b> · stronger than the market but losing steam</span><span style="color:var(--down)"><b>Lagging</b> · weaker than the market and still falling behind</span><span style="color:var(--chart)"><b>Improving</b> · weaker than the market but starting to recover</span></div>
     <div class="rrg-chips" id="rrg-chips"></div>
     <div class="chart rrg-chart" id="rrg-chart"><div class="empty">Loading relative rotation data…</div></div>
     <div class="intel-read" id="rrg-read"></div>
@@ -452,6 +455,8 @@ td{font-size:13.5px}
   <section class="panel" aria-labelledby="h-valt"><div class="ph"><h2 id="h-valt">Valuation summary</h2><span class="note">Values per share in the display currency. Tap a header to sort.</span></div>
     <div class="tablebox"><table id="val-tbl"><thead><tr><th class="l" data-k="ticker">Ticker</th><th class="l" data-k="conf">Method · confidence</th><th data-k="price">Price</th><th data-k="bear">Bear IV</th><th data-k="base">Base IV</th><th data-k="bull">Bull IV</th><th data-k="mos">MOS</th><th data-k="req">Required</th><th data-k="buy">Buy below</th><th data-k="weight">Weight</th></tr></thead>
     <tbody id="val-tbody"></tbody></table></div></section>
+  <section class="panel" id="val-miss" hidden aria-labelledby="h-valm"><div class="ph"><h2 id="h-valm">Not valued</h2><span class="note">Holdings with no intrinsic value, and why</span></div>
+    <div class="tablebox"><table><thead><tr><th class="l">Ticker</th><th class="l">Why there is no value</th></tr></thead><tbody id="val-miss-body"></tbody></table></div></section>
   <details class="panel method"><summary>Method and assumptions</summary><ul>
     <li><b>Cash flow.</b> Free cash flow (operating cash flow − capex), minus stock-based compensation by default. Companies whose capex is mostly growth spending can use owner earnings (operating cash flow − depreciation − SBC) because its reported FCF has been negative through its capex build-out.</li>
     <li><b>Revenue.</b> Year 1 = analyst consensus (low / average / high for bear / base / bull), annualised from the latest reported period when the consensus year ends 6+ months out. After year 1, growth starts at no more than 20 / 30 / 40% and fades each year toward terminal growth (decay 0.55 / 0.70 / 0.80). Ten forecast years, then a Gordon terminal value at 2.0 / 3.0 / 3.5% growth.</li>
@@ -828,9 +833,10 @@ function renderRRG(){
   const el=$("rrg-chart");if(!el)return;
   document.querySelectorAll("#rrg-freq button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.f===S.rrgFreq)));
   document.querySelectorAll("#rrg-tail button").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.n)===S.rrgTail)));
-  if(!S.rot){if(S.rotErr)el.innerHTML=`<div class="empty">${esc(S.rotErr)}</div>`;return}
+  const sbx=$("rot-sum-body");
+  if(!S.rot){if(S.rotErr){const m=`<div class="empty">No rotation data: ${esc(S.rotErr)}. The graph needs daily prices for SPY and the sector ETFs from your data source.</div>`;el.innerHTML=m;if(sbx)sbx.innerHTML=m}return}
   const unit=S.rrgFreq==="W"?"week":"day";const all=RRG_KEYS.map(k=>({k,s:rrgSeries(k,S.rrgFreq)})).filter(o=>o.s&&o.s.length>S.rrgTail+1);
-  if(!all.length){el.innerHTML='<div class="empty">Not enough history for the RRG.</div>';return}
+  if(!all.length){const m='<div class="empty">Not enough price history for the rotation graph: it needs roughly 20 weeks (about 100 trading days) of closes for each ETF and SPY. Missing or short: '+RRG_KEYS.filter(k=>!(S.rot.D[k]&&S.rot.D[k].length>100)).join(", ")+'.</div>';el.innerHTML=m;if(sbx)sbx.innerHTML=m;return}
   const maxBack=Math.min(...all.map(o=>o.s.length))-S.rrgTail-1;const slider=$("rrg-asof");slider.max=String(Math.min(maxBack,S.rrgFreq==="W"?104:250));if(S.rrgBack>Number(slider.max))S.rrgBack=Number(slider.max);slider.value=String(S.rrgBack);
   const trails=all.map(o=>{const end=o.s.length-1-S.rrgBack;return{k:o.k,pts:o.s.slice(Math.max(0,end-S.rrgTail),end+1)}});
   const endT=trails[0].pts[trails[0].pts.length-1].t;
@@ -845,7 +851,7 @@ function renderRRG(){
   for(const [axis,e] of [["x",ex],["y",ey]]){const st=step(e);for(let v=Math.ceil((100-e)/st)*st;v<=100+e+1e-9;v+=st){v=Math.round(v*100)/100;
     if(axis==="x")g+=`<line x1="${X(v)}" x2="${X(v)}" y1="${H-B}" y2="${H-B+4}" stroke="var(--muted)"/><text x="${X(v)}" y="${H-B+16}" text-anchor="middle" class="ax">${v.toFixed(st<1?1:0)}</text>`;
     else g+=`<line x1="${L-4}" x2="${L}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--muted)"/><text x="${L-7}" y="${Y(v)+4}" text-anchor="end" class="ax">${v.toFixed(st<1?1:0)}</text>`}}
-  g+=`<text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle" class="ax">JdK RS-Ratio (approx.) →</text><text transform="translate(11 ${(T+H-B)/2}) rotate(-90)" text-anchor="middle" class="ax">JdK RS-Momentum (approx.) →</text>`;
+  g+=`<text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle" class="ax">Strength vs S&amp;P 500 (right = stronger) →</text><text transform="translate(11 ${(T+H-B)/2}) rotate(-90)" text-anchor="middle" class="ax">Momentum (up = improving) →</text>`;
   let defs="<defs>",paths="",dots="",labs="";const sel=S.rrgSel;
   trails.forEach((tr,i)=>{const col=`var(--q${i+1})`;const dim=sel&&sel!==tr.k;const op=dim?0.14:1;const w=sel===tr.k?2.6:1.6;
     defs+=`<marker id="ah${i}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="${sel===tr.k?7:6}" markerHeight="${sel===tr.k?7:6}" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${col}" fill-opacity="${op}"/></marker>`;
@@ -869,13 +875,15 @@ function renderRRG(){
   svg.addEventListener("click",e=>{const f=nearest(e);if(f){S.rrgSel=S.rrgSel===f.k?null:f.k;renderRRG()}});
   /* chips */
   $("rrg-chips").innerHTML=trails.map((tr,i)=>{const lp=tr.pts[tr.pts.length-1];const q=quadOf(lp.x,lp.y);
-    return `<button class="rrg-chip" data-k="${tr.k}" aria-pressed="${sel===tr.k}"><i style="background:var(--q${i+1})"></i><b>${tr.k}</b><span style="color:${QUADS[q].c}">${q}</span></button>`}).join("")+(sel?`<button class="rrg-chip clear" data-k="">Show all</button>`:"");
+    return `<button class="rrg-chip" data-k="${tr.k}" aria-pressed="${sel===tr.k}"><i style="background:var(--q${i+1})"></i><b>${esc(RRG_NAMES[tr.k]||tr.k)}</b><span class="muted">${tr.k}</span><span style="color:${QUADS[q].c}">${q}</span></button>`}).join("")+(sel?`<button class="rrg-chip clear" data-k="">Show all</button>`:"");
   /* interpretation */
   const now={},then={};trails.forEach(tr=>{const a=tr.pts[tr.pts.length-1],b=tr.pts[Math.max(0,tr.pts.length-1-Math.min(4,S.rrgTail))];now[tr.k]=quadOf(a.x,a.y);then[tr.k]=quadOf(b.x,b.y)});
   const lb=Math.min(4,S.rrgTail);const by=q=>RRG_KEYS.filter(k=>now[k]===q);
   const moves=RRG_KEYS.filter(k=>now[k]&&now[k]!==then[k]).map(k=>`${k} ${then[k]} → ${now[k]}`);
   const entering=RRG_KEYS.filter(k=>now[k]==="Leading"&&then[k]!=="Leading"),leaving=RRG_KEYS.filter(k=>then[k]==="Leading"&&now[k]!=="Leading");
   const list=a=>a.length?a.join(", "):"none";
+  {const nm=a=>a.map(k=>RRG_NAMES[k]||k).join(", ")||"none";const sb=$("rot-sum-body");
+    if(sb)sb.innerHTML=`<ul class="rot-sum"><li style="color:var(--up)"><b>Leading</b> (strong and gaining): ${esc(nm(by("Leading")))}</li><li style="color:var(--chart)"><b>Improving</b> (weak but recovering): ${esc(nm(by("Improving")))}</li><li style="color:var(--warn)"><b>Weakening</b> (strong but fading): ${esc(nm(by("Weakening")))}</li><li style="color:var(--down)"><b>Lagging</b> (weak and falling behind): ${esc(nm(by("Lagging")))}</li></ul><p class="note">Compared with the S&amp;P 500, as of ${esc(fmtD(endT))}. Over the last ${lb} ${unit}s: ${moves.length?esc(moves.map(m=>m.replace(/^(\S+)/,(x,k)=>RRG_NAMES[k]||k)).join("; ")):"no quadrant changes"}.</p>`}
   $("rrg-read").innerHTML=`<p>${tagObs} Leading: <b>${list(by("Leading"))}</b> · Improving: <b>${list(by("Improving"))}</b> · Weakening: <b>${list(by("Weakening"))}</b> · Lagging: <b>${list(by("Lagging"))}</b>.</p>
     <p>${tagObs} Over the last ${lb} ${unit}s: ${moves.length?esc(moves.join("; ")):"no quadrant changes"}. Entered leadership: <b>${list(entering)}</b>. Left leadership: <b>${list(leaving)}</b>.</p>
     <p>${tagSpec} RRG rotations usually move clockwise (Improving → Leading → Weakening → Lagging). If that tendency holds, ${by("Improving").length?`<b>${by("Improving").join(", ")}</b> ${by("Improving").length>1?"are":"is"} the next candidate${by("Improving").length>1?"s":""} to lead`:"no ETF is currently in Improving"}${by("Weakening").length?` and <b>${by("Weakening").join(", ")}</b> ${by("Weakening").length>1?"risk":"risks"} sliding into Lagging`:""}. This is a historical pattern, not a forecast; trails can reverse without completing the cycle.</p>`;
@@ -1722,7 +1730,7 @@ function parseValin(text){const rows=parseCSV(text);const out={rows:{},fx:{USD:1
 const VALIN_ID="VALIN";
 const RF_FALLBACK=4.99;
 Object.assign(S,{fund:{},fundAt:null,valin:null,valinAt:null,valinErr:null,vset:{erp:4.41,erpSrc:"Damodaran implied ERP, 1 Nov 2026",mos:{quality:20,growth:25,cyclical:35,speculative:40},sbc:true},vsetLoaded:false,
-  vhist:[],vres:null,vSel:null,vSort:"mos",vTbl:{k:"mos",d:-1},vFunds:false,vCustom:null,vWritten:false,tab:"ov"});
+  fundMissing:{},fundLoaded:false,fundErr:null,vhist:[],vres:null,vSel:null,vSort:"mos",vTbl:{k:"mos",d:-1},vFunds:false,vCustom:null,vWritten:false,tab:"ov"});
 try{const t=localStorage.getItem("ptpub.v1.tab");if(t==="val"||t==="ov"||t==="set")S.tab=t;const v=localStorage.getItem("ptpub.v1.vSort");if(v)S.vSort=v}catch(e){}
 const V_CLS={quality:"Quality compounder",growth:"Established growth",cyclical:"Cyclical / AI semis",speculative:"Speculative",fund:"Fund"};
 const V_STAT={pass:"var(--up)",near:"var(--warn)",fail:"var(--down)",na:"var(--muted)"};
@@ -1756,9 +1764,25 @@ function renderValKpis(){const el=$("val-kpis");if(!S.vres){el.innerHTML="";retu
 function vTip(box,html,x,y){let tip=box.querySelector(".tip");if(!tip){tip=document.createElement("div");tip.className="tip";box.appendChild(tip)}
   if(html==null){tip.style.display="none";return}tip.innerHTML=html;tip.style.display="block";const bw=box.clientWidth;tip.style.left="0px";tip.style.top="0px";
   const tw=tip.offsetWidth;let lx=Math.min(Math.max(x+12,4),bw-tw-4);tip.style.left=lx+"px";tip.style.top=Math.max(0,y-tip.offsetHeight-8)+"px";tip.style.transform="none"}
-function tipFor(r){if(!r.iv){return `<b>${esc(r.t)}</b> · ${r.method==="nav"?"fund, valued at NAV":"no intrinsic value"}<br>${r.implied?"Price implies "+r.implied.margin.toFixed(1)+"% FCF margin":r.rev?"Needs "+compact(r.rev.needFcf10/ (S.cur==="THB"?1:1))+" FCF in year 10":""}`}
+function tipFor(r){if(!r.iv){return `<b>${esc(r.t)}</b> · ${r.method==="nav"?"fund, valued at NAV":"no intrinsic value"}<br>${r.conf==="Waiting for price"?"No live price or market cap":""}${r.implied?"Price implies "+r.implied.margin.toFixed(1)+"% FCF margin":r.rev?"Needs "+compact(r.rev.needFcf10/ (S.cur==="THB"?1:1))+" FCF in year 10":""}`}
   return `<b>${esc(r.t)}</b> · price ${usd(r.px)}<br>Bear ${usd(r.iv.bear)} · Base ${usd(r.iv.base)} · Bull ${usd(r.iv.bull)}<br>Buy below ${usd(r.buy)} (required MOS ${pu(r.reqMos)})<br>MOS ${pc(r.mos)} · ${esc(r.conf)} confidence · ${esc(V_CLS[r.cls]||r.cls)}`}
-function renderValA(){const box=$("val-a");if(!S.vres){box.innerHTML=`<div class="empty">${S.valinErr||"Loading live inputs and fundamentals…"}</div>`;return}
+function valHeld(){return S.rows.filter(r=>r.ticker&&r.ticker!=="CASH").map(r=>r.ticker)}
+function valEmptyHtml(){const held=valHeld();const E=(m,btn,act)=>`<div class="empty"><b>${m[0]}</b><br>${m[1]}${btn?`<br><button class="btn" data-act="${act}" style="margin-top:8px">${btn}</button>`:""}</div>`;
+  if(!S.rows.length)return E(["No holdings yet.","Intrinsic value is calculated for the stocks you hold. Add your positions on the Overview tab and this tab fills in."],"Go to Overview","ov");
+  const err=S.valinErr||S.fundErr;if(err)return E(["Valuation data could not be loaded.","Reason: "+esc(err)+"."],"Retry","retry");
+  if(S.fundLoaded&&!Object.keys(S.fund).length)return E(["None of your "+held.length+" holdings could be valued.","See “Not valued” below for the reason for each one."]);
+  if(S.valin&&!Object.keys(S.fund).length)return E(["Waiting for fundamentals…","Reading annual cash-flow filings from SEC EDGAR for your holdings (can take 10 to 20 seconds)."]);
+  return E(["Loading…","Fetching live prices and SEC fundamentals for your holdings."])}
+function renderValMissing(){const el=$("val-miss");if(!el)return;const rows=[],seen=new Set();
+  for(const t of valHeld()){if(seen.has(t))continue;seen.add(t);
+    const m=S.fundMissing[t],r=S.vres&&S.vres.res[t];let why=null;
+    if(m)why=m.message;
+    else if(r&&r.method==="nav")why=null;
+    else if(r&&!r.iv)why=(r.conf==="Waiting for price"?"No live price or market cap (shares outstanding missing from SEC data or no price history). ":"Insufficient cash-flow history for a reliable value, so only the reverse DCF is shown. ")+(r.notes||[]).join(" ");
+    else if(!r&&S.fundLoaded&&!S.fund[t])why=(window.PT_VAL_SKIPPED||[]).includes(t)?"Beyond the 12-holding limit of the free valuation source; only your first 12 holdings are valued.":"No fundamentals returned for this ticker.";
+    if(why)rows.push(`<tr><td class="l"><b>${esc(t)}</b></td><td class="l">${esc(why)}</td></tr>`)}
+  el.hidden=!rows.length;if(rows.length)$("val-miss-body").innerHTML=rows.join("")}
+function renderValA(){const box=$("val-a");if(!S.vres){box.innerHTML=valEmptyHtml();const b=box.querySelector("[data-act]");if(b)b.onclick=()=>{b.dataset.act==="ov"?setTab("ov"):window.PT_RELOAD_VAL&&window.PT_RELOAD_VAL()};return}
   const rows=vRows();const w=Math.max(320,box.clientWidth||800);const mob=w<560;const LW=mob?50:66,RW=mob?62:150,PL=LW+6,PW=w-LW-RW-14;const RH=mob?26:28,top=26;
   let xmax=200;for(const r of rows)if(r.iv)xmax=Math.max(xmax,Math.min(400,r.iv.bull/r.px*100));xmax=Math.ceil(xmax/50)*50;
   const X=v=>PL+Math.max(0,Math.min(v,xmax))/xmax*PW;const H=top+rows.length*RH+8;
@@ -1897,9 +1921,9 @@ function vHistHtml(t){const hs=S.vhist.filter(h=>h.items&&h.items[t]);if(!hs.len
   return `<h3>Valuation history</h3><div class="tablebox"><table class="kv"><thead><tr><th class="l">Date</th><th>Price</th><th>Base IV</th><th>MOS</th><th>Δ from price</th><th>Δ from fundamentals</th><th class="l">Fundamentals as of</th></tr></thead><tbody>${rows}</tbody></table></div>`}
 function renderValStatus(){const el=$("val-src");const c=vCtx();
   el.innerHTML=`<span class="pill ${S.valinSrc==="live"?"live":S.valin?"stale":""}">Inputs: ${S.valin?(S.valinSrc==="live"?"live · ":"")+esc(S.valin.updated||""):S.valinErr?esc(S.valinErr):"loading"}</span>
-    <span class="pill">Fundamentals: ${Object.keys(S.fund).length?esc(Object.values(S.fund).map(f=>f.asOf).sort().pop()):"none (no data source)"}</span>
+    <span class="pill">Fundamentals: ${Object.keys(S.fund).length?esc(Object.values(S.fund).map(f=>f.asOf).sort().pop()):S.fundErr?esc(S.fundErr):S.fundLoaded?"none of your holdings could be valued":"loading"}</span>
     <span class="pill ${c.rfLive?"live":"stale"}">US 10Y ${c.rf.toFixed(2)}%${c.rfLive?"":" (fallback assumption, not live)"}</span><span class="pill">ERP ${c.erp.toFixed(2)}%</span>`}
-function renderValAll(selOnly,keepSet){if(S.tab!=="val")return;if(!selOnly)computeVal();renderValStatus();renderValKpis();renderValA();renderValB();renderValC();renderValTable();if(!keepSet&&!selOnly)renderValSettings();if(!selOnly)renderDisp()}
+function renderValAll(selOnly,keepSet){if(S.tab!=="val")return;if(!selOnly)computeVal();renderValStatus();for(const id of["h-valb","h-valc","h-valt"]){const e=$(id);const pn=id==="h-valb"?e.closest(".grid2v"):e.closest(".panel");if(pn)pn.hidden=!S.vres}renderValKpis();renderValA();renderValB();renderValC();renderValTable();renderValMissing();if(!keepSet&&!selOnly)renderValSettings();if(!selOnly)renderDisp()}
 function setTab(t){S.tab=t;try{localStorage.setItem("ptpub.v1.tab",t)}catch(e){}for(const k of ["ov","val","set"]){$("tab-"+k).hidden=t!==k;$("tb-"+k).setAttribute("aria-pressed",t===k)}
   if(t==="val")renderValAll();else if(t==="set"){if(window.PT_UI)window.PT_UI.renderSettings()}else renderAll()}
 
@@ -2022,7 +2046,7 @@ function applyEngine(text,source,at){const p=parseEngine(text);if(!p.rows.length
   db.collection("news").onSnapshot(sn=>{S.news=sn.docs.map(d=>d.data()).filter(n=>n&&n.date);setPill("st-news",S.news.length?"News: "+S.news.map(n=>n.date).sort().pop():"News: no source connected",S.news.length?"live":"");renderNews()},()=>setPill("st-news","News: could not load","err"));
   db.collection("snapshots").onSnapshot(sn=>{S.snapshots=sn.docs.map(d=>d.data()).filter(s=>s&&s.date).sort((a,b)=>a.date<b.date?-1:1);renderPortfolioChart()},()=>{});
   db.doc("meta/macro").onSnapshot(d=>{S.macro=d.exists?d.data():null;renderMacro()},()=>{$("mc-chart").innerHTML='<div class="empty">Could not load the rates and inflation data.</div>'});
-  db.collection("fund").onSnapshot(sn=>{const m={};sn.docs.forEach(d=>{const v=d.data();if(v&&v.t)m[v.t]=v});S.fund=m;renderValAll()},()=>{S.valinErr="Fundamentals could not load.";renderValAll()});
+  db.collection("fund").onSnapshot(sn=>{const m={},ms={};sn.docs.forEach(d=>{const v=d.data();if(v&&v.t){if(v.missing)ms[v.t]=v;else m[v.t]=v}});S.fund=m;S.fundMissing=ms;S.fundLoaded=true;S.fundErr=null;renderValAll()},e=>{S.fundErr=handleErr(e,"fundamentals");S.fundLoaded=true;renderValAll()});
   db.doc("val/settings").onSnapshot(d=>{if(d.exists){const v=d.data();S.vset={...S.vset,...v,mos:{...S.vset.mos,...(v.mos||{})}}}S.vsetLoaded=true;renderValAll()},()=>{S.vsetLoaded=true});
   db.collection("rev").onSnapshot(sn=>{S.revs=sn.docs.map(d=>d.data()).filter(r=>r&&r.date&&r.items).sort((a,b)=>a.date<b.date?1:-1);S.revsLoaded=true;S.rvM=null;renderLead()},()=>{S.revsLoaded=true});
   db.doc("meta/fredhist").onSnapshot(d=>{if(d.exists){S.fred=d.data();S.fredErr=null}else S.fredErr="Macro history: no market-data source connected.";S.rgM=null;renderRegime()},()=>{S.fredErr="Macro history could not load.";renderRegime()});
@@ -2046,7 +2070,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   else if(c==="needs_reauth")msg="data source needs re-authentication";
   else if(c==="not_in_manifest"||c==="approval_required")msg="Google Drive not allowed for this page";
   else if(c==="server_unavailable")msg="Google Drive did not answer, retrying";
-  else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else msg="Live "+what+" unavailable";return msg}
+  else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else if(c==="rate_limited")msg="too many requests to the "+what+" source; wait a few minutes and retry";else if(c==="no_data")msg="the price source returned nothing for your holdings";else if(/^source_http_/.test(c||""))msg=what+" source error (HTTP "+c.slice(12)+")";else msg="Live "+what+" unavailable";return msg}
 (async()=>{
   mcp=await PT_ADAPTER.use("mcp");
   if(!mcp){if(S.source!=="snapshot")setPill("st-prices","Prices: live feed unavailable in this view","stale");return}
@@ -2068,7 +2092,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   /* re-pull history when the set of US-listed tickers changes, so new holdings get prices and charts */
   const histSigOf=items=>(items||[]).filter(h=>h&&h.tk!=="CASH").map(h=>h.tk+"|"+h.cur).sort().join(",");
   let histSig=histSigOf((()=>{try{return JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all")).items}catch(e){return[]}})());
-  window.PT_ONHOLD=()=>{const sig=histSigOf(phLoad().items);if(sig!==histSig){histSig=sig;if(window.PT_DATA_SOURCE)loadHist(true)}};
+  let valSig=null;window.PT_ONHOLD=()=>{const vs=phLoad().items.map(h=>h.tk).filter(t=>t&&t!=="CASH").sort().join(",");if(valSig!==null&&vs!==valSig&&window.PT_RELOAD_VAL)window.PT_RELOAD_VAL();valSig=vs;const sig=histSigOf(phLoad().items);if(sig!==histSig){histSig=sig;if(window.PT_DATA_SOURCE)loadHist(true)}};
   mcp.watchTool(DRIVE,TOOL,{fileId:ROT_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"D|SPY");if(!t){if(!S.rot){S.rotErr="Rotation data export could not be read.";renderRotation()}return}
       const R=parseRotation(t);if(!R.D.SPY||!R.D.SPY.length){if(!S.rot){S.rotErr="Rotation data is empty.";renderRotation()}return}
@@ -2087,11 +2111,13 @@ function handleErr(err,what){const c=err&&err.code;let msg;
       if(O&&O.stocks.length>400&&O.etf.SPY&&O.etf.SPY.pts.length>60){S.obos=O;S.obM=null;S.obErr=null;S.obAt=ev.result.cache?ev.result.cache.storedAt:Date.now()}else if(!S.obos)S.obErr="Overbought/oversold data export could not be read (the sheet may still be calculating).";renderObos()}
     else{if(authz(ev.error&&ev.error.code)){S.obos=null;S.obM=null}S.obErr=handleErr(ev.error,"overbought/oversold data");if(!S.obos)renderObos()}
   },{cache:{staleTime:900000,gcTime:12*3600000},refetchInterval:1800000});
-  mcp.watchTool(DRIVE,TOOL,{fileId:VALIN_ID,exportMimeType:"text/csv"},ev=>{
+  const loadValin=()=>mcp.watchTool(DRIVE,TOOL,{fileId:VALIN_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Price,MarketCap");const V=t&&parseValin(t);
       if(V&&Object.keys(V.rows).length>0){S.valin=V;S.valinSrc="live";S.valinErr=null}else if(!S.valin)S.valinErr="Valuation inputs export could not be read.";renderValAll()}
-    else{if(authz(ev.error&&ev.error.code)&&S.valinSrc==="live"){S.valin=null;S.valinSrc=null}S.valinErr=handleErr(ev.error,"valuation inputs");renderValAll()}
+    else{if(authz(ev.error&&ev.error.code)&&S.valinSrc==="live"){S.valin=null;S.valinSrc=null}S.valinErr=handleErr(ev.error,"valuation inputs");if(ev.error&&ev.error.code==="not_configured")S.valinErr="No data source is configured. Choose one on the Settings tab.";renderValAll()}
   },{cache:{staleTime:300000,gcTime:6*3600000},refetchInterval:900000});
+  loadValin();
+  window.PT_RELOAD_VAL=()=>{S.valinErr=null;S.fundErr=null;S.fundLoaded=false;S.valinSrc=null;S.valin=null;S.fund={};S.fundMissing={};renderValAll();ptEmit("fund/x");loadValin()};
   mcp.watchTool(DRIVE,TOOL,{fileId:FACTOR_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Kind");const F=t&&parseFactor(t);
       if(F&&F.px.SPY&&F.px.SPY.length>200){S.factor=F;S.factorErr=null;S.qfM=null;S.rgM=null;S.rvM=null}else if(!S.factor)S.factorErr="Factor data export could not be read (the sheet may still be calculating).";renderLead();renderRegime()}

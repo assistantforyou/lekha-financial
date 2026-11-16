@@ -65,30 +65,41 @@ async function many(symbols) {
   return out;
 }
 
+// Plain-language reasons a holding gets no DCF; shown on the Intrinsic value tab so nothing disappears silently.
+const WHY = {
+  not_in_sec_universe: "Not an S&P 500 company or recognised US ETF, so there are no SEC filings to build a cash-flow model from (non-US listings such as HK or Thai stocks, small caps, crypto and bonds are not covered by the free source).",
+  no_filings: "No annual cash-flow filings found at SEC EDGAR for this company.",
+  fetch_failed: "SEC EDGAR did not answer in time. Reload to retry.",
+  no_revenue_or_cash_flow_tags: "Its SEC filings lack standard revenue or operating-cash-flow data (typical of banks, insurers and REIT-style filers), so a free-cash-flow DCF cannot be built.",
+  fewer_than_3_years: "Fewer than 3 fiscal years of revenue, operating cash flow and capex in its filings, too little history for a DCF.",
+};
+const whyText = (c) => WHY[c] || "Not enough SEC data to value this holding.";
+
 async function fundCollection(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(200).json([]);
-  if (await limited(req)) return res.status(429).end();
+  if (await limited(req)) return res.status(429).json({ error: "rate_limited" });
   const syms = symbolsOf(req);
   if (!syms.length) return res.status(200).json([]);
   const s = await many(syms);
   // analyst consensus (Alpha Vantage, cached per symbol) replaces the trailing-growth fallback where available
   const companies = syms.filter((t) => s[t] && s[t].kind === "company");
   const est = companies.length ? await estimatesFor(companies, { fresh: 2 }).catch(() => ({})) : {};
-  return res.status(200).json(syms.filter((t) => s[t] && s[t].fund).map((t) => {
+  const missing = syms.filter((t) => !(s[t] && s[t].fund)).map((t) => ({ id: "_missing_" + t, data: { t, missing: true, why: (s[t] && s[t].why) || "fetch_failed", message: whyText(s[t] && s[t].why) } }));
+  return res.status(200).json(missing.concat(syms.filter((t) => s[t] && s[t].fund).map((t) => {
     const fund = s[t].fund, e = est[t];
     if (!e || !fund.fc) return { id: t, data: fund };
     const c = consensusFc(e.est, e.ov);
     const fc = { ...fund.fc, ...c };
     if (c.basis !== "consensus") { fc.basis = fund.fc.basis; fc.note = fund.fc.note + (c.pt ? " Analyst target price from Alpha Vantage." : ""); }
     return { id: t, data: { ...fund, fc } };
-  }));
+  })));
 }
 
 async function valinCsvHandler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(204).end();
-  if (await limited(req)) return res.status(429).end();
+  if (await limited(req)) return res.status(429).json({ error: "rate_limited" });
   const syms = symbolsOf(req);
   if (!syms.length) return res.status(204).end();
   const [s, px] = await Promise.all([many(syms), seriesFor([...new Set([...syms, "SPY"])])]);
@@ -107,4 +118,4 @@ async function valinCsvHandler(req, res) {
   return res.status(200).send(csv);
 }
 
-module.exports = { fundCollection, valinCsvHandler };
+module.exports = { fundCollection, valinCsvHandler, whyText };
