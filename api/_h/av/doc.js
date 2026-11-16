@@ -1,6 +1,6 @@
-const { requirePremium } = require("../_auth");
-const { av, cached } = require("../_lib");
-const { macroFrom } = require("../_mappers");
+const { requirePremium } = require("../../_auth");
+const { av, cached } = require("../../_lib");
+const { macroFrom } = require("../../_mappers");
 
 const DAY = 864e5;
 module.exports = async (req, res) => {

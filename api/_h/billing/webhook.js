@@ -1,6 +1,6 @@
 // Stripe webhook: keeps pt_profiles.sub_status / period_end in step with the subscription. Signature-verified.
-const { sb } = require("../_lib");
-const { stripe, verifySignature, periodEnd } = require("../_stripe");
+const { sb } = require("../../_lib");
+const { stripe, verifySignature, periodEnd } = require("../../_stripe");
 
 const raw = (req) => new Promise((resolve, reject) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => resolve(Buffer.concat(c).toString("utf8"))); req.on("error", reject); });
 const patch = (filter, body) => sb(`pt_profiles?${filter}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ...body, updated_at: new Date().toISOString() }) });

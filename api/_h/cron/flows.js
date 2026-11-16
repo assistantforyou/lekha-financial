@@ -1,6 +1,6 @@
 // Vercel cron target (see vercel.json). Vercel sends "Authorization: Bearer $CRON_SECRET"; anything else is refused.
 const crypto = require("crypto");
-const { runEtf } = require("../_etf");
+const { runEtf } = require("../../_etf");
 
 const same = (a, b) => { const x = Buffer.from(String(a)), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 

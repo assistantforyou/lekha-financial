@@ -1,9 +1,43 @@
 {
-  "functions": { "api/**/*.js": { "maxDuration": 60 } },
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
-    { "path": "/api/cron/flows", "schedule": "30 23 * * 1-5" },
-    { "path": "/api/cron/insiders?run=1", "schedule": "10 2 * * *" },
-    { "path": "/api/cron/insiders?run=2", "schedule": "40 3 * * *" },
-    { "path": "/api/cron/insiders?run=3", "schedule": "10 5 * * *" }
+    {
+      "path": "/api/cron/flows",
+      "schedule": "30 23 * * 1-5"
+    },
+    {
+      "path": "/api/cron/insiders?run=1",
+      "schedule": "10 2 * * *"
+    },
+    {
+      "path": "/api/cron/insiders?run=2",
+      "schedule": "40 3 * * *"
+    },
+    {
+      "path": "/api/cron/insiders?run=3",
+      "schedule": "10 5 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/free/:r*",
+      "destination": "/api/free?__r=:r*"
+    },
+    {
+      "source": "/api/av/:r*",
+      "destination": "/api/av?__r=:r*"
+    },
+    {
+      "source": "/api/billing/:r*",
+      "destination": "/api/billing?__r=:r*"
+    },
+    {
+      "source": "/api/cron/:r*",
+      "destination": "/api/cron?__r=:r*"
+    }
   ]
 }

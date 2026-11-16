@@ -1,6 +1,6 @@
 // GET /api/free/status: when each free dataset was last refreshed (for the Settings page freshness chart). No secrets.
-const { cacheGetMany } = require("../_lib");
-const { lastDays } = require("../_insiders");
+const { cacheGetMany } = require("../../_lib");
+const { lastDays } = require("../../_insiders");
 
 const SETS = [
   ["Rates & inflation (FRED)", "free/meta/macro"], ["Regime inputs (FRED)", "free/meta/fredhist"], ["Futures positioning (CFTC)", "free/meta/cftc"],

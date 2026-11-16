@@ -11,7 +11,11 @@ const require = createRequire(import.meta.url);
 const PORT = Number(process.argv[2]) || 3456;
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 
+// same rewrites as vercel.json: /api/<group>/<rest> -> api/<group>.js?__r=<rest>
+const REWRITE = /^\/api\/(free|av|billing|cron)\/(.+)$/;
 function route(pathname) {
+  const rw = REWRITE.exec(pathname);
+  if (rw) return { file: join(ROOT, "api", rw[1] + ".js"), query: { __r: rw[2] } };
   const parts = pathname.replace(/^\/api\//, "").split("/").filter(Boolean);
   let dir = join(ROOT, "api"); const query = {};
   for (let i = 0; i < parts.length; i++) {

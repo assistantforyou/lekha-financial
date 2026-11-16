@@ -1,9 +1,9 @@
-const { requirePremium } = require("../../_auth");
-const { av, cached } = require("../../_lib");
-const { newsFrom } = require("../../_mappers");
-const { estimatesFor, revDoc } = require("../../_estimates");
-const { cleanSymbols } = require("../../_history");
-const { newsDocs } = require("../../_news");
+const { requirePremium } = require("../../../_auth");
+const { av, cached } = require("../../../_lib");
+const { newsFrom } = require("../../../_mappers");
+const { estimatesFor, revDoc } = require("../../../_estimates");
+const { cleanSymbols } = require("../../../_history");
+const { newsDocs } = require("../../../_news");
 
 module.exports = async (req, res) => {
   if (!(await requirePremium(req, res))) return; // Premium: signed-in subscribers only

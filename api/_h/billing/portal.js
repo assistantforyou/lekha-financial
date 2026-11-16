@@ -1,6 +1,6 @@
 // POST /api/billing/portal (signed in) -> {url} of the Stripe customer portal (cancel, change card, invoices).
-const { requireUser, profile } = require("../_auth");
-const { stripe } = require("../_stripe");
+const { requireUser, profile } = require("../../_auth");
+const { stripe } = require("../../_stripe");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");

@@ -1,9 +1,9 @@
-const { newsDocs } = require("../../_news");
-const { etfCollection } = require("../../_etf");
-const { fundCollection } = require("../../_valuation");
-const { estimatesFor, revDoc } = require("../../_estimates");
-const { cleanSymbols, rateLimited } = require("../../_history");
-const { insiderCollection } = require("../../_insiders");
+const { newsDocs } = require("../../../_news");
+const { etfCollection } = require("../../../_etf");
+const { fundCollection } = require("../../../_valuation");
+const { estimatesFor, revDoc } = require("../../../_estimates");
+const { cleanSymbols, rateLimited } = require("../../../_history");
+const { insiderCollection } = require("../../../_insiders");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");

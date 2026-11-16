@@ -1,7 +1,7 @@
 // POST /api/free/extras {symbols:[...]} -> {ath:{SYM:{v,d,from}}, fx:{usdthb,hkdusd,asOf,source}}
 // Tickers come in the POST body (not the URL) and are not stored; per-client rate limit shared with HISTORY.
-const { cleanSymbols, rateLimited } = require("../_history");
-const { allTimeHighs, fxRates } = require("../_intl");
+const { cleanSymbols, rateLimited } = require("../../_history");
+const { allTimeHighs, fxRates } = require("../../_intl");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");

@@ -1,6 +1,6 @@
 // POST /api/billing/checkout (signed in) -> {url} of a Stripe Checkout page for the Premium subscription ($60/month).
-const { requireUser, profile, updateProfile } = require("../_auth");
-const { stripe } = require("../_stripe");
+const { requireUser, profile, updateProfile } = require("../../_auth");
+const { stripe } = require("../../_stripe");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
