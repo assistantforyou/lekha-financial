@@ -19,7 +19,7 @@ async function userFrom(req) {
     const r = await gotrue("user", { headers: { Authorization: `Bearer ${tok}` } });
     if (!r.ok) return null;
     const u = await r.json();
-    return u && u.id ? { id: u.id, email: u.email } : null;
+    return u && u.id ? { id: u.id, email: u.email, confirmed: !!(u.email_confirmed_at || u.confirmed_at) } : null;
   } catch (e) { return null; }
 }
 
@@ -31,7 +31,7 @@ async function profile(user) {
     p = ins.ok ? (await ins.json())[0] : { user_id: user.id, email: user.email, plan: "free", prefs: {} };
   }
   const premium = ["active", "trialing"].includes(p.sub_status);
-  return { ...p, premium, is_admin: isAdmin(user.email) };
+  return { ...p, premium, is_admin: !!user.confirmed && isAdmin(user.email) };
 }
 
 async function updateProfile(userId, patch) {
@@ -53,7 +53,8 @@ async function requirePremium(req, res) {
 }
 async function requireAdmin(req, res) {
   const u = await userFrom(req);
-  if (!u || !isAdmin(u.email)) { res.status(u ? 403 : 401).json({ error: "Admins only." }); return null; }
+  // admin = a confirmed email on the server-side ADMIN_EMAILS list (an unconfirmed sign-up with that address gets nothing)
+  if (!u || !u.confirmed || !isAdmin(u.email)) { res.status(u ? 403 : 401).json({ error: "Admins only." }); return null; }
   return u;
 }
 

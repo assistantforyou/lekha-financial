@@ -634,7 +634,7 @@ function renderTable(){
   const tb=$("tbody");let h="";
   for(const a of list){const open=S.open.has(a.ticker);
     h+=`<tr class="main" tabindex="0" data-t="${esc(a.ticker)}" aria-expanded="${open}">
-      <td><span class="tk">${esc(a.cur==="HKD"?a.ticker+".HK":a.ticker)}</span>${a.est?'<span class="est" title="Share count estimated">EST</span>':""}</td>
+      <td><span class="tk">${esc(a.cur==="HKD"&&!/\.HK$/.test(a.ticker)?a.ticker+".HK":a.ticker)}</span>${a.est?'<span class="est" title="Share count estimated">EST</span>':""}</td>
       <td class="l muted">${esc(a.theme)}</td><td class="n">${a.priced?priceFmt(a.price,a.cur):"–"}</td>
       <td class="n">${money(a.value,0)}</td><td class="n">${pct(a.weight,1,false)}</td>
       <td class="n ${cls(a.day)}">${pct(a.day)}</td><td class="n ${cls(a.w1)}">${pct(a.w1)}</td><td class="n ${cls(a.m1)}">${pct(a.m1)}</td><td class="n ${cls(a.ytd)}">${pct(a.ytd)}</td>
@@ -651,18 +651,18 @@ function bar(label,v,max,hot,right){return `<div class="brow"><span class="${hot
 function renderRisk(){
   const {list,total}=aggregate();const inv=list.filter(a=>a.ticker!=="CASH");
   const top=[...inv].sort((a,b)=>b.weight-a.weight).slice(0,8);const mx=top[0]?top[0].weight:1;
-  $("conc").innerHTML=top.map(a=>bar(`<span class="tk">${esc(a.cur==="HKD"?a.ticker+".HK":a.ticker)}</span>`,a.weight,mx,a.weight>=0.08,pct(a.weight,1,false))).join("");
+  $("conc").innerHTML=top.map(a=>bar(`<span class="tk">${esc(a.cur==="HKD"&&!/\.HK$/.test(a.ticker)?a.ticker+".HK":a.ticker)}</span>`,a.weight,mx,a.weight>=0.08,pct(a.weight,1,false))).join("");
   const th={};for(const a of list)th[a.theme]=(th[a.theme]||0)+a.value;const ta=Object.entries(th).sort((a,b)=>b[1]-a[1]);const tm=ta[0]?ta[0][1]:1;
   $("themes").innerHTML=ta.map(([t,v])=>bar(esc(t),v,tm,AI_THEMES.includes(t),pct(v/total,1,false))).join("");
   const ai=list.filter(a=>AI_THEMES.includes(a.theme)).reduce((s,a)=>s+a.value,0);
   $("ai-exp").innerHTML=`AI-linked exposure <b class="mono">${pct(ai/total,1,false)}</b>`;
   $("ai-exp").title="Themes counted as AI-linked: semiconductors, megacap tech, photonics, software, and power & energy. Amber bars.";
   const al=inv.filter(a=>a.fromAth!=null&&a.fromAth<=-0.25).sort((a,b)=>a.fromAth-b.fromAth);
-  const alMore=al.length>8?al.length-8:0;$("alerts").innerHTML=al.length?al.slice(0,8).map(a=>`<div class="alert ${a.fromAth<=-0.4?"sev-crit":"sev-warn"}"><span class="stripe"></span><span><b class="tk">${esc(a.cur==="HKD"?a.ticker+".HK":a.ticker)}</b> <span class="muted">${pct(a.weight,1,false)} of book · ATH ${priceFmt(a.ath,a.cur)}</span></span><span class="mono down">${pct(a.fromAth,1)}</span></div>`).join("")+(alMore?`<div class="note">${alMore} more below 25%. Sort the holdings table by From ATH to see all.</div>`:""):'<div class="note">No holding is 25% or more below its all-time high.</div>';
+  const alMore=al.length>8?al.length-8:0;$("alerts").innerHTML=al.length?al.slice(0,8).map(a=>`<div class="alert ${a.fromAth<=-0.4?"sev-crit":"sev-warn"}"><span class="stripe"></span><span><b class="tk">${esc(a.cur==="HKD"&&!/\.HK$/.test(a.ticker)?a.ticker+".HK":a.ticker)}</b> <span class="muted">${pct(a.weight,1,false)} of book · ATH ${priceFmt(a.ath,a.cur)}</span></span><span class="mono down">${pct(a.fromAth,1)}</span></div>`).join("")+(alMore?`<div class="note">${alMore} more below 25%. Sort the holdings table by From ATH to see all.</div>`:""):'<div class="note">No holding is 25% or more below its all-time high.</div>';
   const mv=inv.filter(a=>a.day!=null).sort((a,b)=>Math.abs(b.day)-Math.abs(a.day)).slice(0,5);const mm=mv[0]?Math.abs(mv[0].day):1;
-  $("movers-up").innerHTML=mv.map(a=>bar(`<span class="tk ${cls(a.day)}">${esc(a.cur==="HKD"?a.ticker+".HK":a.ticker)}</span>`,Math.abs(a.day),mm,false,`<span class="${cls(a.day)}">${pct(a.day)}</span>`)).join("");
+  $("movers-up").innerHTML=mv.map(a=>bar(`<span class="tk ${cls(a.day)}">${esc(a.cur==="HKD"&&!/\.HK$/.test(a.ticker)?a.ticker+".HK":a.ticker)}</span>`,Math.abs(a.day),mm,false,`<span class="${cls(a.day)}">${pct(a.day)}</span>`)).join("");
   const lo=inv.filter(a=>a.pnlPct!=null).sort((a,b)=>a.pnlPct-b.pnlPct).slice(0,5);const lm=lo[0]?Math.abs(lo[0].pnlPct):1;
-  $("losers").innerHTML=lo.map(a=>bar(`<span class="tk">${esc(a.cur==="HKD"?a.ticker+".HK":a.ticker)}</span>`,Math.abs(Math.min(0,a.pnlPct)),lm||1,false,`<span class="${cls(a.pnlPct)}">${pct(a.pnlPct)}</span>`)).join("")}
+  $("losers").innerHTML=lo.map(a=>bar(`<span class="tk">${esc(a.cur==="HKD"&&!/\.HK$/.test(a.ticker)?a.ticker+".HK":a.ticker)}</span>`,Math.abs(Math.min(0,a.pnlPct)),lm||1,false,`<span class="${cls(a.pnlPct)}">${pct(a.pnlPct)}</span>`)).join("")}
 
 /* ---------- charts ---------- */
 function rangeStart(r,last){const d=new Date(last);if(r==="1M")d.setMonth(d.getMonth()-1);else if(r==="3M")d.setMonth(d.getMonth()-3);else if(r==="6M")d.setMonth(d.getMonth()-6);else if(r==="YTD")return Date.UTC(d.getUTCFullYear(),0,1);else if(r==="1Y")d.setFullYear(d.getFullYear()-1);else d.setFullYear(d.getFullYear()-5);return d.getTime()}
@@ -791,7 +791,7 @@ function renderRotation(){
   const slope=n>=5&&s.m20[n-5]!=null&&a!=null?(a>s.m20[n-5]?"rising":"falling"):null;
   const meaning=tr.label==="Uptrend"?P.up:tr.label==="Downtrend"?P.down:(ch>=0?P.up:P.down);
   let bookLine="";if(S.rows.length){const {list,total}=aggregate();const inT=list.filter(x=>P.themes.includes(x.theme));const w=inT.reduce((q,x)=>q+x.value,0);
-    const tk=inT.sort((x,y)=>y.value-x.value).map(x=>x.cur==="HKD"?x.ticker+".HK":x.ticker).slice(0,6).join(", ");bookLine=P.book(pct(total?w/total:0,1,false),tk||"none")}
+    const tk=inT.sort((x,y)=>y.value-x.value).map(x=>x.cur==="HKD"&&!/\.HK$/.test(x.ticker)?x.ticker+".HK":x.ticker).slice(0,6).join(", ");bookLine=P.book(pct(total?w/total:0,1,false),tk||"none")}
   $("rot-read").innerHTML=`<p class="verdict">${esc(P.subj)} ${ch>=0?"outperformed":"underperformed"} SPY over ${S.rotRange}: the ${P.k}/SPY ratio is <span class="${cls(ch)}">${pct(ch,1)}</span><span class="trend-chip ${tr.c}">${tr.label}</span></p>
     <p>The ratio (${rfmt(r)}) is ${r>=a?"above":"below"} its 20-day average (${rfmt(a)}) and ${r>=b?"above":"below"} its 50-day average (${rfmt(b)})${slope?`, and the 20-day average is ${slope}`:""}. ${esc(meaning)}${tr.label==="Turning up"?` It has moved back above its 20-day average while the 20-day is still below the 50-day, so the turn is not yet confirmed${ch<0?` and runs against the ${S.rotRange} downtrend`:""}.`:tr.label==="Weakening"?` It has slipped below its 20-day average while the 20-day is still above the 50-day, an early warning that is not yet confirmed${ch>0?` and runs against the ${S.rotRange} uptrend`:""}.`:tr.label==="Downtrend"&&ch>0?` It is still ahead of SPY over ${S.rotRange}, but that lead is now being given back.`:tr.label==="Uptrend"&&ch<0?` It is still behind SPY over ${S.rotRange}, but the recent trend has turned up.`:""}</p>
     ${bookLine?`<p class="muted">${esc(bookLine)}</p>`:""}

@@ -32,8 +32,13 @@ module.exports = async (req, res) => {
       ? await gotrue("signup", { method: "POST", body: JSON.stringify({ email, password }) })
       : await gotrue("token?grant_type=password", { method: "POST", body: JSON.stringify({ email, password }) });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) return res.status(r.status === 429 ? 429 : 400).json({ error: action === "login" ? "Wrong email or password, or the email is not confirmed yet." : msg(j, "Sign-up failed.") });
-    if (!j.access_token) return res.status(200).json({ confirm: true, message: "Check your email for a confirmation link, then sign in." });
+    if (r.status === 429) return res.status(429).json({ error: "Too many attempts. Wait a few minutes." });
+    if (action === "login" && !r.ok) return res.status(400).json({ error: "Wrong email or password, or the email is not confirmed yet." });
+    // sign-up never says whether an address is already registered: same answer either way
+    if (action === "signup" && (!r.ok || !j.access_token)) {
+      if (!r.ok) console.error("signup refused:", r.status, String(msg(j, "")).slice(0, 80));
+      return res.status(200).json({ confirm: true, message: "If this email can be used, a confirmation link is on its way. Confirm it, then sign in." });
+    }
     return res.status(200).json({ session: session(j) });
   }
   if (action === "refresh") {
