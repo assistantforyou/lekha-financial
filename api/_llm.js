@@ -13,6 +13,8 @@ const { logUsage } = require("./_costs");
 
 const ZAI = "https://api.z.ai/api/paas/v4";
 const GEMINI_DEFAULT = "gemini-3.5-flash-lite"; // gemini-3.5-flash was deprecated 2026-10-08
+const DEPRECATED = new Set(["gemini-3.5-flash", "gemini-2.5-flash"]);
+const geminiModel = () => (process.env.GEMINI_MODEL && !DEPRECATED.has(process.env.GEMINI_MODEL) ? process.env.GEMINI_MODEL : GEMINI_DEFAULT);
 const err = (msg, status) => Object.assign(new Error(msg), { status });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -94,7 +96,7 @@ async function zaiOcr({ mime, base64 }) {
 async function geminiJson({ job, model, system, parts, schema, temperature = 0.1, timeoutMs = 50000 }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw err("not_configured", 503);
-  const m = model || process.env.GEMINI_MODEL || GEMINI_DEFAULT;
+  const m = model || geminiModel();
   const r = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
@@ -157,9 +159,9 @@ async function generateJson({ system, user, schema, model, timeoutMs = 50000, jo
 // Which provider/model serves each job (shown on the Settings page; no secrets).
 function describe() {
   return {
-    import: zaiReady() ? `Z.ai ${process.env.LLM_TEXT_MODEL || "glm-4.6v-flash"} (text) / ${process.env.LLM_VISION_MODEL || "glm-4.6v-flash"} (images)${process.env.LLM_OCR === "1" ? " + GLM-OCR" : ""}` : geminiReady() ? `Gemini ${process.env.GEMINI_MODEL || GEMINI_DEFAULT}` : "not configured",
+    import: zaiReady() ? `Z.ai ${process.env.LLM_TEXT_MODEL || "glm-4.6v-flash"} (text) / ${process.env.LLM_VISION_MODEL || "glm-4.6v-flash"} (images)${process.env.LLM_OCR === "1" ? " + GLM-OCR" : ""}` : geminiReady() ? `Gemini ${geminiModel()}` : "not configured",
     news: zaiReady() ? `Z.ai ${process.env.NEWS_MODEL || "glm-4.6v-flash"}` : geminiReady() ? `Gemini ${GEMINI_DEFAULT}` : "not configured",
-    fallback: geminiReady() ? `Gemini ${process.env.GEMINI_MODEL || GEMINI_DEFAULT}` : "none",
+    fallback: geminiReady() ? `Gemini ${geminiModel()}` : "none",
   };
 }
 
