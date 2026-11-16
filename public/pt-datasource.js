@@ -2,7 +2,7 @@
    Config lives only in this browser (localStorage "ptpub.v1.source"). Types:
      none     no market data (panels show "no market-data source connected")
      free     this site's free tier: public sources (FRED, ...) through /api/free, no key needed
-     av       premium tier: Alpha Vantage through /api/av (key held server-side)
+     premium  everything in free, plus Alpha Vantage extras through /api/av (signed-in subscribers; checked server-side)
      custom   any HTTP endpoint implementing the contract below, optional bearer token
    With nothing saved the free tier is the default; choosing "none" is stored explicitly.
    Endpoint contract (base = URL without trailing slash):
@@ -12,15 +12,34 @@
      GET base/collection/<name>     -> JSON [{id, data}]  (news fund rev etf ins)
    Entitlement checks belong on that server; nothing here is security. */
 (function () {
+  /* ---- account session (email + password via /api/auth; tokens kept in this browser) ---- */
+  var SKEY = "ptpub.v1.session";
+  function sess() { try { return JSON.parse(localStorage.getItem(SKEY) || "null"); } catch (e) { return null; } }
+  function setSess(v) { try { if (v) localStorage.setItem(SKEY, JSON.stringify(v)); else localStorage.removeItem(SKEY); } catch (e) {} }
+  var refreshing = null;
+  async function token() {
+    var s = sess(); if (!s || !s.access_token) return null;
+    if (s.expires_at && s.expires_at * 1000 - Date.now() > 60000) return s.access_token;
+    if (!refreshing) refreshing = fetch("/api/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: s.refresh_token }) })
+      .then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.session) { j.session.email = j.session.email || s.email; setSess(j.session); return j.session.access_token; } setSess(null); return null; })
+      .catch(function () { return s.access_token; }).finally(function () { refreshing = null; });
+    return refreshing;
+  }
+  async function authFetch(url, opts) {
+    opts = opts || {}; var t = await token(); var h = Object.assign({}, opts.headers || {});
+    if (t) h.Authorization = "Bearer " + t;
+    return fetch(url, Object.assign({}, opts, { headers: h }));
+  }
+  window.PT_AUTH = { session: sess, setSession: setSess, token: token, fetch: authFetch };
+
   var KEY = "ptpub.v1.source";
   function load() {
-    try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && v.type) { if (v.type === "builtin") v.type = "av"; return v; } } catch (e) {}
+    try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && v.type) { if (v.type === "builtin" || v.type === "av") v.type = "premium"; return v; } } catch (e) {}
     return { type: "free" };
   }
   function save(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); return true; } catch (e) { return false; } }
   function baseOf(c) {
-    if (c.type === "free") return location.origin + "/api/free";
-    if (c.type === "av") return location.origin + "/api/av";
+    if (c.type === "free" || c.type === "premium") return location.origin + "/api/free";
     if (c.type === "custom" && c.url) return String(c.url).trim().replace(/\/+$/, "");
     return null;
   }
@@ -35,14 +54,24 @@
   /* ---- your holdings -> free-tier prices ----
      The tickers go to the server in a POST body (not the URL) so they are not written into request logs; nothing is stored.
      The returned history also gives live quote fields, published as window.PT_LIVE for the holdings table. US-listed USD holdings only. */
-  function holdingSymbols() {
-    try {
-      var v = JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all") || "null");
-      return ((v && v.items) || []).filter(function (h) { return h && h.tk && h.tk !== "CASH" && h.cur === "USD"; }).map(function (h) { return h.tk; });
-    } catch (e) { return []; }
+  /* quote symbol for a holding: US tickers as-is; HKD -> 0700.HK, THB -> PTT.BK (suffix added when missing) */
+  function quoteSym(h) {
+    var t = String(h.tk || "").toUpperCase();
+    if (h.cur === "HKD" && !/\.HK$/.test(t)) return /^\d+$/.test(t) ? ("0000" + t).slice(-4) + ".HK" : t + ".HK";
+    if (h.cur === "THB" && !/\.BK$/.test(t)) return t + ".BK";
+    return t;
   }
+  function holdingMap() {
+    try {
+      var v = JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all") || "null"), m = {};
+      ((v && v.items) || []).forEach(function (h) { if (h && h.tk && h.tk !== "CASH") m[quoteSym(h)] = h.tk; });
+      return m;
+    } catch (e) { return {}; }
+  }
+  function holdingSymbols() { return Object.keys(holdingMap()); }
+  window.PT_QUOTE_SYM = quoteSym;
   function parseCsvLine(l) { return l.split(","); }
-  function computeLive(text, syms) {
+  function computeLive(text, syms, map) {
     var lines = String(text).split("\n"), head = parseCsvLine(lines[0] || ""), live = {}, newest = 0;
     for (var j = 0; j < head.length; j += 2) {
       var m = /^D\|(.+)$/.exec(head[j] || ""); if (!m || syms.indexOf(m[1]) < 0) continue;
@@ -54,7 +83,7 @@
       for (var q = n - 1; q >= 0; q--) if (new Date(pts[q][0]).getUTCFullYear() < yr) { prevYear = pts[q][1]; break; }
       var hi = 0; for (var r2 = Math.max(0, n - 252); r2 < n; r2++) if (pts[r2][1] > hi) hi = pts[r2][1];
       var rel = function (base) { return base ? px / base - 1 : null; };
-      live[m[1]] = { px: px, prev: at(1), hi52: hi, day: rel(at(1)), w1: rel(at(5)), m1: rel(at(21)), ytd: rel(prevYear), from52: rel(hi) };
+      live[(map && map[m[1]]) || m[1]] = { px: px, prev: at(1), hi52: hi, day: rel(at(1)), w1: rel(at(5)), m1: rel(at(21)), ytd: rel(prevYear), from52: rel(hi) };
       if (pts[n - 1][0] > newest) newest = pts[n - 1][0];
     }
     var sig = JSON.stringify(live), changed = sig !== window.PT_LIVE_SIG;
@@ -67,7 +96,21 @@
     var r = await fetch(location.origin + "/api/free/csv/" + key, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
     if (r.status === 204 || r.status === 404) return null;
     if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
-    var t = await r.text(); if (key === "HISTORY") computeLive(t, syms); return t;
+    var t = await r.text();
+    if (key === "HISTORY") { computeLive(t, syms, holdingMap()); loadExtras(syms); }
+    return t;
+  }
+
+  /* all-time highs + FX rates (ECB) for the holdings table; tickers in a POST body */
+  async function loadExtras(syms) {
+    try {
+      var r = await fetch(location.origin + "/api/free/extras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
+      if (!r.ok) return;
+      var j = await r.json(), map = holdingMap(), ath = {};
+      Object.keys(j.ath || {}).forEach(function (s) { ath[map[s] || s] = j.ath[s]; });
+      window.PT_ATH = ath; window.PT_FX = j.fx || null;
+      if (window.PT_HOLD) window.PT_HOLD.apply();
+    } catch (e) { /* the table keeps its other columns */ }
   }
 
   /* Intrinsic value inputs for your own holdings: tickers in a POST body, never the URL; nothing stored. */
@@ -80,15 +123,30 @@
     return asText ? r.text() : r.json();
   }
 
+  /* Premium extras (Alpha Vantage news / estimates); null = not entitled or failed, so the free data is used */
+  async function premiumCollection(n) {
+    try {
+      var syms = holdingSymbols().slice(0, 25);
+      var r = n === "rev"
+        ? await authFetch("/api/av/collection/rev", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) })
+        : await authFetch("/api/av/collection/" + n);
+      if (!r.ok) { window.PT_PREMIUM_STATE = r.status; return null; }
+      window.PT_PREMIUM_STATE = 200;
+      var j = await r.json(); return Array.isArray(j) && j.length ? j : null;
+    } catch (e) { return null; }
+  }
+
   var cfg = load();
-  window.PT_SOURCE_LABEL = cfg.type === "av" ? "Alpha Vantage" : cfg.type === "free" ? "free public data" : cfg.type === "custom" ? "custom data source" : "";
+  window.PT_SOURCE_LABEL = cfg.type === "premium" ? "Premium (Alpha Vantage + free sources)" : cfg.type === "free" ? "free public data" : cfg.type === "custom" ? "custom data source" : "";
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
-      fetchCsv: function (k) { return cfg.type === "free" && (k === "HISTORY" || k === "FACTOR") ? freePost(k) : cfg.type === "free" && k === "VALIN" ? holdPost("csv/VALIN", true) : get(cfg, "/csv/" + encodeURIComponent(k), true); },
+      fetchCsv: function (k) { return (cfg.type === "free" || cfg.type === "premium") && (k === "HISTORY" || k === "FACTOR") ? freePost(k) : (cfg.type === "free" || cfg.type === "premium") && k === "VALIN" ? holdPost("csv/VALIN", true) : get(cfg, "/csv/" + encodeURIComponent(k), true); },
       getDoc: async function (p) { var v = await get(cfg, "/doc?path=" + encodeURIComponent(p), false); return v && typeof v === "object" && !Array.isArray(v) ? v : null; },
       getCollection: async function (n) {
         /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */
-        var v = cfg.type === "free" && n === "fund" ? await holdPost("collection/fund", false) : await get(cfg, "/collection/" + encodeURIComponent(n), false);
+        var v = null;
+        if (cfg.type === "premium" && (n === "news" || n === "rev")) v = await premiumCollection(n);
+        if (v == null) v = (cfg.type === "free" || cfg.type === "premium") && (n === "fund" || n === "rev") ? await holdPost("collection/" + n, false) : await get(cfg, "/collection/" + encodeURIComponent(n), false);
         if (!Array.isArray(v)) return [];
         return v.filter(function (d) {
           if (!d || typeof d.id !== "string" || !d.data || typeof d.data !== "object") return false;
@@ -107,73 +165,9 @@
     };
   }
 
-  /* ---- UI ---- */
-  var css = document.createElement("style");
-  css.textContent =
-    "#ds-dlg{max-width:460px;width:calc(100% - 32px);background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:16px}" +
-    "#ds-dlg::backdrop{background:rgba(0,0,0,.45)}#ds-dlg h3{margin:0 0 4px;font-family:var(--f-display);font-size:16px}" +
-    "#ds-dlg label.ds-opt{display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid var(--line);border-radius:4px;margin-top:8px;cursor:pointer}" +
-    "#ds-dlg label.ds-opt small{display:block;color:var(--muted)}#ds-dlg .ds-f{display:grid;gap:6px;margin-top:10px}" +
-    "#ds-dlg input[type=text],#ds-dlg input[type=password]{width:100%;font-family:var(--f-mono);font-size:12px;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--fg)}" +
-    "#ds-dlg .ds-row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}#ds-msg{font-size:12px;min-height:18px;margin-top:8px;color:var(--muted)}";
-  document.head.appendChild(css);
-
-  var btn = document.createElement("button");
-  btn.className = "btn"; btn.id = "ds-open";
-  var labels = { none: "Data source: none", free: "Data source: free", av: "Data source: Alpha Vantage", custom: "Data source: custom" };
-  btn.textContent = labels[cfg.type] || labels.none;
-  var status = document.querySelector("header.bar .status");
-  if (status) status.insertBefore(btn, status.firstChild);
-
-  var dlg = document.createElement("dialog");
-  dlg.id = "ds-dlg";
-  dlg.innerHTML =
-    "<h3>Data source</h3><div class='muted' style='font-size:12px'>Where market panels get their data. Holdings never leave this browser.</div>" +
-    "<label class='ds-opt'><input type='radio' name='ds-t' value='none'><span>None<small>Panels show what is missing. Manual prices only.</small></span></label>" +
-    "<label class='ds-opt'><input type='radio' name='ds-t' value='free'><span>Free public data<small>FRED and other public sources through this site. No key, no account; coverage grows as sources are added.</small></span></label>" +
-    "<label class='ds-opt'><input type='radio' name='ds-t' value='av'><span>Alpha Vantage (premium)<small>Licensed market data through this site's proxy. The key stays on the server.</small></span></label>" +
-    "<label class='ds-opt'><input type='radio' name='ds-t' value='custom'><span>Custom endpoint<small>Your own server implementing the endpoint contract.</small></span></label>" +
-    "<div class='ds-f' id='ds-custom' hidden><input type='text' id='ds-url' placeholder='https://your-server.example.com/pt' autocomplete='off' spellcheck='false'>" +
-    "<input type='password' id='ds-token' placeholder='Bearer token (optional, stored in this browser)' autocomplete='off'></div>" +
-    "<div id='ds-msg' role='status'></div>" +
-    "<div class='ds-row'><button class='btn' id='ds-test' type='button'>Test</button><button class='btn' id='ds-cancel' type='button'>Cancel</button><button class='btn' id='ds-save' type='button' style='border-color:var(--accent);color:var(--accent)'>Save &amp; reload</button></div>";
-  document.body.appendChild(dlg);
-
-  function $(id) { return document.getElementById(id); }
-  function cur() { var r = dlg.querySelector("input[name=ds-t]:checked"); return r ? r.value : "none"; }
-  function draft() { var t = cur(); return t === "custom" ? { type: "custom", url: $("ds-url").value, token: $("ds-token").value } : { type: t }; }
-  function sync() { $("ds-custom").hidden = cur() !== "custom"; $("ds-test").disabled = cur() === "none"; }
-  function say(t, bad) { var m = $("ds-msg"); m.textContent = t; m.style.color = bad ? "var(--down)" : "var(--muted)"; }
-  dlg.addEventListener("change", sync);
-  btn.addEventListener("click", function () {
-    var c = load();
-    dlg.querySelector("input[value=" + c.type + "]").checked = true;
-    $("ds-url").value = c.url || ""; $("ds-token").value = c.token || "";
-    say(""); sync(); dlg.showModal();
-  });
-  $("ds-cancel").addEventListener("click", function () { dlg.close(); });
-  $("ds-test").addEventListener("click", async function () {
-    var c = draft();
-    if (c.type === "custom") {
-      var u = (c.url || "").trim();
-      if (!/^https?:\/\//i.test(u)) return say("Enter a full http(s) URL.", true);
-      if (/^http:\/\//i.test(u) && !/^http:\/\/(localhost|127\.0\.0\.1)/i.test(u)) return say("Use https:// (plain http is only allowed for localhost).", true);
-    }
-    say("Testing…");
-    try {
-      var j = await get(c, "/health", false);
-      if (j && j.ok) say("Connected" + (j.name ? ": " + j.name : "") + ".");
-      else say("Reached the server but /health did not return {ok:true}.", true);
-    } catch (e) { say("Could not connect (" + ((e && e.message) || "network or CORS error") + ").", true); }
-  });
-  $("ds-save").addEventListener("click", function () {
-    var c = draft();
-    if (c.type === "custom") {
-      c.url = (c.url || "").trim();
-      if (!/^https?:\/\//i.test(c.url)) return say("Enter a full http(s) URL.", true);
-      if (/^http:\/\//i.test(c.url) && !/^http:\/\/(localhost|127\.0\.0\.1)/i.test(c.url)) return say("Use https:// (plain http is only allowed for localhost).", true);
-    }
-    if (!save(c)) return say("Could not save (browser storage blocked).", true);
-    location.reload();
-  });
+  /* The picker lives on the Settings tab (pt-ui.js); it uses these. */
+  window.PT_DS = {
+    load: load, save: save,
+    test: async function (c) { return get(c.type === "premium" ? { type: "free" } : c, "/health", false); }
+  };
 })();

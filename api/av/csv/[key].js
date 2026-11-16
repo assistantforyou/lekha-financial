@@ -1,3 +1,4 @@
+const { requirePremium } = require("../../_auth");
 const { av, cacheGetMany, cacheSet } = require("../../_lib");
 const { dailyFrom, rotationCsv } = require("../../_mappers");
 
@@ -11,6 +12,7 @@ const COOLDOWN = 30 * 6e4;    // after a failed refresh, wait 30 min before retr
 const MAX_REFRESH = 4;        // per request: 4 calls * 1.2s spacing stays inside the function time limit
 
 module.exports = async (req, res) => {
+  if (!(await requirePremium(req, res))) return; // Premium: signed-in subscribers only
   res.setHeader("Cache-Control", "no-store");
   const syms = SETS[String(req.query.key || "")];
   if (!syms) return res.status(204).end(); // not provided by Alpha Vantage: panel stays in "no source" state
@@ -41,7 +43,7 @@ module.exports = async (req, res) => {
     const csv = rotationCsv(bySym);
     if (!csv) return res.status(204).end();
     // only let the CDN hold the response once every symbol is present; partial sets must keep filling in
-    if (syms.every((s) => bySym[s])) res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
+    if (syms.every((s) => bySym[s])) res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     return res.status(200).send(csv);
   } catch (e) {

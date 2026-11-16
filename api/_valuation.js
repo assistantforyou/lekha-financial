@@ -6,6 +6,7 @@ const { buildFund, epsTtm, sharesOutstanding } = require("./_fundamentals");
 const { rateHit } = require("./_lib");
 const { cleanSymbols, seriesFor, clientId } = require("./_history");
 const { valinCsv, betaOf } = require("./_fundamentals");
+const { estimatesFor, consensusFc } = require("./_estimates");
 const SP = Object.fromEntries(require("./_data/sp500.json").stocks);
 
 const MAX = 12;
@@ -71,7 +72,17 @@ async function fundCollection(req, res) {
   const syms = symbolsOf(req);
   if (!syms.length) return res.status(200).json([]);
   const s = await many(syms);
-  return res.status(200).json(syms.filter((t) => s[t] && s[t].fund).map((t) => ({ id: t, data: s[t].fund })));
+  // analyst consensus (Alpha Vantage, cached per symbol) replaces the trailing-growth fallback where available
+  const companies = syms.filter((t) => s[t] && s[t].kind === "company");
+  const est = companies.length ? await estimatesFor(companies, { fresh: 2 }).catch(() => ({})) : {};
+  return res.status(200).json(syms.filter((t) => s[t] && s[t].fund).map((t) => {
+    const fund = s[t].fund, e = est[t];
+    if (!e || !fund.fc) return { id: t, data: fund };
+    const c = consensusFc(e.est, e.ov);
+    const fc = { ...fund.fc, ...c };
+    if (c.basis !== "consensus") { fc.basis = fund.fc.basis; fc.note = fund.fc.note + (c.pt ? " Analyst target price from Alpha Vantage." : ""); }
+    return { id: t, data: { ...fund, fc } };
+  }));
 }
 
 async function valinCsvHandler(req, res) {

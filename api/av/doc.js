@@ -1,9 +1,11 @@
+const { requirePremium } = require("../_auth");
 const { av, cached } = require("../_lib");
 const { macroFrom } = require("../_mappers");
 
 const DAY = 864e5;
 module.exports = async (req, res) => {
-  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=3600");
+  if (!(await requirePremium(req, res))) return; // Premium: signed-in subscribers only
+  res.setHeader("Cache-Control", "private, no-store");
   const path = String((req.query && req.query.path) || "");
   try {
     if (path === "meta/macro") {

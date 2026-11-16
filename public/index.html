@@ -4,23 +4,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Portfolio Terminal</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<script>/* apply saved theme / text size / density before first paint */
+try{var p=JSON.parse(localStorage.getItem("ptpub.v1.prefs")||"null")||{};var r=document.documentElement;if(p.theme==="light"||p.theme==="dark")r.setAttribute("data-theme",p.theme);r.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[p.size]||1);if(p.density==="compact")r.setAttribute("data-density","compact")}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* Layout: terminal strip header, KPI rail, value chart + risk column, full-width holdings ledger, news feed. Amber = terminal accent; green/red are semantic only. */
 :root{
-  --bg:#F2F4F7; --panel:#FFFFFF; --panel-2:#E8ECF1; --line:#D3D9E1; --fg:#121A24; --muted:#5B6878;
-  --accent:#B36B00; --accent-soft:#F6E7CF; --up:#0F8A57; --down:#C62F3A; --warn:#A86200; --chart:#1F4E8C; --chart-fill:rgba(31,78,140,.10); --s2:#B36B00; --s3:#7A4FB5; --q1:#2F6DB5; --q2:#8E44AD; --q3:#0E8C8C; --q4:#C2185B; --q5:#A86A00; --q6:#4A5568; --q7:#D35400;
+  --bg:#F2F4F7; --panel:#FFFFFF; --panel-2:#E8ECF1; --line:#D3D9E1; --fg:#121A24; --muted:#475465;
+  --accent:#B36B00; --accent-soft:#F6E7CF; --up:#0F8A57; --down:#C62F3A; --warn:#A86200; --chart:#1F4E8C; --chart-fill:rgba(31,78,140,.10); --s2:#B36B00; --s3:#7A4FB5; --q1:#2a78d6; --q2:#eb6834; --q3:#1baf7a; --q4:#eda100; --q5:#e87ba4; --q6:#008300; --q7:#6250d6;
   --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0D131B; --panel:#141C26; --panel-2:#1B2531; --line:#263241; --fg:#E6EBF1; --muted:#8C99A8;
-  --accent:#F0A63A; --accent-soft:#3A2A12; --up:#34C38A; --down:#F2626B; --warn:#F0A63A; --chart:#7FB2F0; --chart-fill:rgba(127,178,240,.12); --s2:#F0A63A; --s3:#C3A6F2; --q1:#6FA8F5; --q2:#C39BE6; --q3:#3CC7C7; --q4:#F06292; --q5:#E3B341; --q6:#A0AEC0; --q7:#FF8A50; color-scheme:dark}}
+  --bg:#0D131B; --panel:#141C26; --panel-2:#1B2531; --line:#263241; --fg:#E6EBF1; --muted:#A7B3C1;
+  --accent:#F0A63A; --accent-soft:#3A2A12; --up:#34C38A; --down:#F2626B; --warn:#F0A63A; --chart:#7FB2F0; --chart-fill:rgba(127,178,240,.12); --s2:#F0A63A; --s3:#C3A6F2; --q1:#3987e5; --q2:#d95926; --q3:#199e70; --q4:#c98500; --q5:#d55181; --q6:#0ca30c; --q7:#9085e9; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0D131B; --panel:#141C26; --panel-2:#1B2531; --line:#263241; --fg:#E6EBF1; --muted:#8C99A8;
-  --accent:#F0A63A; --accent-soft:#3A2A12; --up:#34C38A; --down:#F2626B; --warn:#F0A63A; --chart:#7FB2F0; --chart-fill:rgba(127,178,240,.12); --s2:#F0A63A; --s3:#C3A6F2; --q1:#6FA8F5; --q2:#C39BE6; --q3:#3CC7C7; --q4:#F06292; --q5:#E3B341; --q6:#A0AEC0; --q7:#FF8A50; color-scheme:dark}
+  --bg:#0D131B; --panel:#141C26; --panel-2:#1B2531; --line:#263241; --fg:#E6EBF1; --muted:#A7B3C1;
+  --accent:#F0A63A; --accent-soft:#3A2A12; --up:#34C38A; --down:#F2626B; --warn:#F0A63A; --chart:#7FB2F0; --chart-fill:rgba(127,178,240,.12); --s2:#F0A63A; --s3:#C3A6F2; --q1:#3987e5; --q2:#d95926; --q3:#199e70; --q4:#c98500; --q5:#d55181; --q6:#0ca30c; --q7:#9085e9; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
@@ -240,12 +242,32 @@ tr.ob-detail td{white-space:normal}
 .ph-form input,.ph-form select,.ph-fx input{font:inherit;font-size:13px;padding:5px 7px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--fg);min-width:0}
 .ph-fx{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:4px 0 8px}.ph-fx label{width:130px}
 #ph-table td,#ph-table th{white-space:nowrap}#ph-table button{font:inherit;font-size:11px;padding:1px 7px}
+
+/* ---- readability layer (2026-11): larger minimum text, sentence-case titles, calmer density ---- */
+body{font-size:15px;line-height:1.5}
+.wrap{zoom:var(--zoom,1)}
+:root[data-density="compact"] .panel{padding:10px;gap:8px}:root[data-density="compact"] .wrap{gap:10px}
+.panel{padding:16px 18px;gap:12px}
+.ph h2{font-family:var(--f-body);font-size:17px;font-weight:600;letter-spacing:0;text-transform:none;margin-right:auto}
+.ph .why{flex-basis:100%;margin:0;font-size:13.5px;color:var(--muted);line-height:1.45}
+h3,#tab-val h3{font-size:12.5px;letter-spacing:.05em}
+.note,.legend{font-size:13px}
+.pill{font-size:12px}
+.kpi .lbl{font-size:12.5px;letter-spacing:.03em;text-transform:none;font-weight:500}
+.kpi .val{font-size:24px}.kpi .sub{font-size:13px}
+th{font-size:12.5px}
+td{font-size:13.5px}
+.chip,.sig,.est,.ob-flag,.ob-lab,.etf,.vx-now small{font-size:12px}
+.chart svg text,svg .ax{font-size:12px}
+.chart .tip{font-size:12.5px;padding:6px 10px;line-height:1.45}
+.una{font-style:normal}
+.seg button,.btn{font-size:13px;padding:5px 11px}
 </style>
 
 <div class="wrap">
   <header class="bar">
     <div class="brand">Portfolio Terminal <span class="tick">PUBLIC EDITION</span></div>
-    <div class="seg tabs" role="group" aria-label="View"><button id="tb-ov" aria-pressed="true">Overview</button><button id="tb-val" aria-pressed="false">Intrinsic value</button></div>
+    <div class="seg tabs" role="group" aria-label="View"><button id="tb-ov" aria-pressed="true">Overview</button><button id="tb-val" aria-pressed="false">Intrinsic value</button><button id="tb-set" aria-pressed="false">Settings</button></div>
     <div class="status">
       <span class="pill" id="st-prices">Prices: loading</span>
       <span class="pill" id="st-news">News: loading</span>
@@ -384,8 +406,8 @@ tr.ob-detail td{white-space:normal}
     <div id="vx-box"><div class="empty">Loading VIX and VIXEQ history…</div></div>
   </section>
 
-  <section class="panel" aria-labelledby="h-hold">
-    <div class="ph"><h2 id="h-hold">Holdings</h2><span class="note">Tap a row for broker split and price chart. Sorted by <span id="sort-lbl">value</span>.</span></div>
+  <section class="panel" aria-labelledby="h-ledger">
+    <div class="ph"><h2 id="h-ledger">Holdings</h2><span class="note">Tap a row for broker split and price chart. Sorted by <span id="sort-lbl">value</span>.</span></div>
     <div class="tablebox"><table id="tbl">
       <thead><tr>
         <th class="l" data-k="ticker">Ticker</th><th class="l" data-k="theme">Theme</th><th data-k="price">Price</th><th data-k="value">Value</th><th data-k="weight">Weight</th>
@@ -441,6 +463,8 @@ tr.ob-detail td{white-space:normal}
     <li><b>Data.</b> Fundamentals and consensus come from the data source, saved with an as-of date. On the free tier they come from SEC EDGAR filings (annual cash flows, balance sheet, shares) with no analyst consensus: year-1 growth then falls back to the trailing revenue growth rate, and the cash-flow history, net cash and share count are as filed. Prices, market caps and betas come from the data source's price feed. Each day's values are saved so changes can be split into price moves and fundamental revisions.</li>
   </ul></details>
 </div>
+
+<div id="tab-set" class="tabpane" hidden><div class="empty">Loading settings…</div></div>
 
   <footer>
     <span id="foot-asof"></span>
@@ -584,7 +608,7 @@ function aggregate(){
 
 /* ---------- render ---------- */
 function setPill(id,text,kind){const el=$(id);el.textContent=text;el.className="pill"+(kind?" "+kind:"")}
-function renderAll(){if(!S.rows.length)return;if(S.tab==="val"){renderValAll();return}renderPortfolioChart();renderKpis();renderTable();renderRisk();renderFoot();if(S.rot)renderRotation()}
+function renderAll(){if(window.PT_UI)setTimeout(window.PT_UI.extras,0);if(!S.rows.length)return;if(S.tab==="val"){renderValAll();return}renderPortfolioChart();renderKpis();renderTable();renderRisk();renderFoot();if(S.rot)renderRotation()}
 
 function renderKpis(){
   const rows=positions();const tot=rows.reduce((a,r)=>a+(r.valueUSD||0),0);const cost=rows.reduce((a,r)=>a+(r.costUSD||0),0);
@@ -867,7 +891,8 @@ const QF_GICS={XLB:"Materials",XLC:"Communication Services",XLE:"Energy",XLF:"Fi
 const QF_FAC=[["MKT","Market beta (SPY)"],["SIZE","Size (IWM − SPY)"],["VAL","Value (IWD − IWF)"],["RATE","Rates (IEF)"]];
 const QF_W=60,QF_MIN=48,QF_COST=0.0010,QF_TOP=3;
 const tagEst='<span class="sig est">Statistical estimate</span>';
-const qNA='<span class="una" title="Unavailable">n/a</span>';
+const qNA='<span class="una" title="No value: the inputs for this cell are not available yet">–</span>';
+const qPrem='<span class="sig obs" title="Sector-wide analyst revisions need consensus estimates for all ~500 S&amp;P stocks; included with Premium. Your own holdings are covered in the Holdings view.">Premium</span>';
 const qn=(v,dp=2,sign=true)=>v==null||!isFinite(v)?qNA:(sign&&v>0?"+":"")+(v<0?"−":"")+Math.abs(v).toFixed(dp);
 const qp=(v,dp=1,sign=true)=>v==null||!isFinite(v)?qNA:(sign&&v>0?"+":"")+(v<0?"−":"")+Math.abs(v*100).toFixed(dp)+"%";
 const qMK=t=>{const d=new Date(t);return d.getUTCFullYear()*12+d.getUTCMonth()};
@@ -1106,26 +1131,26 @@ function rgValOos(){const V=S.rgVal;if(!V||!V.oos)return null;const out={G:[],I:
 /* observed inputs behind each regime card, in their own units (so the state label can be checked against the data) */
 const qOrd=x=>{const n=Math.round(x);const t=n%100,u=n%10;return n+(t>=11&&t<=13?"th":u===1?"st":u===2?"nd":u===3?"rd":"th")};
 function rgObsText(Fe,D,i){const f=Fe.f,m1=qMKlab(Fe.keys[i]-1),m0=qMKlab(Fe.keys[i]);const v=(a,k)=>a[k]==null?null:a[k];
-  const pp=(x,dp)=>x==null?"n/a":(x>0?"+":"")+x.toFixed(dp);
-  if(D==="G"){const sa=v(f.sahm,i),du=v(f.dur,i);return `Real-time Sahm indicator ${sa==null?"n/a":(-sa).toFixed(2)+" pp"}; unemployment change over 6 months ${du==null?"n/a":pp(-du,1)+" pp"} (${m1}).`}
-  if(D==="I"){const c=v(f.cpi,i),cc=v(f.core,i);return `Headline CPI ${c==null?"n/a":c.toFixed(1)+"%"} y/y, core ${cc==null?"n/a":cc.toFixed(1)+"%"} (${m1}, not seasonally adjusted). The state is relative to 1990–2026 history and averages both measures.`}
-  const re=v(f.real,i),cu=v(f.curve,i);return `Real Fed funds ${re==null?"n/a":pp(-re,2)+"%"} (Fed funds ${m0} minus core CPI ${m1}); 10-year minus Fed funds ${cu==null?"n/a":pp(cu,2)+" pp"} (${m0}).`}
+  const pp=(x,dp)=>x==null?"–":(x>0?"+":"")+x.toFixed(dp);
+  if(D==="G"){const sa=v(f.sahm,i),du=v(f.dur,i);return `Real-time Sahm indicator ${sa==null?"–":(-sa).toFixed(2)+" pp"}; unemployment change over 6 months ${du==null?"–":pp(-du,1)+" pp"} (${m1}).`}
+  if(D==="I"){const c=v(f.cpi,i),cc=v(f.core,i);return `Headline CPI ${c==null?"–":c.toFixed(1)+"%"} y/y, core ${cc==null?"–":cc.toFixed(1)+"%"} (${m1}, not seasonally adjusted). The state is relative to 1990–2026 history and averages both measures.`}
+  const re=v(f.real,i),cu=v(f.curve,i);return `Real Fed funds ${re==null?"–":pp(-re,2)+"%"} (Fed funds ${m0} minus core CPI ${m1}); 10-year minus Fed funds ${cu==null?"–":pp(cu,2)+" pp"} (${m0}).`}
 function renderRegime(){const el=$("rg-box");if(!el)return;
   if(!S.fred){el.innerHTML=`<div class="empty">${esc(S.fredErr||"Loading verified FRED history from the dashboard database…")}</div>`;return}
   const R=S.rgM;if(!R){el.innerHTML='<div class="empty">Fitting regime models…</div>';rgSchedule();return}
   if(R.err){el.innerHTML=`<div class="empty">${esc(R.err)}</div>`;return}
   const card=D=>{const d=R.dims[D];const L=RG_DIM[D];const hi=d.p>=0.5;const conf=Math.max(d.p,1-d.p);const cl=conf>=0.8?"High":conf>=0.6?"Moderate":"Low";
-    const drv=RG_COMP[D].map(([k,n])=>`<li><span>${esc(n)}</span><b>${d.parts[k]==null?"n/a":qn(d.parts[k],2)}</b></li>`).join("");
+    const drv=RG_COMP[D].map(([k,n])=>`<li><span>${esc(n)}</span><b>${d.parts[k]==null?"–":qn(d.parts[k],2)}</b></li>`).join("");
     return `<div class="rg-card"><h4>${esc(L.n)}</h4><div class="rg-state">${hi?L.hi:L.lo}</div>
       <div class="rg-bar" title="Probability of the ${L.hi.toLowerCase()} state"><i style="width:${(d.p*100).toFixed(1)}%"></i></div>
-      <div class="rg-kv"><span>P(${esc(L.hi.toLowerCase())})</span><b>${(d.p*100).toFixed(0)}%</b><span>Previous month</span><b>${d.pPrev!=null?(d.pPrev*100).toFixed(0)+"%":"n/a"}</b>
+      <div class="rg-kv"><span>P(${esc(L.hi.toLowerCase())})</span><b>${(d.p*100).toFixed(0)}%</b><span>Previous month</span><b>${d.pPrev!=null?(d.pPrev*100).toFixed(0)+"%":"–"}</b>
       <span>Next month (model)</span><b>${(d.next*100).toFixed(0)}%</b><span>Model certainty (not calibrated)</span><b>${cl}</b>
       <span>Expected stay, ${esc(L.hi.toLowerCase())} / ${esc(L.lo.toLowerCase())}</span><b>${d.dur.hi.toFixed(0)} / ${d.dur.lo.toFixed(0)} mo</b></div>
       <p class="rg-obs">${tagObs} ${rgObsText(R.Fe,D,d.last)}</p><details><summary>Drivers (z-scores)</summary><ul class="rg-drv">${drv}</ul><p class="note">Composite ${qn(d.comp,2)}. State means ${d.P.mu[0].toFixed(2)} and ${d.P.mu[1].toFixed(2)}; fitted on ${d.n} months from ${qMKlab(d.from)}.</p></details></div>`};
   const lm=R.Fe.last;const V=S.rgVal;
   let h=`<div class="ob-head"><h3>Macro regime model</h3>${tagEst}<span class="note">Decision month-end ${qMKlab(R.dims.G.month)} · employment and CPI through ${qMKlab(R.dims.G.month-1)}, rates through ${qMKlab(R.dims.M.month)}</span></div>
     <div class="rg-cards">${card("G")}${card("I")}${card("M")}</div>
-    <p class="note">${tagObs} Baa corporate spread over the 10-year: <b>${R.spread.now!=null?R.spread.now.toFixed(2)+" pp":"n/a"}</b>${R.spread.pct!=null?`, ${qOrd(R.spread.pct*100)} percentile of the last 10 years`:""} (${qMKlab(R.spread.month)}). Shown as a reading, not a regime.</p>`;
+    <p class="note">${tagObs} Baa corporate spread over the 10-year: <b>${R.spread.now!=null?R.spread.now.toFixed(2)+" pp":"–"}</b>${R.spread.pct!=null?`, ${qOrd(R.spread.pct*100)} percentile of the last 10 years`:""} (${qMKlab(R.spread.month)}). Shown as a reading, not a regime.</p>`;
   const rd=[];
   if(V){const g=V.growthVsNber,ind=V.independence,se=V.sensitivity,ro=V.rotation;
     rd.push(`<p class="verdict">What has been validated: the growth state, not sector calls.</p>`);
@@ -1154,12 +1179,12 @@ function renderVix(){const el=$("vx-box");if(!el)return;document.querySelectorAl
   const rows=X.rows.filter(r=>r.t>=st&&(showH||!r.hyp));const ex=a=>{let mx=null,mn=null;for(const r of a){if(!mx||r.s>mx.s)mx=r;if(!mn||r.s<mn.s)mn=r}return {mx,mn}};const E=ex(rows);
   const k=(lab,v,cl)=>`<div><span>${lab}</span><b class="${cl||""}">${v}</b></div>`;
   let h=`<div class="ob-head"><h3>Implied dispersion · VIXEQ − VIX</h3>${tagObs}<span class="note">Close ${fmtD(L.t)} · data built ${esc(S.vol.at||"–")}</span></div>
-    <div class="macro-now vx-now">${k("VIXEQ",L.eq.toFixed(2))}${k("VIX",L.vx.toFixed(2))}${k("Spread (points)",L.s.toFixed(2))}${k("Ratio",L.r.toFixed(2)+"×")}${k("20-day change",qn(X.c20,2),cls(X.c20))}${k("60-day change",qn(X.c60,2),cls(X.c60))}${k("252-day z-score",qn(L.z,2))}${k("Percentile since launch",X.pctObs!=null?(X.pctObs*100).toFixed(0)+"th <small>n="+X.nObs+"</small>":"n/a")}${S.vxHyp?k("Percentile incl. back-test",(X.pctAll*100).toFixed(0)+"th <small>n="+X.nAll+"</small>"):""}</div>
+    <div class="macro-now vx-now">${k("VIXEQ",L.eq.toFixed(2))}${k("VIX",L.vx.toFixed(2))}${k("Spread (points)",L.s.toFixed(2))}${k("Ratio",L.r.toFixed(2)+"×")}${k("20-day change",qn(X.c20,2),cls(X.c20))}${k("60-day change",qn(X.c60,2),cls(X.c60))}${k("252-day z-score",qn(L.z,2))}${k("Percentile since launch",X.pctObs!=null?(X.pctObs*100).toFixed(0)+"th <small>n="+X.nObs+"</small>":"–")}${S.vxHyp?k("Percentile incl. back-test",(X.pctAll*100).toFixed(0)+"th <small>n="+X.nAll+"</small>"):""}</div>
     <div class="ctrls"><div class="seg" id="vx-range" role="group" aria-label="Range">${["1M","3M","6M","1Y","MAX"].map(r=>`<button data-r="${r}" aria-pressed="${r===S.vxRange}">${r}</button>`).join("")}</div>
     <label class="chk"><input type="checkbox" id="vx-hyp"${S.vxHypOn?" checked":""}${S.vxHyp?"":" disabled"}> Include Cboe back-tested history (Jun 2014 – Oct 2024)</label></div>
     <div class="legend"><span><i style="background:var(--chart)"></i>Spread, observed (since 4 Nov 2024 launch)</span>${showH?'<span><i style="background:var(--muted)"></i>Spread, back-tested (hypothetical)</span>':""}</div>
     <div class="chart" id="vx-chart"></div><div class="chart" id="vx-z"></div>
-    <div class="intel-read"><p>${tagObs} In this range the spread ran from ${E.mn?E.mn.s.toFixed(2)+" ("+fmtD(E.mn.t)+(E.mn.hyp?", back-tested":"")+")":"n/a"} to ${E.mx?E.mx.s.toFixed(2)+" ("+fmtD(E.mx.t)+(E.mx.hyp?", back-tested":"")+")":"n/a"}. ${L.z!=null&&Math.abs(L.z)>=2?`The spread is ${L.z>0?"unusually wide":"unusually narrow"} relative to the past year (z ${L.z.toFixed(1)}).`:"The spread is within two standard deviations of its past-year average."}</p>
+    <div class="intel-read"><p>${tagObs} In this range the spread ran from ${E.mn?E.mn.s.toFixed(2)+" ("+fmtD(E.mn.t)+(E.mn.hyp?", back-tested":"")+")":"–"} to ${E.mx?E.mx.s.toFixed(2)+" ("+fmtD(E.mx.t)+(E.mx.hyp?", back-tested":"")+")":"–"}. ${L.z!=null&&Math.abs(L.z)>=2?`The spread is ${L.z>0?"unusually wide":"unusually narrow"} relative to the past year (z ${L.z.toFixed(1)}).`:"The spread is within two standard deviations of its past-year average."}</p>
     <p>${tagSpec} A wide gap means options price single stocks as much more volatile than the index, i.e. low implied correlation and high expected dispersion between winners and losers. Historically this has been read as a stock-picker's market or as hedges concentrated in the index; it is not a timing signal and has not been tested here for predictive value.</p></div>
     <details class="note"><summary>Method and sources</summary><p>VIXEQ (Cboe S&amp;P 500 Constituent Volatility Index) is the cap-weighted 30-day implied volatility of S&amp;P 500 constituents from single-stock options; VIX uses index options. Spread = VIXEQ − VIX on days where both closed; ratio = VIXEQ ÷ VIX. 20-day and 60-day changes are in index points over trading days; the z-score uses the trailing 252 sessions including today; percentiles rank today's spread against all observed days since launch (and separately including the back-test). Only completed sessions are used.</p>
     <p>Observed data: Cboe's published daily closes for VIX and for VIXEQ (from its 4 Nov 2024 launch), delivered by ${esc(window.PT_SOURCE_LABEL||"the configured data source")}. Back-tested values: ${S.vxHyp?esc(S.vxHyp.doc.src)+". "+esc(S.vxHyp.doc.verification):"not loaded"}. Google's pre-launch VIXEQ quotes (14–15 Oct 2024) differ from Cboe's back-test and are not used.</p></details>`;
@@ -1210,9 +1235,9 @@ function flEtf(){const obs={};for(const d of S.etf||[])for(const [t,x] of Object
     out[t]={n:a.length,first:a[0].asOf,last,fl,w5:win(7),w20:win(28),w60:win(84),
       since:fl.length?{usd:fl.reduce((s,f)=>s+f.usd,0),pct:fl.reduce((s,f)=>s+f.usd,0)/(a[0].so*1e6*a[0].nav),from:a[0].asOf}:null}}
   return out}
-/* ---- insider cluster purchases (SEC Form 4 via OpenInsider "latest cluster buys") ---- */
+/* ---- insider cluster purchases (SEC EDGAR Form 4, S&P 500 issuers, collected daily) ---- */
 function flIns(){const seen=new Map();for(const d of S.ins||[])for(const r of d.cluster||[]){const k=r.ticker+"|"+r.filing+"|"+r.trade+"|"+r.value;if(!seen.has(k))seen.set(k,r)}
-  const all=[...seen.values()].map(r=>({...r,sec:flSicSector(r.industry)})).filter(r=>r.sec!==null);
+  const all=[...seen.values()].map(r=>({...r,sec:r.sec!==undefined&&r.sec!==null?r.sec:flSicSector(r.industry)})).filter(r=>r.sec!==null);
   const today=flToday(),st60=new Date(Date.parse(today)-60*864e5).toISOString().slice(0,10);
   const rows=all.filter(r=>r.filing>=st60).sort((a,b)=>a.filing<b.filing?1:-1);
   const sec={};for(const s of FL_SECT)sec[s]={cos:new Set(),usd:0,ins:0};
@@ -1279,9 +1304,9 @@ function renderFlow(){const el=$("fl-box");if(!el)return;
   h+=`<details class="note fl-det"><summary>ETF creations and redemptions by fund (${Object.keys(E).length} funds)</summary><div class="br-wrap"><table class="ob"><thead><tr><th class="l">Fund</th><th>Shares out</th><th>NAV</th><th>Net assets</th><th>5D</th><th>20D</th><th>60D</th><th>Since first snapshot</th><th>As of</th></tr></thead><tbody>${etfRows}</tbody></table></div>
     <p>Net creations = change in issuer-reported shares outstanding × NAV on the later date. Secondary-market trading volume is not used: a share changing hands between two investors is not a flow into the fund. Issuers report shares in millions with two decimals (±5,000 shares; one creation unit is usually 50,000). Sources: State Street Global Advisors daily NAV and shares-outstanding history (SPDR sector funds, SPY, XBI; about 100 days are stored from the first run) and iShares fund pages (SOXX, IBB, ITA), which publish only the latest value, so their windows fill in as daily snapshots accumulate.</p></details>`;
   /* insider list */
-  const hold=new Set((S.rows||[]).map(r=>r.ticker));const top=I.rows.slice(0,14).map(r=>`<tr><th class="l"><a href="http://openinsider.com/${encodeURIComponent(r.ticker)}" target="_blank" rel="noopener">${esc(r.ticker)}</a>${hold.has(r.ticker)?' <span class="sig obs">Held</span>':""}</th><td class="l muted">${esc(r.industry||"")}</td><td>${r.sec?esc(QF_NAME[r.sec]):qNA}</td><td>${r.ins}</td><td>${money(r.value)}</td><td class="muted">${esc(r.trade)}</td><td class="muted">${esc(r.filing)}</td></tr>`).join("");
-  h+=`<details class="note fl-det"${S.flIns?" open":""} id="fl-ins"><summary>Smart-money monitor: latest insider cluster purchases (${I.rows.length} in 60 days)</summary><div class="br-wrap"><table class="ob"><thead><tr><th class="l">Ticker</th><th class="l">Industry (SIC)</th><th>Sector</th><th>Insiders</th><th>Value</th><th>Trade</th><th>Filed</th></tr></thead><tbody>${top||'<tr><td colspan="7" class="muted">No filings stored yet.</td></tr>'}</tbody></table></div>
-    <p>A cluster buy is an open-market purchase (Form 4 code P) by two or more insiders of the same company. Closed-end funds and blank-check companies are excluded. Source: <a href="http://openinsider.com/latest-cluster-buys" target="_blank" rel="noopener">OpenInsider</a>, which republishes SEC EDGAR Form 4 filings; open each ticker for the filings.</p></details>`;
+  const hold=new Set((S.rows||[]).map(r=>r.ticker));const top=I.rows.slice(0,14).map(r=>`<tr><th class="l"><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&amp;type=4&amp;CIK=${encodeURIComponent(r.ticker)}" target="_blank" rel="noopener">${esc(r.ticker)}</a>${hold.has(r.ticker)?' <span class="sig obs">Held</span>':""}</th><td class="l muted">${esc(r.industry||"")}</td><td>${r.sec?esc(QF_NAME[r.sec]):qNA}</td><td>${r.ins}</td><td>${money(r.value)}</td><td class="muted">${esc(r.trade)}</td><td class="muted">${esc(r.filing)}</td></tr>`).join("");
+  h+=`<details class="note fl-det"${S.flIns?" open":""} id="fl-ins"><summary>Smart-money monitor: latest insider cluster purchases (${I.rows.length} in 60 days)</summary><div class="br-wrap"><table class="ob"><thead><tr><th class="l">Ticker</th><th class="l">Sector</th><th>Sector</th><th>Insiders</th><th>Value</th><th>Trade</th><th>Filed</th></tr></thead><tbody>${top||'<tr><td colspan="7" class="muted">No filings stored yet.</td></tr>'}</tbody></table></div>
+    <p>A cluster buy is an open-market purchase (Form 4 code P) by two or more different insiders of the same company within 7 days. Coverage: S&amp;P 500 companies, read every day straight from <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&amp;type=4" target="_blank" rel="noopener">SEC EDGAR</a> Form 4 filings; open each ticker for its filings.</p></details>`;
   /* futures positioning */
   if(C){const lab={ES_AM:"E-mini S&P 500 · asset managers",ES_LF:"E-mini S&P 500 · leveraged funds",NQ_AM:"Nasdaq-100 mini · asset managers",NQ_LF:"Nasdaq-100 mini · leveraged funds"};
     const pr=Object.entries(C.s).map(([k,v])=>`<div><span>${esc(lab[k]||k)}</span><b class="${cls(v.last.net)}">${qn(v.last.net/1000,1)}k</b><small>1W ${qn(v.chg/1000,1)}k · ${v.pct!=null?qOrd(v.pct*100)+" pct of 1Y":""} (n=${v.n})</small></div>`).join("");
@@ -1293,10 +1318,10 @@ function renderFlow(){const el=$("fl-box");if(!el)return;
     <div class="macro-now vx-now">${ms.map(m=>{const v=T.months[m];return `<div><span>${esc(m)}</span><b class="${cls(v.total)}">${qn(v.total,1,true)}</b><small>private ${qn(v.private,1)} · official ${qn(v.official,1)}</small></div>`}).join("")}</div>
     <p class="note">Net purchases of all US equities (stocks and fund shares) by foreign residents, from custodial data. Treasury notes the data cannot attribute holdings precisely by country. No sector or stock detail exists, so foreign flows are not used in the sector evidence.</p>`}
   h+=`<details class="note"><summary>Rules, validation and limitations</summary>
-    <p><b>Evidence rules (fixed in advance, not fitted).</b> 13F: +1 when a sector's change in the number of 13F holders is at least 1 percentage point above the median of the 56 sampled large caps, −1 when at least 1 point below. ETF: +1 when net creations over 20 trading days (5 if that is all there is) exceed +1% of net assets, −1 below −1%. Insiders: +1 when the sector has 2 or more cluster-bought companies and is in the top third of sectors; insider selling never scores. Two agreeing signals = accumulation or distribution evidence; opposite signs = conflicting; fewer than two available = insufficient. Price momentum and revisions are shown for comparison and are not counted again.</p>
-    <p><b>Validation.</b> ${F&&F.F.backtest?`13F holder breadth was tested as a sector rotation signal on real data (${esc(F.F.backtest.from)} to ${esc(F.F.backtest.to)}, ${F.F.backtest.n} quarterly decisions, each made only after the 45-day filing deadline): top-3 sectors vs equal weight ${qp(F.F.backtest.exAnn,1)} a year (t ${F.F.backtest.t.toFixed(2)}), rank IC ${F.F.backtest.ic.toFixed(3)}; 25 bp costs ${qp(F.F.backtest.exAnn25,1)}; no added value over 12-month momentum (t ${F.F.backtest.fmT.toFixed(2)}). <b>No demonstrated predictive value.</b> The sample is today's largest stocks, a survivorship bias that would flatter the signal, so the null result is conservative.`:"13F test results not loaded."} ETF flows and insider cluster buys have no history before this build, so they are tracked prospectively in the daily log and cannot yet be evaluated.</p>
-    ${F&&F.F.flags&&F.F.flags.length?`<p><b>Data flags.</b> ${F.F.flags.map(esc).join(" ")}</p>`:""}<p><b>13F detail.</b> Holder counts for ${F?F.F.sample.length:"–"} large caps (5–6 per sector) from 13f.info, a viewer of SEC 13F data, cross-sectionally demeaned each quarter to remove the Q4 jump in new filers. Counts of holders say nothing about position size; share totals on that site are rounded and are not used. Option positions, shorts and confidential filings are outside 13F.</p>
-    <p>Sources: <a href="https://13f.info/" target="_blank" rel="noopener">13f.info</a> (SEC 13F), <a href="http://openinsider.com/" target="_blank" rel="noopener">OpenInsider</a> (SEC Form 4), <a href="https://www.ssga.com/" target="_blank" rel="noopener">SSGA</a> and <a href="https://www.ishares.com/" target="_blank" rel="noopener">iShares</a> fund pages, <a href="https://publicreporting.cftc.gov/" target="_blank" rel="noopener">CFTC public reporting</a>, <a href="https://home.treasury.gov/data/treasury-international-capital-tic-system" target="_blank" rel="noopener">US Treasury TIC</a>. SEC EDGAR itself is not reachable from the refresh tasks (it blocks automated readers), hence the mirrors.</p></details>`;
+    <p><b>Evidence rules (fixed in advance, not fitted).</b> 13F: +1 when a sector's change in the number of 13F holders is at least 1 percentage point above the median of the sampled S&amp;P 500 stocks, −1 when at least 1 point below. ETF: +1 when net creations over 20 trading days (5 if that is all there is) exceed +1% of net assets, −1 below −1%. Insiders: +1 when the sector has 2 or more cluster-bought companies and is in the top third of sectors; insider selling never scores. Two agreeing signals = accumulation or distribution evidence; opposite signs = conflicting; fewer than two available = insufficient. Price momentum and revisions are shown for comparison and are not counted again.</p>
+    <p><b>Validation.</b> ${F&&F.F.backtest?`13F holder breadth was tested as a sector rotation signal on real data (${esc(F.F.backtest.from)} to ${esc(F.F.backtest.to)}, ${F.F.backtest.n} quarterly decisions, each made only after the 45-day filing deadline): top-3 sectors vs equal weight ${qp(F.F.backtest.exAnn,1)} a year (t ${F.F.backtest.t.toFixed(2)}), rank IC ${F.F.backtest.ic.toFixed(3)}; 25 bp costs ${qp(F.F.backtest.exAnn25,1)}; no added value over 12-month momentum (t ${F.F.backtest.fmT.toFixed(2)}). <b>No demonstrated predictive value.</b> The sample is today's largest stocks, a survivorship bias that would flatter the signal, so the null result is conservative.`:"13F holder breadth from the SEC data sets has not been back-tested here yet, so treat it as descriptive."} ETF flows and insider cluster buys have no history before this build, so they are tracked prospectively in the daily log and cannot yet be evaluated.</p>
+    ${F&&F.F.flags&&F.F.flags.length?`<p><b>Data flags.</b> ${F.F.flags.map(esc).join(" ")}</p>`:""}<p><b>13F detail.</b> Holder counts for ${F?F.F.sample.length:"–"} S&amp;P 500 stocks (${F&&F.F.latest?esc(F.F.latest.prev)+" to "+esc(F.F.latest.q):"latest two quarters"}) counted from the SEC Form 13F data sets (one original report per filer, common shares only, CUSIPs matched to tickers with OpenFIGI), cross-sectionally demeaned each quarter to remove the steady growth in new filers; each sector is the median of its stocks. Counts of holders say nothing about position size; share totals on that site are rounded and are not used. Option positions, shorts and confidential filings are outside 13F.</p>
+    <p>Sources: <a href="https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets" target="_blank" rel="noopener">SEC Form 13F data sets</a>, <a href="https://www.sec.gov/edgar/search/" target="_blank" rel="noopener">SEC EDGAR</a> (Form 4), <a href="https://www.ssga.com/" target="_blank" rel="noopener">SSGA</a> and <a href="https://www.ishares.com/" target="_blank" rel="noopener">iShares</a> fund pages, <a href="https://publicreporting.cftc.gov/" target="_blank" rel="noopener">CFTC public reporting</a>, <a href="https://home.treasury.gov/data/treasury-international-capital-tic-system" target="_blank" rel="noopener">US Treasury TIC</a>.</p></details>`;
   if(warn.length)h=`<p class="note" style="color:var(--down)">Data integrity warning: ${warn.map(esc).join('; ')}.</p>`+h;
   el.innerHTML=h;
   const fi=$("fl-ins");if(fi)fi.ontoggle=()=>{S.flIns=fi.open};
@@ -1321,13 +1346,13 @@ function qLog(){if(S.qLogged||!S.qfM||!S.rgM||S.rgM.err||!S.factor)return;
 function btTable(rows){return `<div class="br-wrap"><table class="ob bt"><thead><tr><th class="l">Strategy</th><th>Months</th><th>Ann. return</th><th>Equal-weight sectors</th><th>SPY</th><th>Excess vs EW</th><th>Tracking error</th><th>Info. ratio</th><th>t (Newey-West)</th><th>Hit rate</th><th>Max excess drawdown</th><th>Turnover / mo</th><th>1st half · 2nd half excess</th></tr></thead><tbody>${rows.map(([n,b])=>b?`<tr><th class="l">${esc(n)}</th><td>${b.n}</td><td>${qp(b.ann)}</td><td>${qp(b.annEw)}</td><td>${qp(b.annSpy)}</td><td class="${cls(b.exAnn)}">${qp(b.exAnn)}</td><td>${qp(b.te,1,false)}</td><td>${qn(b.ir,2)}</td><td>${qn(b.t,2)}</td><td>${qp(b.hit,0,false)}</td><td>${qp(b.mdd)}</td><td>${qp(b.to,0,false)}</td><td>${qp(b.first.ann)} (t ${qn(b.first.t,1)}) · ${qp(b.second.ann)} (t ${qn(b.second.t,1)})</td></tr>`:`<tr><th class="l">${esc(n)}</th><td colspan="12">${qNA}</td></tr>`).join("")}</tbody></table></div>`}
 function btVerdict(b){if(!b)return"Not enough history.";const sig=b.t!=null&&Math.abs(b.t)>=2,stable=b.first.ann*b.second.ann>0;
   return sig&&stable?`Excess return was statistically significant (t ${b.t.toFixed(1)}) and had the same sign in both halves. This is historical evidence, not a guarantee.`:
-    `Not validated as predictive: ${!sig?`the excess return is not statistically different from zero (t ${b.t!=null?b.t.toFixed(1):"n/a"})`:""}${!sig&&!stable?" and ":""}${!stable?"the sign flipped between the two halves":""}. Treat the signal as descriptive.`}
+    `Not validated as predictive: ${!sig?`the excess return is not statistically different from zero (t ${b.t!=null?b.t.toFixed(1):"–"})`:""}${!sig&&!stable?" and ":""}${!stable?"the sign flipped between the two halves":""}. Treat the signal as descriptive.`}
 /* ---------- rendering: leadership quality (factor-adjusted strength + revisions) ---------- */
 function renderLead(){const el=$("ld-box");if(!el)return;document.querySelectorAll("#ld-view button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===S.ldView)));
   if(!S.factor){el.innerHTML=`<div class="empty">${esc(S.factorErr||"Loading weekly factor and sector history…")}</div>`;return}
   let Q;try{Q=qfModel()}catch(e){el.innerHTML=`<div class="empty">Factor model failed: ${esc(e.message)}</div>`;return}
   const V=S.revs&&S.revs.length?rvModel():null;const asof=qMKlab(Q.month);
-  $("ld-asof").textContent=`Factor model: month-end ${asof} · revisions: ${V?"Yahoo Finance snapshot "+V.date:"no snapshot yet"}`;
+  $("ld-asof").textContent=`Factor model: month-end ${asof} · revisions: ${V?"Alpha Vantage consensus "+V.date+" (your holdings)":"collecting the first snapshot"}`;
   const lab=sc=>{const L=qfLabel(sc);return `<span class="ob-lab sm" style="color:${L.c}"><i></i>${L.t}</span>`};
   const sigT=fit=>fit?fit.fac.filter(k=>k!=="MKT").map(k=>`${k} ${qn(fit.b[k],2)} (${qn(fit.t[k],1)})`).join(" · "):"";
   let h="";
@@ -1336,7 +1361,7 @@ function renderLead(){const el=$("ld-box");if(!el)return;document.querySelectorA
       <td>${lab(sc)}</td><td>${qn(sc&&sc.rm12,2)}</td><td>${qn(sc&&sc.rm6,2)}</td><td>${qn(sc&&sc.rm3,2)}</td><td>${rk||qNA}${rk&&rp?` <span class="muted">(${rp>rk?"▲"+(rp-rk):rp<rk?"▼"+(rk-rp):"="})</span>`:""}</td>
       <td>${qp(sc&&sc.raw3)}</td><td>${qp(sc&&sc.fac3!=null?sc.fac3+sc.alpha3:null)}</td><td class="${cls(sc&&sc.res3)}">${qp(sc&&sc.res3)}</td>
       <td>${f?qn(f.b.MKT,2,false):qNA}</td>
-      <td>${g&&g.n?qp(g.r4,1):qNA}</td><td>${g&&g.n?qp(g.r12,1):qNA}</td><td>${g&&g.n?qn(g.br,2):qNA}</td><td>${g&&g.n?qp(g.acc,1):qNA}</td><td>${g&&g.rv4!=null?qp(g.rv4,1):'<span class="una" title="Needs a second snapshot about 4 weeks later">pending</span>'}</td>
+      <td>${g&&g.n?qp(g.r4,1):qPrem}</td><td>${g&&g.n?qp(g.r12,1):qPrem}</td><td>${g&&g.n?qn(g.br,2):qPrem}</td><td>${g&&g.n?qp(g.acc,1):qPrem}</td><td>${g&&g.rv4!=null?qp(g.rv4,1):'<span class="una" title="Needs a second snapshot about 4 weeks later">pending</span>'}</td>
       <td class="l">${g&&g.divLab?`<span class="ob-lab sm" style="color:${/^Fund/.test(g.divLab)?"var(--q3)":"var(--q4)"}"><i></i>${esc(g.divLab)}</span>`:'<span class="muted">–</span>'}</td>
       <td>${g&&g.n?`${g.n}/${g.of}${g.capCov!=null?` · ${(g.capCov*100).toFixed(0)}% cap`:""}`:qNA}</td></tr>`+
       (S.ldOpen===a?`<tr class="ld-det"><td colspan="17">${ldDetail(Q,a,V)}</td></tr>`:"")}).join("");
@@ -1360,14 +1385,14 @@ function renderLead(){const el=$("ld-box");if(!el)return;document.querySelectorA
   const B=Q.bt.stats,B25=Q.bt25.stats,FV=S.factorVal;
   h+=`<details class="note"><summary>Historical reconstruction: walk-forward test of residual vs raw sector momentum</summary><p>Each month-end, using only data up to that month, rank the SPDR sectors available at the time (XLRE from 2015, XLC from 2018) and hold the top ${QF_TOP} equal-weight for the next month. Benchmark: equal-weight all available sectors. ${Q.bt.n?qMKlab(Q.bt.months[0])+" to "+qMKlab(Q.bt.months[Q.bt.n-1]):""}. Recomputed from the live sheet on every load.</p>
     ${btTable([["Residual momentum 12-1, 10 bp",B.res],["Residual momentum 12-1, 25 bp",B25.res],["Raw momentum 12-1, 10 bp",B.raw],["Raw momentum 12-1, 25 bp",B25.raw]])}
-    <p>${btVerdict(B.res)} Monthly rank correlation between the residual score and next-month sector excess return: ${B.ic?qn(B.ic.m,3)+" (t "+qn(B.ic.t,2)+", "+B.ic.n+" months)":"n/a"}.</p>
+    <p>${btVerdict(B.res)} Monthly rank correlation between the residual score and next-month sector excess return: ${B.ic?qn(B.ic.m,3)+" (t "+qn(B.ic.t,2)+", "+B.ic.n+" months)":"–"}.</p>
     <p>${FV?`Independently reproduced in Python (statsmodels) on ${esc(FV.asOf)} from the same Google Finance data; the JavaScript results matched. A 36-month window gave the same conclusion (excess ${qp(FV.runs.sens_36m_4f.resid.exAnn,2)} a year, t ${qn(FV.runs.sens_36m_4f.resid.t,2)}).`:""} Price returns only: dividends are excluded from both the strategy and the benchmark, which understates high-yield sectors such as utilities and energy by roughly their yield difference. Fama-French factors could not be used: the Dartmouth data library is distributed only as zip files, which this environment cannot open, so ETF-based factor proxies are used instead.</p></details>
     <details class="note"><summary>Method, data and limitations</summary>
     <p><b>Factor model.</b> For each sector or stock, monthly price returns are regressed on a fixed set of four ETF-based factors over the trailing ${QF_W} months (at least ${QF_MIN}): market (SPY), size (IWM − SPY), value (Russell 1000 Value − Growth, IWD − IWF) and interest rates (IEF). The factor set is fixed in advance: no factor is added or dropped based on its t-statistic, to avoid selection bias. Momentum (SPMO) is excluded because its history starts only in late 2015. Residual momentum follows Blitz, Huij &amp; Martens (2011): the sum of residuals over months t−11 to t−1, divided by residual volatility × √11; the 6M and 3M windows include the latest month.</p>
     <p><b>Decomposition.</b> 3-month return vs SPY = factor part ((beta − 1) × market + other factor exposures + alpha) + residual part. Months are the last weekly close in each completed month (Google Finance weekly closes), so the month ends on the last Friday, not the calendar month end.</p>
-    <p><b>Earnings revisions.</b> Three different things are kept apart. (1) Consensus EPS change: Yahoo Finance's EPS Trend table gives the consensus for the current and next fiscal year today and 7, 30, 60 and 90 days ago; sector figures are the cap-weighted change in aggregate earnings (shares × EPS). (2) Analyst revision counts: Yahoo's EPS Revisions table counts analysts who raised or cut estimates in the last 7 and 30 days; breadth = (up − down) ÷ (up + down). (3) Recommendation changes (upgrades/downgrades): available for your holdings only, from stockanalysis.com's latest-forecasts table, collected by the Sunday task. The weekly snapshot (Sunday task) covers the 5 largest S&amp;P 500 constituents of each sector, 4 semiconductor and 4 aerospace &amp; defense names, and your holdings; each snapshot is kept unchanged as a point-in-time record. History starts with the first snapshot: no earlier revision history is reconstructed. Acceleration = latest 4-week revision minus the prior 4 weeks. Revenue revisions need two snapshots about 4 weeks apart and stay "pending" until then. 12-week revision breadth counts are not published by the source, so the 12W column is magnitude only. Divergence flags when the cross-sectional z-scores of 12-week revisions and 12-week price performance vs SPY differ by 1.5 or more.</p>
+    <p><b>Earnings revisions.</b> Three different things are kept apart. (1) Consensus EPS change: the Alpha Vantage consensus feed gives the consensus for the current and next fiscal year today and 7, 30, 60 and 90 days ago; sector figures are the cap-weighted change in aggregate earnings (shares × EPS). (2) Analyst revision counts: the consensus feed counts analysts who raised or cut estimates in the last 7 and 30 days; breadth = (up − down) ÷ (up + down). (3) Recommendation changes (upgrades/downgrades): available for your holdings only, from stockanalysis.com's latest-forecasts table, collected by the Sunday task. The weekly snapshot (Sunday task) covers the 5 largest S&amp;P 500 constituents of each sector, 4 semiconductor and 4 aerospace &amp; defense names, and your holdings; each snapshot is kept unchanged as a point-in-time record. History starts with the first snapshot: no earlier revision history is reconstructed. Acceleration = latest 4-week revision minus the prior 4 weeks. Revenue revisions need two snapshots about 4 weeks apart and stay "pending" until then. 12-week revision breadth counts are not published by the source, so the 12W column is magnitude only. Divergence flags when the cross-sectional z-scores of 12-week revisions and 12-week price performance vs SPY differ by 1.5 or more.</p>
     <p><b>Point in time.</b> Every regression and score uses only data up to its month; the backtest re-fits each month. Survivorship bias does not apply to the sector ETF universe; constituent coverage uses today's S&amp;P 500 list.</p>
-    <p>Sources: Portfolio Factor Data (Google Finance, calculated ${esc(S.factor.at||"–")}${S.factor.bad.length?"; unavailable: "+esc(S.factor.bad.join(", ")):""}); revisions from Yahoo Finance analyst pages${V?`, snapshot ${esc(V.date)} (${V.nSnap} stored${V.old?", revenue compared with "+esc(V.old):""})`:""}; constituents and market caps from Portfolio Peer Valuation.</p></details>`;
+    <p>Sources: Portfolio Factor Data (Google Finance, calculated ${esc(S.factor.at||"–")}${S.factor.bad.length?"; unavailable: "+esc(S.factor.bad.join(", ")):""}); revisions from Alpha Vantage analyst consensus${V?`, snapshot ${esc(V.date)} (${V.nSnap} stored${V.old?", revenue compared with "+esc(V.old):""})`:""}; constituents and market caps from Portfolio Peer Valuation.</p></details>`;
   el.innerHTML=h;
   el.querySelectorAll("tr.ld-row").forEach(tr=>tr.onclick=()=>{S.ldOpen=S.ldOpen===tr.dataset.k?null:tr.dataset.k;renderLead()});if(S.flowReady)renderFlow();qLog()}
 function ldDetail(Q,a,V){const o=Q.now[a],f=o.fit;if(!f)return `<p class="note">Not enough history for a ${QF_W}-month regression.</p>`;
@@ -1402,7 +1427,7 @@ function renderDisp(){const el=$("vd-box");if(!el)return;const P=pvModel();if(!P
   const ticks=[0,0.25,0.5,0.75,1].map(q=>lo+(hi-lo)*q).map(v=>`<text x="${X(v)}" y="${14+secs.length*24+6}" font-size="10.5" fill="var(--muted)" text-anchor="middle" font-family="IBM Plex Mono,monospace">${(v*100).toFixed(1)}%</text>`).join("");
   let h=`<div class="chart"><svg viewBox="0 0 ${W} ${24*secs.length+30}" role="img" aria-label="Earnings yield dispersion by sector">${svgRows}${ticks}</svg></div>
     <p class="note">Trailing earnings yield (E/P, higher = cheaper) of S&amp;P 500 constituents by sector: box = middle 50%, line = 10th to 90th percentile, tick = median, orange dots = your holdings. E/P is used instead of P/E so loss-makers stay in the distribution.</p>
-    <div class="br-wrap"><table class="ob"><thead><tr><th class="l">Sector</th><th>Stocks</th><th>Median P/E</th><th>Median E/P</th><th>Interquartile E/P</th><th>Dispersion (IQR ÷ median)</th><th>Loss-makers</th><th class="l">Your holdings (E/P percentile in sector)</th></tr></thead><tbody>${secs.map(([k,s])=>`<tr><th class="l">${esc(SECTOR_SHORT[k]||k)}</th><td>${s.n}</td><td>${s.md>0?(1/s.md).toFixed(1)+"×":"n/a"}</td><td>${(s.md*100).toFixed(2)}%</td><td>${(s.q1*100).toFixed(1)}–${(s.q3*100).toFixed(1)}%</td><td>${s.disp!=null?s.disp.toFixed(2):qNA}</td><td>${s.neg}</td><td class="l">${(hold.get(k)||[]).map(t=>{const p=pvHolding(t);return esc(t)+" "+(p.pct*100).toFixed(0)}).join(", ")||'<span class="muted">–</span>'}</td></tr>`).join("")}</tbody></table></div>
+    <div class="br-wrap"><table class="ob"><thead><tr><th class="l">Sector</th><th>Stocks</th><th>Median P/E</th><th>Median E/P</th><th>Interquartile E/P</th><th>Dispersion (IQR ÷ median)</th><th>Loss-makers</th><th class="l">Your holdings (E/P percentile in sector)</th></tr></thead><tbody>${secs.map(([k,s])=>`<tr><th class="l">${esc(SECTOR_SHORT[k]||k)}</th><td>${s.n}</td><td>${s.md>0?(1/s.md).toFixed(1)+"×":"–"}</td><td>${(s.md*100).toFixed(2)}%</td><td>${(s.q1*100).toFixed(1)}–${(s.q3*100).toFixed(1)}%</td><td>${s.disp!=null?s.disp.toFixed(2):qNA}</td><td>${s.neg}</td><td class="l">${(hold.get(k)||[]).map(t=>{const p=pvHolding(t);return esc(t)+" "+(p.pct*100).toFixed(0)}).join(", ")||'<span class="muted">–</span>'}</td></tr>`).join("")}</tbody></table></div>
     <p class="note">Snapshot from Portfolio Peer Valuation (${esc(window.PT_SOURCE_LABEL||"data source")}, calculated ${esc(P.at||"–")}), ${P.all.n} constituents with EPS. Dispersion history builds up from the daily valuation log${S.vhist.filter(x=>x.disp).length?` (${S.vhist.filter(x=>x.disp).length} days so far)`:""}; there is no free point-in-time source for earlier constituent EPS, so no historical percentile of dispersion is shown yet.</p>`;
   el.innerHTML=h}
 
@@ -1476,7 +1501,7 @@ function obModel(){
     return {...g,name:obName(g),mem,n:mem.length,pOS,pOB,p50,nR,nM,cOS,cOB,c50,close,rsi,sma50,ratio,lab,agree,
       now:{rsi:rsi[i],pOS:pOS[i],pOB:pOB[i],nR:nR[i],cOS:cOS[i],cOB:cOB[i],p50:p50[i],nM:nM[i],c50:c50[i],d5,rs20,p20,lab:cur,trans,etfOk:close[i]!=null}}});
   return S.obM={cal,N,st,last,groups,stale,missing,total:stocks.length}}
-const obNA='<span class="una" title="Unavailable: not enough data">n/a</span>';
+const obNA='<span class="una" title="Not enough data for this value yet">–</span>';
 const obNum=(v,dp=0,sign=false)=>v==null||!isFinite(v)?obNA:(sign&&v>0?"+":"")+(v<0?"−":"")+Math.abs(v).toFixed(dp);
 function obLabel(k,small){const L=OB_LAB[k]||OB_LAB.NA;return `<span class="ob-lab${small?" sm":""}" style="color:${L.c}"><i></i>${L.t}</span>`}
 function obSortRows(gs){const s=S.obSort;const v=x=>x==null||!isFinite(x)?-1e9:x;
@@ -1508,7 +1533,7 @@ function renderObos(){
   const narrowOB=rest.filter(g=>g.now.rsi>70&&g.now.p50!=null&&g.now.p50<=60).map(g=>esc(g.etf)),broadUp=rest.filter(g=>g.now.rsi>=50&&g.now.rsi<=70&&g.now.p50>=60&&g.now.rs20>0).map(g=>esc(g.etf));
   const ag=M.groups.filter(g=>g.agree&&g.agree.tot);const aOk=ag.reduce((s,g)=>s+g.agree.ok,0),aTot=ag.reduce((s,g)=>s+g.agree.tot,0);
   const nOk=M.total-M.missing.length;
-  $("ob-read").innerHTML=`<p>${tagObs} Oversold Watch: ${list(by("OSW"))} · Recovery Candidate: ${list(by("RC"))} · Overbought Watch: ${list(by("OBW"))} · Exhaustion Watch: ${list(by("EXW"))}. S&amp;P 500: ${all.now.pOS!=null?Math.round(all.now.pOS):"–"}% of stocks oversold, ${all.now.pOB!=null?Math.round(all.now.pOB):"–"}% overbought, SPY RSI ${all.now.rsi!=null?all.now.rsi.toFixed(1):"n/a"}.</p>
+  $("ob-read").innerHTML=`<p>${tagObs} Oversold Watch: ${list(by("OSW"))} · Recovery Candidate: ${list(by("RC"))} · Overbought Watch: ${list(by("OBW"))} · Exhaustion Watch: ${list(by("EXW"))}. S&amp;P 500: ${all.now.pOS!=null?Math.round(all.now.pOS):"–"}% of stocks oversold, ${all.now.pOB!=null?Math.round(all.now.pOB):"–"}% overbought, SPY RSI ${all.now.rsi!=null?all.now.rsi.toFixed(1):"–"}.</p>
     <p>${tagObs} ${tr.length?`Moved from Oversold Watch to Recovery Candidate within 10 sessions: ${tr.join(", ")}.`:"No sector moved from Oversold Watch to Recovery Candidate in the last 10 sessions."}</p>
     <p>${tagObs} Relative vs absolute: ${relOnly.length?`<b>${relOnly.join(", ")}</b> ${relOnly.length>1?"are":"is"} beating SPY over 20 sessions while ${relOnly.length>1?"their":"its"} own price is down, so the strength is relative only (falling less than the market), not a price recovery.`:"no ETF is beating SPY while falling in price."}${absUp.length?` <b>${absUp.join(", ")}</b> ${absUp.length>1?"are":"is"} up in price but lagging SPY.`:""}</p>
     <p>${tagSpec} ${broadUp.length?`<b>${broadUp.join(", ")}</b> combine${broadUp.length>1?"":"s"} RSI 50–70, 60%+ of stocks above the 50-day and positive 20D RS, a profile that has more often marked sustainable trends than overextension. `:""}${narrowOB.length?`<b>${narrowOB.join(", ")}</b> ${narrowOB.length>1?"have":"has"} RSI above 70 with 60% or fewer stocks above the 50-day: momentum resting on fewer names, which has more often preceded fading. `:""}Overbought is not a sell signal and oversold is not a buy signal: in strong trends RSI can stay above 70 for weeks, and in declines below 30.</p>
@@ -1529,7 +1554,7 @@ function obDrawDetail(g,M){const T=i=>M.cal[i];const pick=arr=>{const o=[];for(l
   if(box("obc-px"))multiChart(box("obc-px"),[{name:"Price",short:g.etf,color:"var(--chart)",w:2,pts:pick(g.close)},{name:"50D",short:"50D",color:"var(--s3)",w:1.3,dash:"3 3",pts:pick(g.sma50)}],{label:g.etf+" price and 50-day average",h:180,fmt:(v,f)=>"$"+v.toFixed(f||v<100?2:0)});
   if(box("obc-rsi"))multiChart(box("obc-rsi"),[{name:"RSI",short:"RSI",color:"var(--fg)",w:1.8,pts:pick(g.rsi)},{name:"70",short:"70",color:"var(--warn)",w:1,dash:"4 4",pts:flat(70)},{name:"30",short:"30",color:"var(--q1)",w:1,dash:"4 4",pts:flat(30)}],{label:g.etf+" RSI 14",h:180,fmt:v=>v.toFixed(0)});
   if(box("obc-br"))multiChart(box("obc-br"),[{name:"50D",short:"Above 50D",color:"var(--fg)",w:2,pts:pick(g.p50)},{name:"OS",short:"Oversold",color:"var(--q1)",w:1.4,pts:pick(g.pOS)},{name:"OB",short:"Overbought",color:"var(--warn)",w:1.4,pts:pick(g.pOB)}],{label:g.name+" constituent breadth",h:180,zero:true,fmt:(v,f)=>v.toFixed(0)+"%",
-    tipHtml:t=>{const i=Math.max(M.st,rotIdx(M.cal.map(x=>[x]),t));return `<b>${day(T(i))}</b><br>Above 50D ${g.p50[i]!=null?Math.round(g.p50[i])+"% ("+g.c50[i]+"/"+g.nM[i]+")":"n/a"}<br>Oversold ${g.pOS[i]!=null?Math.round(g.pOS[i])+"% ("+g.cOS[i]+"/"+g.nR[i]+")":"n/a"} · Overbought ${g.pOB[i]!=null?Math.round(g.pOB[i])+"% ("+g.cOB[i]+"/"+g.nR[i]+")":"n/a"}<br>Status: ${(OB_LAB[g.lab[i]]||OB_LAB.NA).t}`}});
+    tipHtml:t=>{const i=Math.max(M.st,rotIdx(M.cal.map(x=>[x]),t));return `<b>${day(T(i))}</b><br>Above 50D ${g.p50[i]!=null?Math.round(g.p50[i])+"% ("+g.c50[i]+"/"+g.nM[i]+")":"–"}<br>Oversold ${g.pOS[i]!=null?Math.round(g.pOS[i])+"% ("+g.cOS[i]+"/"+g.nR[i]+")":"–"} · Overbought ${g.pOB[i]!=null?Math.round(g.pOB[i])+"% ("+g.cOB[i]+"/"+g.nR[i]+")":"–"}<br>Status: ${(OB_LAB[g.lab[i]]||OB_LAB.NA).t}`}});
   if(box("obc-rs"))multiChart(box("obc-rs"),[{name:"Ratio",short:g.etf+"/SPY",color:"var(--chart)",w:2,pts:pick(g.ratio)},{name:"20D",short:"20D",color:"var(--s2)",w:1.3,dash:"5 4",pts:pick(rsSma)}],{label:g.etf+" to SPY ratio",h:180,fmt:v=>Number(v).toPrecision(4)})}
 
 Object.assign(S,{obos:null,obErr:null,obAt:null,obM:null,obSort:"status",obOpen:null});
@@ -1634,8 +1659,8 @@ function vShares(f,lv){return f.shareMode==="gf"?lv.sh:lv.mcap/lv.px}
 /* ctx: {rf, erp, sbc, mos:{quality,growth,cyclical,speculative}, L (live inputs)} */
 function valueOne(f,ctx){const t=f.t;const lv=vLive(ctx.L,t);
   const r={t,method:f.method,cls:f.cls,sector:f.sector,ai:!!f.ai,notes:[],iv:null,px:lv?lv.px:null,asOf:f.asOf};
-  if(f.method==="nav"){r.conf="n/a";r.notes.push("Fund: valued at net asset value. A DCF of an index or commodity fund is not meaningful, so no margin of safety is computed.");return r}
-  if(!lv||!lv.px||!lv.mcap){r.conf="n/a";r.notes.push("Live price or market cap missing from the inputs sheet.");return r}
+  if(f.method==="nav"){r.conf="Fund (NAV)";r.notes.push("Fund: valued at net asset value. A DCF of an index or commodity fund is not meaningful, so no margin of safety is computed.");return r}
+  if(!lv||!lv.px||!lv.mcap){r.conf="Waiting for price";r.notes.push("Live price or market cap missing from the inputs sheet.");return r}
   const FX=ctx.L.fx;const ba=vBeta(lv.beta);r.beta=lv.beta;r.ba=ba;
   const fxb=FX[f.bsCur||"USD"]||1;const debtUSD=(f.debt||0)*1e6*fxb;const wc=vWacc(lv.beta,lv.mcap,debtUSD,ctx.rf,ctx.erp);
   Object.assign(r,{W:wc.W,ke:wc.ke,kd:wc.kd,wd:wc.wd});
@@ -1698,7 +1723,7 @@ const VALIN_ID="VALIN";
 const RF_FALLBACK=4.99;
 Object.assign(S,{fund:{},fundAt:null,valin:null,valinAt:null,valinErr:null,vset:{erp:4.41,erpSrc:"Damodaran implied ERP, 1 Nov 2026",mos:{quality:20,growth:25,cyclical:35,speculative:40},sbc:true},vsetLoaded:false,
   vhist:[],vres:null,vSel:null,vSort:"mos",vTbl:{k:"mos",d:-1},vFunds:false,vCustom:null,vWritten:false,tab:"ov"});
-try{const t=localStorage.getItem("ptpub.v1.tab");if(t==="val"||t==="ov")S.tab=t;const v=localStorage.getItem("ptpub.v1.vSort");if(v)S.vSort=v}catch(e){}
+try{const t=localStorage.getItem("ptpub.v1.tab");if(t==="val"||t==="ov"||t==="set")S.tab=t;const v=localStorage.getItem("ptpub.v1.vSort");if(v)S.vSort=v}catch(e){}
 const V_CLS={quality:"Quality compounder",growth:"Established growth",cyclical:"Cyclical / AI semis",speculative:"Speculative",fund:"Fund"};
 const V_STAT={pass:"var(--up)",near:"var(--warn)",fail:"var(--down)",na:"var(--muted)"};
 const usd=(v,dp)=>v==null||!isFinite(v)?"–":money(v,dp!=null?dp:v>=1000?0:2);
@@ -1708,7 +1733,7 @@ const pm=v=>v==null?"–":v<-2?"< −200%":pc(v);
 function vCtx(){const rf=S.tnx!=null?S.tnx:RF_FALLBACK;return {rf,rfLive:S.tnx!=null,erp:S.vset.erp,sbc:S.vset.sbc,mos:S.vset.mos,L:S.valin}}
 function computeVal(){if(!S.valin||!Object.keys(S.fund).length){S.vres=null;return null}
   const ctx=vCtx();const {list,total}=aggregate();const res={};
-  for(const t in S.fund){try{res[t]=valueOne(S.fund[t],ctx)}catch(e){res[t]={t,method:S.fund[t].method,conf:"n/a",notes:["Calculation error: "+e.message]}}}
+  for(const t in S.fund){try{res[t]=valueOne(S.fund[t],ctx)}catch(e){res[t]={t,method:S.fund[t].method,conf:"Calculation error",notes:["Calculation error: "+e.message]}}}
   for(const h of list){const r=res[h.ticker];if(r){r.weight=h.weight;r.value=h.value;r.held=h.shares;r.theme=h.theme}}
   S.vres={res,ctx,list,total};if(!S.vSel||!res[S.vSel]||!res[S.vSel].iv&&!res[S.vSel].implied&&!res[S.vSel].rev){const c=Object.values(res).filter(r=>r.iv&&r.weight).sort((a,b)=>b.weight-a.weight)[0];S.vSel=c?c.t:null}
   maybeWriteHist();return S.vres}
@@ -1795,7 +1820,7 @@ function renderValC(){const box=$("val-c"),sel=$("val-sel");if(!S.vres){box.inne
     const lab=f.cols.map((c,i)=>c==="TTM"?"TTM "+f.ends[i].slice(2,7):c);
     h+=`<div><h3>Inputs</h3><table class="kv"><tbody>
       <tr><th>Risk-free (US 10Y)</th><td>${ctx.rf.toFixed(2)}% ${ctx.rfLive?"live":"<span class='muted'>fallback assumption, not live</span>"}</td></tr>
-      <tr><th>Beta raw → adjusted</th><td>${r.beta!=null?r.beta.toFixed(2):"n/a"} → ${r.ba.toFixed(2)} <span class="muted">Blume, capped 0.6–2.0</span></td></tr>
+      <tr><th>Beta raw → adjusted</th><td>${r.beta!=null?r.beta.toFixed(2):"–"} → ${r.ba.toFixed(2)} <span class="muted">Blume, capped 0.6–2.0</span></td></tr>
       <tr><th>Equity risk premium</th><td>${ctx.erp.toFixed(2)}%</td></tr><tr><th>Cost of equity · debt (after tax)</th><td>${r.ke.toFixed(2)}% · ${r.kd.toFixed(2)}%</td></tr>
       <tr><th>WACC bear / base / bull</th><td>${r.Ws.bear.toFixed(2)} / ${r.Ws.base.toFixed(2)} / ${r.Ws.bull.toFixed(2)}%</td></tr>
       <tr><th>Year-1 revenue growth</th><td>${pc(r.g1.bear,1)} / ${pc(r.g1.base,1)} / ${pc(r.g1.bull,1)} <span class="muted">${f.fc.basis==="trailing"?"trailing revenue growth, no consensus":"consensus "+esc(f.fc.fy)}${r.dm>=6&&f.fc.basis!=="trailing"?", annualised from the latest period":""}</span></td></tr>
@@ -1803,7 +1828,7 @@ function renderValC(){const box=$("val-c"),sel=$("val-sel");if(!S.vres){box.inne
       <tr><th>Terminal growth</th><td>${VAL_SC.bear.gT} / ${VAL_SC.base.gT} / ${VAL_SC.bull.gT}% · terminal value ${pu(r.tvShare)} of base EV</td></tr>
       <tr><th>Price implies</th><td>${r.implied.margin.toFixed(1)}% steady margin, or ${r.implied.cagr!=null?pc(r.implied.cagr,1)+" revenue growth a year for 10 years":"growth outside −30% to +100%"} at the base margin</td></tr>
       <tr><th>Forward P/E</th><td>${r.cross.fpe?r.cross.fpe.toFixed(1)+"× "+esc(r.cross.fpeFy):"–"}${r.cross.fpeHist?` <span class="muted">5Y median ${r.cross.fpeHist.toFixed(1)}×</span>`:""}</td></tr>
-      <tr><th>EV / FCF (trailing)</th><td>${r.cross.evfcf?r.cross.evfcf.toFixed(1)+"×":"n/a (negative FCF)"}${r.cross.evfcfHist?` <span class="muted">5Y median ${r.cross.evfcfHist.toFixed(1)}×</span>`:""}</td></tr>
+      <tr><th>EV / FCF (trailing)</th><td>${r.cross.evfcf?r.cross.evfcf.toFixed(1)+"×":"not meaningful (negative FCF)"}${r.cross.evfcfHist?` <span class="muted">5Y median ${r.cross.evfcfHist.toFixed(1)}×</span>`:""}</td></tr>
       <tr><th>Analyst average target</th><td>${r.cross.pt?usd(r.cross.pt):"–"}</td></tr></tbody></table></div></div>`;
     h+=`<h3>Cash-flow history used</h3><div class="tablebox"><table class="kv hist"><thead><tr><th class="l">Period</th>${lab.map(l=>`<th>${esc(l)}</th>`).join("")}</tr></thead><tbody>
       <tr><th class="l">Revenue</th>${f.rev.map(v=>`<td>${(v*r.fx/1000).toFixed(1)}</td>`).join("")}</tr>
@@ -1875,8 +1900,8 @@ function renderValStatus(){const el=$("val-src");const c=vCtx();
     <span class="pill">Fundamentals: ${Object.keys(S.fund).length?esc(Object.values(S.fund).map(f=>f.asOf).sort().pop()):"none (no data source)"}</span>
     <span class="pill ${c.rfLive?"live":"stale"}">US 10Y ${c.rf.toFixed(2)}%${c.rfLive?"":" (fallback assumption, not live)"}</span><span class="pill">ERP ${c.erp.toFixed(2)}%</span>`}
 function renderValAll(selOnly,keepSet){if(S.tab!=="val")return;if(!selOnly)computeVal();renderValStatus();renderValKpis();renderValA();renderValB();renderValC();renderValTable();if(!keepSet&&!selOnly)renderValSettings();if(!selOnly)renderDisp()}
-function setTab(t){S.tab=t;try{localStorage.setItem("ptpub.v1.tab",t)}catch(e){}$("tab-ov").hidden=t!=="ov";$("tab-val").hidden=t!=="val";$("tb-ov").setAttribute("aria-pressed",t==="ov");$("tb-val").setAttribute("aria-pressed",t==="val");
-  if(t==="val")renderValAll();else renderAll()}
+function setTab(t){S.tab=t;try{localStorage.setItem("ptpub.v1.tab",t)}catch(e){}for(const k of ["ov","val","set"]){$("tab-"+k).hidden=t!==k;$("tb-"+k).setAttribute("aria-pressed",t===k)}
+  if(t==="val")renderValAll();else if(t==="set"){if(window.PT_UI)window.PT_UI.renderSettings()}else renderAll()}
 
 function buildPortfolioSeries(){
   if(!S.hist||!S.rows.length)return null;
@@ -1938,10 +1963,10 @@ function drawTicker(a){const el=$("tc-"+a.ticker);if(!el)return;const h=S.hist&&
   const c=a.cur==="HKD"?"HK$":"$";lineChart(el,pts,{label:a.ticker+" price",h:200,ref:a.ath,refLabel:"ATH "+c+(a.ath||0).toFixed(2),fmt:(v,full)=>c+(full?v.toFixed(2):v>=1000?v.toFixed(0):v.toFixed(v>=100?0:2))})}
 function renderFoot(){const est=S.rows.filter(r=>r.status==="Estimated").length;
   $("foot-est").textContent=est?`${est} positions use estimated share counts (EST).`:"All share counts are actual.";
-  $("foot-asof").textContent=(S.source==="live"?"Live from Google Sheet":"From the last daily snapshot")+(S.asOf?" · fetched "+new Date(S.asOf).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+" your time":"")+(S.usdthb?` · USD/THB ${S.usdthb.toFixed(3)}`:"")}
+  $("foot-asof").textContent=(window.PT_LIVE_ASOF?"Prices from "+(window.PT_SOURCE_LABEL||"the data source")+", close "+window.PT_LIVE_ASOF:"Prices entered by you")+(S.asOf?" · fetched "+new Date(S.asOf).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+" your time":"")+(S.usdthb?` · USD/THB ${S.usdthb.toFixed(3)}`:"")}
 
 /* ---------- news ---------- */
-function renderNews(){const sel=$("news-day");const days=S.news.map(n=>n.date).sort().reverse();
+function renderNews(){if(window.PT_UI)setTimeout(window.PT_UI.extras,0);const sel=$("news-day");const days=S.news.map(n=>n.date).sort().reverse();
   if(!days.length){sel.hidden=true;return}sel.hidden=false;if(!S.newsDay||!days.includes(S.newsDay))S.newsDay=days[0];
   sel.innerHTML=days.map(d=>`<option value="${esc(d)}"${d===S.newsDay?" selected":""}>${new Date(d+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}</option>`).join("");
   const n=S.news.find(x=>x.date===S.newsDay);$("news-macro").textContent=n.macro||"";
@@ -1954,12 +1979,12 @@ $("news-day").addEventListener("change",e=>{S.newsDay=e.target.value;renderNews(
 /* ---------- events ---------- */
 function setCur(c){S.cur=c;try{localStorage.setItem("ptpub.v1.cur",c)}catch(e){}$("cur-usd").setAttribute("aria-pressed",String(c==="USD"));$("cur-thb").setAttribute("aria-pressed",String(c==="THB"));renderAll()}
 $("cur-usd").onclick=()=>setCur("USD");$("cur-thb").onclick=()=>setCur("THB");
-$("tb-ov").onclick=()=>setTab("ov");$("tb-val").onclick=()=>setTab("val");
+$("tb-ov").onclick=()=>setTab("ov");$("tb-val").onclick=()=>setTab("val");$("tb-set").onclick=()=>setTab("set");
 const vSortBtns=()=>document.querySelectorAll("#va-sort button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.s===S.vSort)));vSortBtns();
 document.querySelectorAll("#va-sort button").forEach(b=>b.onclick=()=>{S.vSort=b.dataset.s;try{localStorage.setItem("ptpub.v1.vSort",S.vSort)}catch(e){}vSortBtns();renderValA()});
 $("va-funds").onchange=e=>{S.vFunds=e.target.checked;renderValA();renderValTable()};
 {let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(S.tab==="val"&&S.vres){renderValA();renderValB();if(S.vCustom)drawValCChart(S.vres.res[S.vSel],S.fund[S.vSel])}},150)})}
-if(S.tab==="val")setTab("val");
+if(S.tab==="val"||S.tab==="set")setTab(S.tab);
 $("pf-mode").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.pfMode=b.dataset.m;try{localStorage.setItem("ptpub.v1.pfMode",S.pfMode)}catch(x){}renderPortfolioChart()});
 $("rot-tabs").addEventListener("click",e=>{const b=e.target.closest(".rot-tab");if(!b)return;S.rotSel=b.dataset.k;renderRotation()});
 $("rrg-freq").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.rrgFreq=b.dataset.f;S.rrgBack=0;renderRRG()});
@@ -2041,7 +2066,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
       if(e&&e.retryable&&!refresh)setTimeout(()=>loadHist(true),(e.retryAfterMs||2000)+Math.random()*1500)}};
   loadHist(false);
   /* re-pull history when the set of US-listed tickers changes, so new holdings get prices and charts */
-  const histSigOf=items=>(items||[]).filter(h=>h&&h.tk!=="CASH"&&h.cur==="USD").map(h=>h.tk).sort().join(",");
+  const histSigOf=items=>(items||[]).filter(h=>h&&h.tk!=="CASH").map(h=>h.tk+"|"+h.cur).sort().join(",");
   let histSig=histSigOf((()=>{try{return JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all")).items}catch(e){return[]}})());
   window.PT_ONHOLD=()=>{const sig=histSigOf(phLoad().items);if(sig!==histSig){histSig=sig;if(window.PT_DATA_SOURCE)loadHist(true)}};
   mcp.watchTool(DRIVE,TOOL,{fileId:ROT_ID,exportMimeType:"text/csv"},ev=>{
@@ -2094,18 +2119,19 @@ function handleErr(err,what){const c=err&&err.code;let msg;
 const PH_KEY="holdings/all";
 function phLoad(){const v=ptStore.get(PH_KEY);return v&&Array.isArray(v.items)?v:{items:[],usdthb:null,hkdusd:null}}
 function phSave(v){ptStore.set(PH_KEY,v)}
-function phFx(cur,st){return cur==="USD"?1:cur==="THB"?(st.usdthb>0?1/st.usdthb:null):cur==="HKD"?(st.hkdusd>0?st.hkdusd:null):null}
+function phRates(st){const fx=window.PT_FX||{};return{usdthb:st.usdthb>0?st.usdthb:fx.usdthb>0?fx.usdthb:null,hkdusd:st.hkdusd>0?st.hkdusd:fx.hkdusd>0?fx.hkdusd:null,auto:!(st.usdthb>0&&st.hkdusd>0)&&!!(fx.usdthb>0)}}
+function phFx(cur,st){const r=phRates(st);return cur==="USD"?1:cur==="THB"?(r.usdthb>0?1/r.usdthb:null):cur==="HKD"?(r.hkdusd>0?r.hkdusd:null):null}
 function ptHoldingsCsv(){const st=phLoad();if(!st.items.length)return null;
   const H=["Broker","Ticker","Symbol","Theme","Currency","Shares used","Shares status","Total cost (local)","Price","Prev close","52W high","All-time high","Avg cost","Day %","1W %","1M %","YTD %","% from ATH","% from 52W high","Value (local)","FX to USD","Value (USD)","Cost (USD)","P&L (USD)","P&L %","USD/THB","HKD/USD","Recalculated at","Snapshot value (local)"];
   const q=v=>{const t=v==null?"":String(v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
   const now=new Date().toISOString().slice(0,16).replace("T"," ");
   const lines=[H.join(",")];
-  st.items.forEach((h,i)=>{const cash=h.tk==="CASH";const fx=phFx(h.cur,st);const lv=!cash&&h.cur==="USD"&&window.PT_LIVE?window.PT_LIVE[h.tk]:null;const px=cash?1:(lv?lv.px:(h.px>0?h.px:null));
+  st.items.forEach((h,i)=>{const cash=h.tk==="CASH";const fx=phFx(h.cur,st);const lv=!cash&&window.PT_LIVE?window.PT_LIVE[h.tk]:null;const at=!cash&&window.PT_ATH?window.PT_ATH[h.tk]:null;const athV=at&&at.v>0?Math.max(at.v,lv&&lv.hi52||0,lv&&lv.px||0):null;const px=cash?1:(lv?lv.px:(h.px>0?h.px:null));
     const vl=px!=null?h.qty*px:null;const vu=vl!=null&&fx!=null?vl*fx:null;const cu=h.cost!=null&&fx!=null?h.cost*fx:null;
     const pnl=vu!=null&&cu!=null&&!cash?vu-cu:null;
     const row={"Broker":h.acct||"Account","Ticker":h.tk,"Symbol":cash?"":h.tk,"Theme":cash?"Cash":h.theme,"Currency":h.cur,"Shares used":cash?"":h.qty,"Shares status":"Actual",
-      "Total cost (local)":cash?vl:h.cost,"Price":cash?"":px,"Avg cost":!cash&&h.cost!=null&&h.qty>0?h.cost/h.qty:"","Prev close":lv?lv.prev:"","52W high":lv?lv.hi52:"","Day %":lv?lv.day:"","1W %":lv?lv.w1:"","1M %":lv?lv.m1:"","YTD %":lv?lv.ytd:"","% from 52W high":lv?lv.from52:"","Value (local)":vl,"FX to USD":fx,"Value (USD)":vu,"Cost (USD)":cash?vu:cu,
-      "P&L (USD)":pnl,"P&L %":pnl!=null&&cu?pnl/cu:"","USD/THB":i===0?st.usdthb:"","HKD/USD":i===0?st.hkdusd:"","Recalculated at":i===0?now:""};
+      "Total cost (local)":cash?vl:h.cost,"Price":cash?"":px,"Avg cost":!cash&&h.cost!=null&&h.qty>0?h.cost/h.qty:"","Prev close":lv?lv.prev:"","52W high":lv?lv.hi52:"","All-time high":athV||"","% from ATH":athV&&px?px/athV-1:"","Day %":lv?lv.day:"","1W %":lv?lv.w1:"","1M %":lv?lv.m1:"","YTD %":lv?lv.ytd:"","% from 52W high":lv?lv.from52:"","Value (local)":vl,"FX to USD":fx,"Value (USD)":vu,"Cost (USD)":cash?vu:(vu!=null?cu:""),
+      "P&L (USD)":pnl,"P&L %":pnl!=null&&cu?pnl/cu:"","USD/THB":i===0?phRates(st).usdthb:"","HKD/USD":i===0?phRates(st).hkdusd:"","Recalculated at":i===0?now:""};
     lines.push(H.map(k=>q(row[k])).join(","))});
   return lines.join("\n")}
 function phRender(){const st=phLoad();const tb=document.querySelector("#ph-table tbody");if(!tb)return;
@@ -2114,8 +2140,10 @@ function phRender(){const st=phLoad();const tb=document.querySelector("#ph-table
   if($("ph-hkdusd")&&document.activeElement!==$("ph-hkdusd"))$("ph-hkdusd").value=st.hkdusd||"";
   const f=v=>v==null||v===""?"–":Number(v).toLocaleString("en-US",{maximumFractionDigits:4});
   tb.innerHTML=st.items.map((h,i)=>`<tr><td class="l">${esc(h.acct||"Account")}</td><td class="l"><span class="tk">${esc(h.tk)}</span></td><td class="l muted">${esc(h.tk==="CASH"?"Cash":h.theme)}</td><td>${esc(h.cur)}</td><td>${f(h.qty)}</td><td>${f(h.cost)}</td><td>${h.tk==="CASH"?"–":f(h.px)}</td><td>${f(h.tk==="CASH"?h.qty:(h.px>0?h.qty*h.px:null))}</td><td><button class="btn" data-del="${i}" type="button">Remove</button></td></tr>`).join("");
-  const missFx=st.items.some(h=>phFx(h.cur,st)==null),missPx=st.items.some(h=>h.tk!=="CASH"&&!(h.px>0));
-  $("ph-msg").textContent=(missFx?"Enter an exchange rate for non-USD holdings. ":"")+(missPx?"Positions without a price are not valued.":"")}
+  const missFx=st.items.some(h=>phFx(h.cur,st)==null),missPx=st.items.some(h=>h.tk!=="CASH"&&!(h.px>0)&&!(window.PT_LIVE&&window.PT_LIVE[h.tk]));
+  const R=phRates(st),fx=window.PT_FX;
+  if($("ph-usdthb"))$("ph-usdthb").placeholder=fx&&fx.usdthb?"auto "+fx.usdthb:"";if($("ph-hkdusd"))$("ph-hkdusd").placeholder=fx&&fx.hkdusd?"auto "+fx.hkdusd:"";
+  $("ph-msg").textContent=(missFx?"Waiting for exchange rates (or enter them above). ":R.auto&&fx?"Exchange rates: "+fx.source+", "+fx.asOf+" (type a rate to override). ":"")+(missPx?"Positions without a live or entered price are not valued yet.":"")}
 function phApply(){const csv=ptHoldingsCsv();phRender();if(window.PT_ONHOLD)window.PT_ONHOLD();
   if(!csv){if(S.rows.length){location.reload();return}setPill("st-prices","Prices: add holdings to begin","stale");return}
   if(applyEngine(csv,"manual",Date.now())){if(window.PT_LIVE_AT)setPill("st-prices","Prices: "+(window.PT_SOURCE_LABEL||"live")+(window.PT_LIVE_ASOF?" · close "+window.PT_LIVE_ASOF:""),"live");else setPill("st-prices","Prices: manual · entered by you","stale");renderAll()}}
@@ -2133,6 +2161,10 @@ function phApply(){const csv=ptHoldingsCsv();phRender();if(window.PT_ONHOLD)wind
 
 window.ptHoldingsCsv=ptHoldingsCsv;
 window.PT_HOLD={load:phLoad,save:phSave,apply:phApply};
+/* bridge for pt-ui.js (Settings, layout, extra charts) */
+window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(),
+  redrawOverview:()=>{for(const f of [renderPortfolioChart,renderMacro,renderRotation,renderRRG,renderRiskApp,renderBreadth,renderObos,renderLead,renderVix,renderNews])try{f()}catch(e){}if(S.flowReady)try{renderFlow()}catch(e){}}};
 })();
 </script>
 <script src="pt-import.js"></script>
+<script src="pt-ui.js"></script>

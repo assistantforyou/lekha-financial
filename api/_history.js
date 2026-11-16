@@ -5,6 +5,7 @@ const { getSeries } = require("./_prices");
 const { cached, rateHit } = require("./_lib");
 const { fredSeries } = require("./_fred");
 const { historyCsv } = require("./_mappers");
+const { isIntl, intlSeries } = require("./_intl");
 
 const SYMBOL = /^[A-Z0-9][A-Z0-9.\-]{0,9}$/;
 const MAX_SYMBOLS = 25;
@@ -47,7 +48,9 @@ async function seriesFor(symbols) {
   const now = Date.now(), data = {}, need = [];
   for (const s of symbols) { const m = mem.get(s); if (m && now - m.at < MEM_TTL) data[s] = m.rows; else need.push(s); }
   if (need.length) {
-    const r = (await getSeries(need, 2000, { fallback: false })).data;
+    const us = need.filter((s) => !isIntl(s));
+    const [usData, intl] = await Promise.all([us.length ? getSeries(us, 2000, { fallback: false }).then((x) => x.data) : {}, intlSeries(need.filter(isIntl))]);
+    const r = { ...usData, ...intl };
     for (const s of need) if (r[s] && r[s].length) { data[s] = r[s]; if (mem.size >= MEM_MAX) mem.delete(mem.keys().next().value); mem.set(s, { at: now, rows: r[s] }); }
   }
   return data;
