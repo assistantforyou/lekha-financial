@@ -39,6 +39,7 @@ async function me(token) {
 
 export default function Login() {
   const [mode, setMode] = React.useState("login")
+  const [canCreate, setCanCreate] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [msg, setMsg] = React.useState({ text: "", kind: "" })
   const [email, setEmail] = React.useState("")
@@ -51,7 +52,9 @@ export default function Login() {
     fetch("/api/auth/setup")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (alive && j && j.needed) setMode("setup")
+        if (!alive || !j) return
+        setCanCreate(!!j.needed)
+        if (j.needed) setMode("setup")
       })
       .catch(() => {})
     const s = session()
@@ -244,6 +247,22 @@ export default function Login() {
             className="mx-auto mt-4 block h-auto px-0 text-[13px]"
           >
             Forgot password?
+          </Button>
+        )}
+
+        {(setup || canCreate) && (
+          <Button
+            type="button"
+            variant="link"
+            onClick={() => {
+              setMsg({ text: "", kind: "" })
+              setPassword("")
+              setRepeat("")
+              setMode(setup ? "login" : "setup")
+            }}
+            className="mx-auto mt-2 block h-auto px-0 text-[13px]"
+          >
+            {setup ? "Sign in instead" : "Create an account"}
           </Button>
         )}
 
