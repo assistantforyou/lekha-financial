@@ -139,7 +139,7 @@
   }
 
   var cfg = load();
-  window.PT_SOURCE_LABEL = cfg.type === "premium" ? "Premium (Alpha Vantage + free sources)" : cfg.type === "free" ? "free public data" : cfg.type === "custom" ? "custom data source" : "";
+  window.PT_SOURCE_LABEL = cfg.type === "premium" ? "Premium (Alpha Vantage + free sources)" : cfg.type === "free" ? "" : cfg.type === "custom" ? "custom data source" : "";
   if (cfg.type !== "none" && baseOf(cfg)) {
     window.PT_DATA_SOURCE = {
       fetchCsv: function (k) { return (cfg.type === "free" || cfg.type === "premium") && (k === "HISTORY" || k === "FACTOR") ? freePost(k) : (cfg.type === "free" || cfg.type === "premium") && k === "VALIN" ? holdPost("csv/VALIN", true) : get(cfg, "/csv/" + encodeURIComponent(k), true); },

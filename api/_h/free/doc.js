@@ -3,6 +3,7 @@ const { fredSeries } = require("../../_fred");
 const { fetchCftc, fetchTic } = require("../../_flows");
 const { macroFromFred, fredHistFrom } = require("../../_mappers");
 const { volData, backtestDoc } = require("../../_vol");
+const { fetchFgi } = require("../../_fgi");
 
 const H12 = 12 * 36e5;
 // the monthly series the regime model reads (FRED ids)
@@ -29,6 +30,7 @@ module.exports = async (req, res) => {
     if (path === "meta/cftc") return res.status(200).json((await cached("free/meta/cftc", H12, fetchCftc)) || null);
     if (path === "meta/f13") { const h = await cacheGet("free/meta/f13"); return res.status(200).json((h && h.payload) || null); } // built quarterly by scripts/build-13f.mjs
     if (path === "meta/tic") return res.status(200).json((await cached("free/meta/tic", H12, fetchTic)) || null);
+    if (path === "meta/fgi") return res.status(200).json((await cached("free/meta/fgi", 3 * 36e5, fetchFgi)) || null);
     if (path === "meta/vixeq_hist") {
       const d = await volData();
       return res.status(200).json((d && backtestDoc(d.vixeq)) || null);
