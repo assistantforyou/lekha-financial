@@ -46,6 +46,7 @@ header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .seg button{background:transparent;border:0;padding:4px 10px;font-family:var(--f-mono);font-size:12px;cursor:pointer;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .btn{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px}
+a.btn{display:inline-block;color:var(--fg);text-decoration:none;line-height:1.4}
 .btn:hover{border-color:var(--accent)}
 
 .kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden}
@@ -275,6 +276,7 @@ td{font-size:13.5px}
         <button id="cur-usd" aria-pressed="true">USD</button><button id="cur-thb" aria-pressed="false">THB</button>
       </div>
       <button class="btn" id="refresh">Refresh prices</button>
+      <a class="btn" id="acct" href="/login.html" title="Sign in">Sign in</a>
     </div>
   </header>
 
@@ -479,6 +481,7 @@ td{font-size:13.5px}
 </div>
 
 <script src="pt-datasource.js"></script>
+<script src="pt-state.js"></script>
 <script>
 /* ===================== PUBLIC EDITION DATA ADAPTER =====================
    This build has no connection to any private spreadsheet, database or account.
@@ -500,8 +503,8 @@ const PT_USER_DOCS = /^(val\/settings|valhist\/[\w-]+|quant\/[\w-]+|snapshots\/[
 const PT_USER_COLS = new Set(["valhist","quant","snapshots","holdings"]);
 const ptStore = {
   get(k){try{const v=localStorage.getItem(PT_NS+"db."+k);return v?JSON.parse(v):null}catch(e){return null}},
-  set(k,v){try{localStorage.setItem(PT_NS+"db."+k,JSON.stringify(v));return true}catch(e){return false}},
-  del(k){try{localStorage.removeItem(PT_NS+"db."+k)}catch(e){}},
+  set(k,v){try{localStorage.setItem(PT_NS+"db."+k,JSON.stringify(v));}catch(e){return false}try{window.PT_SYNC&&PT_SYNC.touch(k)}catch(e){}return true},
+  del(k){try{localStorage.removeItem(PT_NS+"db."+k)}catch(e){}try{window.PT_SYNC&&PT_SYNC.forget(k)}catch(e){}},
   keys(prefix){const out=[];try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(PT_NS+"db."+prefix))out.push(k.slice((PT_NS+"db.").length))}}catch(e){}return out}
 };
 const ptListeners = {};
@@ -2194,3 +2197,24 @@ window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(
 </script>
 <script src="pt-import.js"></script>
 <script src="pt-ui.js"></script>
+<script>
+(function(){
+  var a=document.getElementById("acct");
+  if(!a)return;
+  function paint(){
+    var s=null;try{s=window.PT_AUTH&&PT_AUTH.session&&PT_AUTH.session()}catch(e){}
+    if(s&&s.access_token){
+      var who=(s.email||"Account").split("@")[0];
+      a.textContent=who;a.href="#";a.title=s.email||"Signed in";
+      a.onclick=function(ev){ev.preventDefault();var b=document.getElementById("tb-set");if(b)b.click()};
+    }else{
+      a.textContent="Sign in";a.href="/login.html";a.title="Sign in";a.onclick=null;
+    }
+  }
+  paint();
+  document.addEventListener("pt:state-hydrated",paint);
+  document.addEventListener("pt:state-synced",paint);
+  document.addEventListener("visibilitychange",paint);
+  setTimeout(paint,800);setTimeout(paint,2500);
+})();
+</script>

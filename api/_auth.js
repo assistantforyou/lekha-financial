@@ -7,6 +7,9 @@ const gotrue = (path, opts = {}) => fetch(`${process.env.SUPABASE_URL}/auth/v1/$
   headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, "Content-Type": "application/json", ...(opts.headers || {}) },
 });
 
+// GoTrue admin endpoints (create/list users) require the service role as a Bearer token, not just apikey.
+const admin = (path, opts = {}) => gotrue(path, { ...opts, headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, ...(opts.headers || {}) } });
+
 const admins = () => String(process.env.ADMIN_EMAILS || "").toLowerCase().split(",").map((s) => s.trim()).filter(Boolean);
 const isAdmin = (email) => admins().includes(String(email || "").toLowerCase());
 const bearer = (req) => { const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || ""); return m ? m[1].trim() : null; };
@@ -62,4 +65,4 @@ async function requireAdmin(req, res) {
 // public view of a profile (never Stripe ids)
 const publicProfile = (p) => ({ email: p.email, plan: p.premium ? "premium" : "free", sub_status: p.sub_status || null, period_end: p.period_end || null, is_admin: !!p.is_admin, prefs: p.prefs || {} });
 
-module.exports = { gotrue, userFrom, profile, updateProfile, requireUser, requirePremium, requireAdmin, publicProfile, isAdmin, bearer };
+module.exports = { gotrue, admin, userFrom, profile, updateProfile, requireUser, requirePremium, requireAdmin, publicProfile, isAdmin, bearer };
