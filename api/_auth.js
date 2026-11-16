@@ -30,7 +30,8 @@ async function profile(user) {
     const ins = await sb("pt_profiles", { method: "POST", headers: { Prefer: "return=representation,resolution=merge-duplicates" }, body: JSON.stringify({ user_id: user.id, email: user.email }) });
     p = ins.ok ? (await ins.json())[0] : { user_id: user.id, email: user.email, plan: "free", prefs: {} };
   }
-  const premium = ["active", "trialing"].includes(p.sub_status);
+  // premium only while the paid period is current (1-day grace for renewal webhooks)
+  const premium = ["active", "trialing"].includes(p.sub_status) && !!p.period_end && Date.parse(p.period_end) + 864e5 > Date.now();
   return { ...p, premium, is_admin: !!user.confirmed && isAdmin(user.email) };
 }
 

@@ -21,8 +21,12 @@ module.exports = async (req, res) => {
     if (ev.type === "checkout.session.completed" && o.mode === "subscription" && o.subscription) {
       const sub = await stripe("GET", "subscriptions/" + o.subscription);
       await applySub(sub, o.client_reference_id || (sub.metadata && sub.metadata.user_id));
-    } else if (/^customer\.subscription\.(created|updated|deleted|paused|resumed)$/.test(ev.type)) {
-      await applySub(o, o.metadata && o.metadata.user_id);
+    } else if (/^customer\.subscription\.(created|updated|deleted|paused|resumed)$/.test(ev.type) && o && o.id) {
+      // events can arrive out of order: always store Stripe's current state, never the event's snapshot
+      let sub;
+      try { sub = await stripe("GET", "subscriptions/" + o.id); }
+      catch (e) { if (ev.type === "customer.subscription.deleted") sub = { ...o, status: "canceled" }; else throw e; }
+      await applySub(sub, sub.metadata && sub.metadata.user_id);
     }
     return res.status(200).json({ received: true });
   } catch (e) {
