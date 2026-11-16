@@ -1,65 +1,167 @@
-// Provider adapter for statement extraction. Gemini (free tier) first; other providers can be added behind the same function.
+// AI provider adapter. Primary: Z.ai (OpenAI-compatible chat API; GLM Flash models are free, GLM-OCR is $0.03/1M tokens).
+// Fallback: Google Gemini (existing key). Every call logs token usage and cost to pt_costs (no content is logged).
+//
+// Env:
+//   ZAI_API_KEY                         Z.ai key (https://z.ai/manage-apikey/apikey-list)
+//   LLM_TEXT_MODEL   default glm-4.6v-flash   statement text -> JSON
+//   LLM_VISION_MODEL default glm-4.6v-flash   statement image -> JSON
+//   LLM_OCR          "1" to OCR images/PDFs with glm-ocr first (needs a Z.ai balance)
+//   NEWS_MODEL       default glm-4.6v-flash   news briefing (fastest free model in tests)
+//   GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.5-flash-lite)   fallback
 const { SYSTEM_PROMPT, RESPONSE_SCHEMA } = require("./_import");
+const { logUsage } = require("./_costs");
 
-async function extractWithGemini({ mime, base64, text }) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw Object.assign(new Error("not_configured"), { status: 503 });
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
-  const parts = text != null ? [{ text: "Statement text:\n" + text }] : [{ inline_data: { mime_type: mime, data: base64 } }];
-  parts.push({ text: "Extract the holdings and cash from this statement as JSON." });
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 55000);
-  try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts }],
-        generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA },
-      }),
-      signal: ctl.signal,
-    });
-    if (!r.ok) throw Object.assign(new Error("upstream_" + r.status), { status: r.status === 429 ? 429 : 502 });
-    const j = await r.json();
-    const t = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
-    if (!t) throw Object.assign(new Error(j.promptFeedback && j.promptFeedback.blockReason ? "blocked" : "empty"), { status: 502 });
-    try { return JSON.parse(t); } catch (e) { throw Object.assign(new Error("bad_json"), { status: 502 }); }
-  } catch (e) {
-    if (e && e.name === "AbortError") throw Object.assign(new Error("aborted"), { status: 502 });
-    throw e;
-  } finally { clearTimeout(timer); }
+const ZAI = "https://api.z.ai/api/paas/v4";
+const GEMINI_DEFAULT = "gemini-3.5-flash-lite"; // gemini-3.5-flash was deprecated 2026-10-08
+const err = (msg, status) => Object.assign(new Error(msg), { status });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Gemini's OpenAPI-subset schema (uppercase types, nullable) -> plain JSON Schema for prompts / OpenAI-style APIs.
+function toJsonSchema(s) {
+  if (!s || typeof s !== "object") return s;
+  const out = {};
+  const t = s.type ? String(s.type).toLowerCase() : undefined;
+  if (t) out.type = s.nullable ? [t, "null"] : t;
+  if (s.enum) out.enum = s.enum;
+  if (s.properties) { out.properties = {}; for (const [k, v] of Object.entries(s.properties)) out.properties[k] = toJsonSchema(v); }
+  if (s.items) out.items = toJsonSchema(s.items);
+  if (s.required) out.required = s.required;
+  if (s.minItems != null) out.minItems = s.minItems;
+  if (s.maxItems != null) out.maxItems = s.maxItems;
+  return out;
 }
 
-module.exports = { extractWithGemini };
+// Models sometimes wrap JSON in prose or code fences: take the outermost {...}.
+function parseJsonLoose(t) {
+  const s = String(t || "");
+  try { return JSON.parse(s); } catch (e) { /* fall through */ }
+  const a = s.indexOf("{"), b = s.lastIndexOf("}");
+  if (a >= 0 && b > a) { try { return JSON.parse(s.slice(a, b + 1)); } catch (e) { /* fall through */ } }
+  throw err("bad_json", 502);
+}
 
-// Generic structured-JSON call (no tools, no web access): used where the facts are supplied in the prompt.
-async function generateJson({ system, user, schema, model: modelOverride, timeoutMs = 55000 }) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) throw Object.assign(new Error("not_configured"), { status: 503 });
-  const model = modelOverride || process.env.GEMINI_MODEL || "gemini-3.5-flash";
+async function timed(url, init, timeoutMs) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: "application/json", responseSchema: schema },
-      }),
-      signal: ctl.signal,
-    });
-    if (!r.ok) throw Object.assign(new Error("upstream_" + r.status), { status: r.status === 429 ? 429 : 502 });
-    const j = await r.json();
-    const p = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-    const t = p && p[0] && p[0].text;
-    if (!t) throw Object.assign(new Error("empty"), { status: 502 });
-    try { return JSON.parse(t); } catch (e) { throw Object.assign(new Error("bad_json"), { status: 502 }); }
-  } catch (e) {
-    if (e && e.name === "AbortError") throw Object.assign(new Error("aborted"), { status: 502 });
-    throw e;
-  } finally { clearTimeout(timer); }
+  try { return await fetch(url, { ...init, signal: ctl.signal }); }
+  catch (e) { throw err(e && e.name === "AbortError" ? "aborted" : "network", 502); }
+  finally { clearTimeout(timer); }
 }
-module.exports.generateJson = generateJson;
+
+// One Z.ai chat call returning parsed JSON. Retries "overloaded" (code 1305 / 429) a few times.
+async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000 }) {
+  const key = process.env.ZAI_API_KEY;
+  if (!key) throw err("not_configured", 503);
+  const sys = system + "\n\nReply with ONE JSON object only, no prose, matching this JSON Schema:\n" + JSON.stringify(toJsonSchema(schema));
+  const deadline = Date.now() + timeoutMs;
+  for (let attempt = 0; ; attempt++) {
+    const left = deadline - Date.now();
+    if (left < 3000) throw err("aborted", 502);
+    const r = await timed(`${ZAI}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, temperature: 0.1, thinking: { type: "disabled" }, response_format: { type: "json_object" },
+        messages: [{ role: "system", content: sys }, { role: "user", content }] }),
+    }, left);
+    const j = await r.json().catch(() => ({}));
+    const code = j && j.error && String(j.error.code);
+    if ((r.status === 429 || code === "1305" || code === "1302") && attempt < 4) { await sleep(1500 * (attempt + 1)); continue; }
+    if (!r.ok || j.error) throw err("upstream_" + (code || r.status), r.status === 429 ? 429 : 502);
+    const u = j.usage || {};
+    await logUsage({ service: "Z.ai", job, model, inTok: u.prompt_tokens, outTok: u.completion_tokens });
+    const text = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    if (!text) throw err("empty", 502);
+    return parseJsonLoose(text);
+  }
+}
+
+// GLM-OCR: image/PDF -> markdown. Needs a Z.ai balance; callers treat failure as "skip OCR".
+async function zaiOcr({ mime, base64 }) {
+  const key = process.env.ZAI_API_KEY;
+  if (!key) throw err("not_configured", 503);
+  const r = await timed(`${ZAI}/layout_parsing`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "glm-ocr", file: `data:${mime};base64,${base64}` }),
+  }, 40000);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.error || !j.md_results) throw err("ocr_failed", 502);
+  const u = j.usage || {};
+  await logUsage({ service: "Z.ai", job: "import-ocr", model: "glm-ocr", inTok: u.prompt_tokens, outTok: u.completion_tokens, extra: { pages: j.data_info && j.data_info.num_pages } });
+  return j.md_results;
+}
+
+async function geminiJson({ job, model, system, parts, schema, temperature = 0.1, timeoutMs = 50000 }) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw err("not_configured", 503);
+  const m = model || process.env.GEMINI_MODEL || GEMINI_DEFAULT;
+  const r = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }],
+      generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema } }),
+  }, timeoutMs);
+  if (!r.ok) throw err("upstream_" + r.status, r.status === 429 ? 429 : 502);
+  const j = await r.json();
+  const u = j.usageMetadata || {};
+  await logUsage({ service: "Gemini", job, model: m, inTok: u.promptTokenCount, outTok: (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0) });
+  const p = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+  const t = p && p[0] && p[0].text;
+  if (!t) throw err(j.promptFeedback && j.promptFeedback.blockReason ? "blocked" : "empty", 502);
+  return parseJsonLoose(t);
+}
+
+const zaiReady = () => !!process.env.ZAI_API_KEY;
+const geminiReady = () => !!process.env.GEMINI_API_KEY;
+
+// Statement -> raw JSON (validated later by normalizeResult). Input: {text} or {mime, base64}.
+async function extractStatement(input) {
+  const ask = "Extract the holdings and cash from this statement as JSON.";
+  const tries = [];
+  if (zaiReady()) {
+    tries.push(async () => {
+      let text = input.text;
+      if (text == null && process.env.LLM_OCR === "1") { try { text = await zaiOcr(input); } catch (e) { text = null; } }
+      if (text != null) {
+        return zaiJson({ job: "import", model: process.env.LLM_TEXT_MODEL || "glm-4.6v-flash", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, content: "Statement text:\n" + text + "\n\n" + ask });
+      }
+      // scanned PDFs arrive as page images rendered in the browser (input.images); a raw PDF goes to the fallback
+      const imgs = input.images || (/^image\//.test(input.mime) ? [{ mime: input.mime, base64: input.base64 }] : null);
+      if (!imgs) throw err("pdf_needs_text", 502);
+      return zaiJson({ job: "import", model: process.env.LLM_VISION_MODEL || "glm-4.6v-flash", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA,
+        content: [...imgs.slice(0, 4).map((im) => ({ type: "image_url", image_url: { url: `data:${im.mime};base64,${im.base64}` } })), { type: "text", text: ask }] });
+    });
+  }
+  if (geminiReady()) {
+    tries.push(() => geminiJson({ job: "import", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, temperature: 0,
+      parts: [...(input.text != null ? [{ text: "Statement text:\n" + input.text }]
+        : (input.images || [{ mime: input.mime, base64: input.base64 }]).slice(0, 4).map((im) => ({ inline_data: { mime_type: im.mime, data: im.base64 } }))), { text: ask }] }));
+  }
+  if (!tries.length) throw err("not_configured", 503);
+  let last;
+  for (const t of tries) { try { return await t(); } catch (e) { last = e; if (e.status === 503) continue; } }
+  throw last;
+}
+
+// Generic structured-JSON call for prompts whose facts are supplied inline (news briefing).
+async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news" }) {
+  let last;
+  if (zaiReady()) {
+    try { return await zaiJson({ job, model: model || process.env.NEWS_MODEL || "glm-4.6v-flash", system, schema, content: user, timeoutMs: Math.min(timeoutMs, 40000) }); }
+    catch (e) { last = e; }
+  }
+  if (geminiReady()) return geminiJson({ job, model: process.env.NEWS_GEMINI_MODEL || GEMINI_DEFAULT, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: 25000 });
+  throw last || err("not_configured", 503);
+}
+
+// Which provider/model serves each job (shown on the Settings page; no secrets).
+function describe() {
+  return {
+    import: zaiReady() ? `Z.ai ${process.env.LLM_TEXT_MODEL || "glm-4.6v-flash"} (text) / ${process.env.LLM_VISION_MODEL || "glm-4.6v-flash"} (images)${process.env.LLM_OCR === "1" ? " + GLM-OCR" : ""}` : geminiReady() ? `Gemini ${process.env.GEMINI_MODEL || GEMINI_DEFAULT}` : "not configured",
+    news: zaiReady() ? `Z.ai ${process.env.NEWS_MODEL || "glm-4.6v-flash"}` : geminiReady() ? `Gemini ${GEMINI_DEFAULT}` : "not configured",
+    fallback: geminiReady() ? `Gemini ${process.env.GEMINI_MODEL || GEMINI_DEFAULT}` : "none",
+  };
+}
+
+module.exports = { extractStatement, generateJson, describe, toJsonSchema, parseJsonLoose,
+  extractWithGemini: extractStatement /* old name kept for callers */ };

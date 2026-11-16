@@ -3,7 +3,7 @@
 // forwarded to the AI provider and the validated result is returned. Statement contents are never logged.
 const crypto = require("crypto");
 const { checkUpload, normalizeResult, maskDigits, MAX_BYTES } = require("./_import");
-const { extractWithGemini } = require("./_llm");
+const { extractStatement } = require("./_llm");
 const { rateHit } = require("./_lib");
 
 const DAILY_LIMIT = Number(process.env.IMPORT_DAILY_LIMIT) || 40;
@@ -22,6 +22,17 @@ module.exports = async (req, res) => {
     const err = checkUpload({ mime: "text/plain", size: Buffer.byteLength(b.text) });
     if (err) return fail(res, 400, err);
     input = { text: maskDigits(b.text) };
+  } else if (Array.isArray(b.images) && b.images.length) {
+    // scanned PDF rendered to page images in the browser (max 4 pages)
+    const images = [];
+    for (const im of b.images.slice(0, 4)) {
+      const mime = String(im && im.mime || "").toLowerCase(), data = im && typeof im.data === "string" ? im.data : "";
+      const err = checkUpload({ mime, size: Math.floor((data.length * 3) / 4) });
+      if (err || !mime.startsWith("image/")) return fail(res, 400, err || "Page images must be PNG, JPG or WEBP.");
+      images.push({ mime, base64: data });
+    }
+    if (images.reduce((n, im) => n + im.base64.length, 0) > MAX_BYTES * 1.4) return fail(res, 400, "The pages are too large. Import fewer pages.");
+    input = { images };
   } else {
     const mime = String(b.mime || "").toLowerCase();
     const data = typeof b.data === "string" ? b.data : "";
@@ -35,11 +46,11 @@ module.exports = async (req, res) => {
   const day = new Date().toISOString().slice(0, 10);
   if (!(await rateHit("import/day/" + day, DAILY_LIMIT))) return fail(res, 429, "Daily import limit reached. Try again tomorrow.");
   try {
-    const raw = await extractWithGemini(input);
+    const raw = await extractStatement(input);
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(normalizeResult(raw));
   } catch (e) {
-    console.error("parse-positions failed:", /^(upstream_\d+|blocked|empty|not_configured|bad_json|aborted)$/.test(e.message) ? e.message : "other"); // fixed codes only, never statement content
+    console.error("parse-positions failed:", /^(upstream_\w+|blocked|empty|not_configured|bad_json|aborted|network|pdf_needs_text)$/.test(e.message) ? e.message : "other"); // fixed codes only, never statement content
     const msg = e.status === 429 ? "The AI service is rate-limited right now. Try again in a minute."
       : e.status === 503 ? "Statement import is not configured on this site."
       : "The AI service could not read this file. Try a clearer PDF or a CSV export.";

@@ -38,7 +38,7 @@
   dlg.id = "imp-dlg";
   dlg.innerHTML =
     "<h3>Import holdings from a statement</h3><div class='muted' style='font-size:12px'>PDF, screenshot or CSV from your broker or bank. An AI model reads it and you review every line before anything is added.</div>" +
-    "<div class='imp-priv'><b>Privacy.</b> The file you choose is sent through this site to Google's Gemini API to be read. Nothing is stored on this site's server. On Google's free tier, submitted content may be used to improve their products, so prefer a holdings-only export, crop out names and addresses, or use a paid key. Long digit runs (account numbers) are masked in CSV/text files before they leave your browser, but not inside PDFs or images.</div>" +
+    "<div class='imp-priv'><b>Privacy.</b> PDFs are converted to text in your browser and long digit runs (account numbers) are masked before anything is sent. The text, or page images for scanned PDFs and screenshots, goes through this site to Z.ai's GLM model (servers outside the US), with Google Gemini as a fallback. Nothing is stored on this site's server. Free AI tiers may use submitted content to improve their models, so prefer a holdings-only export and crop out names and addresses.</div>" +
     "<div class='imp-f'>" +
     "<input type='file' id='imp-file' accept='.pdf,.png,.jpg,.jpeg,.webp,.csv,.tsv,.txt,application/pdf,image/*,text/csv,text/plain'>" +
     "<input type='password' id='imp-pass' placeholder='Import passcode' autocomplete='off'>" +
@@ -68,17 +68,55 @@
   }
   $("imp-cancel").addEventListener("click", function () { dlg.close(); });
 
+  // PDFs: extract the text layer in the browser (pdf.js); scanned PDFs (no text) are rendered to up to 4 page images.
+  var PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/";
+  var pdfLib = null;
+  async function loadPdf() {
+    if (!pdfLib) { pdfLib = await import(PDFJS + "pdf.min.mjs"); pdfLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.mjs"; }
+    return pdfLib;
+  }
+  async function pdfToBody(buf) {
+    var lib = await loadPdf();
+    var doc = await lib.getDocument({ data: buf }).promise;
+    var n = Math.min(doc.numPages, 12), text = "";
+    for (var i = 1; i <= n; i++) {
+      var page = await doc.getPage(i), tc = await page.getTextContent(), lastY = null, line = [];
+      tc.items.forEach(function (it) {
+        var y = Math.round(it.transform[5]);
+        if (lastY !== null && Math.abs(y - lastY) > 2) { text += line.join(" ") + "\n"; line = []; }
+        line.push(it.str); lastY = y;
+      });
+      text += line.join(" ") + "\n\n";
+    }
+    if (text.replace(/\s/g, "").length > 40 * n) return { text: maskDigits(text) };
+    var images = [];
+    for (var p = 1; p <= Math.min(doc.numPages, 4); p++) {
+      var pg = await doc.getPage(p), vp = pg.getViewport({ scale: 1.6 });
+      var c = document.createElement("canvas"); c.width = vp.width; c.height = vp.height;
+      await pg.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+      images.push({ mime: "image/jpeg", data: c.toDataURL("image/jpeg", 0.82).split(",")[1] });
+    }
+    return { images: images };
+  }
+
   function readFile(f) {
     return new Promise(function (resolve, reject) {
       var isText = /^text\//.test(f.type) || /\.(csv|tsv|txt)$/i.test(f.name);
+      var isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
       var r = new FileReader();
       r.onerror = function () { reject(new Error("Could not read the file.")); };
       if (isText) { r.onload = function () { resolve({ text: maskDigits(String(r.result)) }); }; r.readAsText(f); }
-      else {
+      else if (isPdf) {
         r.onload = function () {
-          var mime = f.type || (/\.pdf$/i.test(f.name) ? "application/pdf" : "");
-          resolve({ mime: mime, data: String(r.result).split(",")[1] || "" });
+          pdfToBody(new Uint8Array(r.result)).then(resolve, function () {
+            // pdf.js failed to load: send the raw PDF (the server's fallback model can read it)
+            var r2 = new FileReader(); r2.onload = function () { resolve({ mime: "application/pdf", data: String(r2.result).split(",")[1] || "" }); }; r2.onerror = reject; r2.readAsDataURL(f);
+          });
         };
+        r.readAsArrayBuffer(f);
+      }
+      else {
+        r.onload = function () { resolve({ mime: f.type, data: String(r.result).split(",")[1] || "" }); };
         r.readAsDataURL(f);
       }
     });

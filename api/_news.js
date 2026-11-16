@@ -1,5 +1,5 @@
 // Market briefing for the free tier: real headlines from public RSS feeds (CNBC, MarketWatch, Federal Reserve),
-// with Gemini only choosing, summarising and labelling them. Headline, link and source ALWAYS come from the feed:
+// with the AI model only choosing, summarising and labelling them. Headline, link and source ALWAYS come from the feed:
 // the model refers to items by number, so it cannot invent a story or a URL.
 const { cached, cacheGet } = require("./_lib");
 const { generateJson } = require("./_llm");
@@ -13,7 +13,7 @@ const FEEDS = [
 ];
 const TICKERS = new Set([...SP500.map((s) => s[0]), "SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB", "XLC", "XLRE", "SMH", "ITA"]);
 const H6 = 6 * 36e5, MAX_AGE = 36 * 36e5, KEEP_DAYS = 7;
-const DISCLOSURE = "AI-written summary of public headlines (CNBC, MarketWatch, Federal Reserve) by Gemini. Each story links to its source; the headline and link come from the feed, the summary and impact label are the model's reading. Verify before acting.";
+const DISCLOSURE = "AI-written summary of public headlines (CNBC, MarketWatch, Federal Reserve) by an AI model (Z.ai GLM, Gemini as fallback). Each story links to its source; the headline and link come from the feed, the summary and impact label are the model's reading. Verify before acting.";
 
 const ENT = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&#x27;": "'", "&apos;": "'", "&nbsp;": " " };
 const decode = (s) => String(s || "").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]+>/g, " ")
@@ -91,7 +91,7 @@ async function buildNews() {
   const items = await collectItems();
   if (items.length < 5) throw new Error("few_items");
   const list = items.map((it, i) => `${i}. [${it.source}] ${it.headline}${it.desc ? " — " + it.desc : ""}`).join("\n");
-  const ai = await generateJson({ system: SYSTEM, user: `Return between 6 and 10 distinct items (as many relevant ones as the list supports, never fewer than 6 when the list has 6 or more).\n\nNews items:\n${list}`, schema: SCHEMA, model: process.env.NEWS_MODEL || "gemini-3.5-flash-lite", timeoutMs: 45000 });
+  const ai = await generateJson({ system: SYSTEM, user: `Return between 6 and 10 distinct items (as many relevant ones as the list supports, never fewer than 6 when the list has 6 or more).\n\nNews items:\n${list}`, schema: SCHEMA, timeoutMs: 45000 });
   const date = new Date().toISOString().slice(0, 10);
   const today = briefingDoc(items, ai, date);
   if (!today) throw new Error("empty_briefing");

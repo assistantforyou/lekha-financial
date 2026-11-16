@@ -77,4 +77,4 @@ async function cached(key, ttlMs, build) {
   return hit ? hit.payload : null;
 }
 
-module.exports = { av, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };
+module.exports = { sb, av, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };
