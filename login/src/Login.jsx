@@ -39,7 +39,6 @@ async function me(token) {
 
 export default function Login() {
   const [mode, setMode] = React.useState("login")
-  const [canCreate, setCanCreate] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [msg, setMsg] = React.useState({ text: "", kind: "" })
   const [email, setEmail] = React.useState("")
@@ -52,9 +51,7 @@ export default function Login() {
     fetch("/api/auth/setup")
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
-        if (!alive || !j) return
-        setCanCreate(!!j.needed)
-        if (j.needed) setMode("setup")
+        if (alive && j && j.needed) setMode("setup")
       })
       .catch(() => {})
     const s = session()
@@ -81,7 +78,6 @@ export default function Login() {
       const r = await post("/api/auth/login", {
         email: email.trim(),
         password,
-        owner: true,
       })
       if (!r.ok || !r.j.session) {
         setMsg({ text: r.j?.error || "Wrong email or password.", kind: "err" })
@@ -93,16 +89,6 @@ export default function Login() {
         save(null)
         setMsg({ text: "That session could not be verified.", kind: "err" })
         return
-      }
-      if (u.is_admin === false) {
-        const s = await fetch("/api/auth/setup")
-          .then((x) => (x.ok ? x.json() : null))
-          .catch(() => null)
-        if (s && s.owner_list) {
-          save(null)
-          setMsg({ text: "This site is private.", kind: "err" })
-          return
-        }
       }
       location.replace("/")
     } catch {
@@ -250,7 +236,7 @@ export default function Login() {
           </Button>
         )}
 
-        {(setup || canCreate) && (
+        {true && (
           <Button
             type="button"
             variant="link"

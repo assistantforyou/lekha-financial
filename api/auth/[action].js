@@ -1,6 +1,6 @@
 // POST /api/auth/signup|login|refresh|logout|password|recover|prefs, GET /api/auth/me
 // Session tokens are returned to the browser (stored in localStorage there); passwords are never stored or logged here.
-const { gotrue, admin, userFrom, profile, updateProfile, publicProfile, isAdmin, bearer } = require("../_auth");
+const { gotrue, admin, userFrom, profile, updateProfile, publicProfile, bearer } = require("../_auth");
 const { rateHit } = require("../_lib");
 const { clientId } = require("../_history");
 
@@ -31,19 +31,13 @@ module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
 
   // brute-force guard: 20 auth attempts per client per 10 minutes
-  if (["signup", "login", "recover"].includes(action) && !(await rateHit(`rl/auth/${clientId(req)}/${Math.floor(Date.now() / 6e5)}`, 20))) return res.status(429).json({ error: "Too many attempts. Wait a few minutes." });
+  if (["setup", "signup", "login", "recover"].includes(action) && !(await rateHit(`rl/auth/${clientId(req)}/${Math.floor(Date.now() / 6e5)}`, 20))) return res.status(429).json({ error: "Too many attempts. Wait a few minutes." });
 
   if (action === "setup") {
     const email = String(b.email || "").trim().toLowerCase(), password = String(b.password || "");
     if (!EMAIL.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
     if (password.length < 8 || password.length > 72) return res.status(400).json({ error: "Passwords are 8 to 72 characters." });
-    // When the owner is pinned by ADMIN_EMAILS, only that address may claim the site.
-    if (String(process.env.ADMIN_EMAILS || "").trim() && !isAdmin(email)) return res.status(403).json({ error: "This site is private." });
-    // One-time only: the moment any account exists, setup is closed for good.
-    const chk = await admin("admin/users?page=1&per_page=2");
-    const cj = await chk.json().catch(() => ({}));
-    if (!chk.ok) return res.status(503).json({ error: "Could not reach the account store." });
-    if (cj.users && cj.users.length) return res.status(409).json({ error: "This site already has its account. Sign in instead." });
+    // Open registration: the site is public, so any address may create its own account.
     const cr = await admin("admin/users", { method: "POST", body: JSON.stringify({ email, password, email_confirm: true }) });
     const cjr = await cr.json().catch(() => ({}));
     if (!cr.ok) return res.status(400).json({ error: msg(cjr, "Could not create the account.") });
@@ -56,8 +50,6 @@ module.exports = async (req, res) => {
     const email = String(b.email || "").trim().toLowerCase(), password = String(b.password || "");
     if (!EMAIL.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
     if (password.length < 8 || password.length > 72) return res.status(400).json({ error: "Passwords are 8 to 72 characters." });
-    // The owner sign-in page passes owner:true: when ADMIN_EMAILS is set, nobody else may use it.
-    if (action === "login" && b.owner && String(process.env.ADMIN_EMAILS || "").trim() && !isAdmin(email)) return res.status(403).json({ error: "This site is private." });
     const r = action === "signup"
       ? await gotrue("signup", { method: "POST", body: JSON.stringify({ email, password }) })
       : await gotrue("token?grant_type=password", { method: "POST", body: JSON.stringify({ email, password }) });
