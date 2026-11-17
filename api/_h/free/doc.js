@@ -1,3 +1,4 @@
+const { requireTier } = require("../../_auth");
 const { cached, cacheGet } = require("../../_lib");
 const { fredSeries } = require("../../_fred");
 const { fetchCftc, fetchTic } = require("../../_flows");
@@ -10,6 +11,8 @@ const H12 = 12 * 36e5;
 const REGIME = ["SAHMREALTIME", "UNRATE", "CPIAUCNS", "CPILFENS", "FEDFUNDS", "GS10", "BAA", "USREC"];
 
 module.exports = async (req, res) => {
+  const p = await requireTier(req, res, ["free", "paid", "premium"]);
+  if (!p) return;
   res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
   const path = String((req.query && req.query.path) || "");
   try {

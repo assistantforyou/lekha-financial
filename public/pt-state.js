@@ -33,7 +33,10 @@
   var inflight = null;
   var lastError = null;
 
-  function signedIn() { try { return !!(AUTH && AUTH.session()); } catch (e) { return false; } }
+  /* DEMO mode: never hydrate or flush. Anonymous visitors run on the simulated dataset
+     (nothing to sync), and a signed-in user forcing ?demo=1 must not have their real
+     account state overwritten by demo documents or pushed back to the server. */
+  function signedIn() { try { return !!(AUTH && AUTH.session() && !window.PT_DEMO_MODE); } catch (e) { return false; } }
 
   function touch(key) {
     if (!USER_KEY.test(String(key || ""))) return;

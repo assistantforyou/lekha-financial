@@ -17,9 +17,9 @@ const mem = new Map();
 async function limited(req) {
   return !(await rateHit(`rl/val/${clientId(req)}/${Math.floor(Date.now() / RATE.windowMs)}`, RATE.max));
 }
-function symbolsOf(req) {
+function symbolsOf(req, max) {
   const body = req.method === "POST" && req.body && typeof req.body === "object" ? req.body : {};
-  return cleanSymbols(body.symbols).slice(0, MAX);
+  return cleanSymbols(body.symbols).slice(0, Math.min(max || MAX, 40));
 }
 
 // Alpaca asset record: used only to recognise ETFs/funds (SEC has no company filings for them)
@@ -75,11 +75,11 @@ const WHY = {
 };
 const whyText = (c) => WHY[c] || "Not enough SEC data to value this holding.";
 
-async function fundCollection(req, res) {
+async function fundCollection(req, res, opts = {}) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(200).json([]);
   if (await limited(req)) return res.status(429).json({ error: "rate_limited" });
-  const syms = symbolsOf(req);
+  const syms = symbolsOf(req, opts.max);
   if (!syms.length) return res.status(200).json([]);
   const s = await many(syms);
   // analyst consensus (Alpha Vantage, cached per symbol) replaces the trailing-growth fallback where available
@@ -96,11 +96,11 @@ async function fundCollection(req, res) {
   })));
 }
 
-async function valinCsvHandler(req, res) {
+async function valinCsvHandler(req, res, opts = {}) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(204).end();
   if (await limited(req)) return res.status(429).json({ error: "rate_limited" });
-  const syms = symbolsOf(req);
+  const syms = symbolsOf(req, opts.max);
   if (!syms.length) return res.status(204).end();
   const [s, px] = await Promise.all([many(syms), seriesFor([...new Set([...syms, "SPY"])])]);
   const rows = [];

@@ -1,16 +1,16 @@
-/* Portfolio Terminal: data-source selector + PT_DATA_SOURCE router.
-   Config lives only in this browser (localStorage "ptpub.v1.source"). Types:
-     none     no market data (panels show "no market-data source connected")
-     free     this site's free tier: public sources (FRED, ...) through /api/free, no key needed
-     premium  everything in free, plus Alpha Vantage extras through /api/av (signed-in subscribers; checked server-side)
-     custom   any HTTP endpoint implementing the contract below, optional bearer token
-   With nothing saved the free tier is the default; choosing "none" is stored explicitly.
-   Endpoint contract (base = URL without trailing slash):
+/* Portfolio Terminal: tier-driven data source.
+   No picker, no "custom/none" sources — the data source follows the account:
+     anonymous            DEMO simulation (public/pt-demo.js, deterministic, no /api calls)
+     signed-in FREE       real data via /api/free (limited history & valuation symbols, server-enforced)
+     signed-in PAID       /api/free at full depth + Alpha Vantage news/estimates via /api/av
+     signed-in PREMIUM    everything in PAID (the AI panel is served by /api/ai)
+   ?demo=1 forces the DEMO simulation even when signed in.
+   The server decides entitlements on every request; nothing here is security.
+   Endpoint contract (base = /api/free, Bearer-authenticated):
      GET base/health                -> {"ok":true,"name":"..."}
      GET base/csv/<KEY>             -> text/csv  (KEY: ROTATION BREADTH RISK OBOS FACTOR PEER VOLATILITY VALIN HISTORY); 204/404 = not available
      GET base/doc?path=meta/<name>  -> JSON object or null
-     GET base/collection/<name>     -> JSON [{id, data}]  (news fund rev etf ins)
-   Entitlement checks belong on that server; nothing here is security. */
+     GET base/collection/<name>     -> JSON [{id, data}]  (news fund rev etf ins) */
 (function () {
   /* ---- account session (email + password via /api/auth; tokens kept in this browser) ---- */
   var SKEY = "ptpub.v1.session";
@@ -32,28 +32,12 @@
   }
   window.PT_AUTH = { session: sess, setSession: setSess, token: token, fetch: authFetch };
 
-  var KEY = "ptpub.v1.source";
-  function load() {
-    try { var v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && v.type) { if (v.type === "builtin" || v.type === "av") v.type = "premium"; return v; } } catch (e) {}
-    return { type: "free" };
-  }
-  function save(c) { try { localStorage.setItem(KEY, JSON.stringify(c)); return true; } catch (e) { return false; } }
-  function baseOf(c) {
-    if (c.type === "free" || c.type === "premium") return location.origin + "/api/free";
-    if (c.type === "custom" && c.url) return String(c.url).trim().replace(/\/+$/, "");
-    return null;
-  }
-  function headers(c) { var h = { Accept: "application/json, text/csv, */*" }; if (c.type === "custom" && c.token) h.Authorization = "Bearer " + c.token; return h; }
-  async function get(c, path, asText) {
-    var b = baseOf(c); if (!b) return null;
-    var r = await fetch(b + path, { headers: headers(c) });
-    if (r.status === 204 || r.status === 404) return null;
-    if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
-    return asText ? r.text() : r.json();
-  }
-  /* ---- your holdings -> free-tier prices ----
-     The tickers go to the server in a POST body (not the URL) so they are not written into request logs; nothing is stored.
-     The returned history also gives live quote fields, published as window.PT_LIVE for the holdings table. US-listed USD holdings only. */
+  /* ---- mode: anonymous -> DEMO simulation; signed-in -> real data (?demo=1 forces DEMO) ---- */
+  var q = location.search || "";
+  var demoForced = /[?&]demo=1(?:&|$)/.test(q) || /^#demo/.test(location.hash || "");
+  window.PT_DEMO_MODE = demoForced || !sess();
+  try { localStorage.removeItem("ptpub.v1.source"); } catch (e) {} /* picker config is gone */
+
   /* quote symbol for a holding: US tickers as-is; HKD -> 0700.HK, THB -> PTT.BK (suffix added when missing) */
   function quoteSym(h) {
     var t = String(h.tk || "").toUpperCase();
@@ -61,9 +45,10 @@
     if (h.cur === "THB" && !/\.BK$/.test(t)) return t + ".BK";
     return t;
   }
+  function ns() { return window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1."; }
   function holdingMap() {
     try {
-      var v = JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all") || "null"), m = {};
+      var v = JSON.parse(localStorage.getItem(ns() + "db.holdings/all") || "null"), m = {};
       ((v && v.items) || []).forEach(function (h) { if (h && h.tk && h.tk !== "CASH") m[quoteSym(h)] = h.tk; });
       return m;
     } catch (e) { return {}; }
@@ -71,6 +56,8 @@
   function holdingSymbols() { return Object.keys(holdingMap()); }
   window.PT_QUOTE_SYM = quoteSym;
   function parseCsvLine(l) { return l.split(","); }
+
+  /* Live quotes for the holdings table, derived from the HISTORY series (identical math in pt-demo.js for DEMO). */
   function computeLive(text, syms, map) {
     var lines = String(text).split("\n"), head = parseCsvLine(lines[0] || ""), live = {}, newest = 0;
     for (var j = 0; j < head.length; j += 2) {
@@ -90,21 +77,62 @@
     window.PT_LIVE = live; window.PT_LIVE_SIG = sig; window.PT_LIVE_AT = Date.now(); window.PT_LIVE_ASOF = newest ? new Date(newest).toISOString().slice(0, 10) : null;
     if (changed) (function again(tries) { if (window.PT_HOLD) window.PT_HOLD.apply(); else if (tries < 20) setTimeout(function () { again(tries + 1); }, 250); })(0);
   }
-  /* HISTORY and FACTOR both take your tickers in a POST body (never the URL) */
+
+  if (window.PT_DEMO_MODE) {
+    /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ---- */
+    window.PT_SOURCE_LABEL = "DEMO — SIMULATED DATA";
+    if (window.PT_DEMO && window.PT_DEMO.source) {
+      try { window.PT_DEMO._seedDemo(); } catch (e) {}
+      window.PT_DATA_SOURCE = window.PT_DEMO.source();
+    }
+    return;
+  }
+
+  /* ---- signed-in: real data through this site's API ---- */
+  var BASE = location.origin + "/api/free";
+  var me = null, meP = null;
+  function meAsync() {
+    if (me) return Promise.resolve(me);
+    if (!meP) meP = authFetch("/api/auth/me").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      me = (j && (j.user || j)) || null;
+      if (me && me.tier) {
+        window.PT_TIER = me.tier;
+        window.PT_LIMITS = me.limits || null;
+        window.PT_SOURCE_LABEL = me.tier === "premium" ? "Premium — full real data + AI analyst"
+          : me.tier === "paid" ? "Paid — full real data"
+          : "Free — real data, limited history";
+      }
+      return me;
+    }).catch(function () { return null; });
+    return meP;
+  }
+  meAsync(); /* start tier discovery immediately */
+
+  async function get(path, asText) {
+    var r = await authFetch(BASE + path, { headers: { Accept: "application/json, text/csv, */*" } });
+    if (r.status === 204 || r.status === 404) return null;
+    if (r.status === 401) throw { code: "needs_reauth", message: "Session expired — sign in again." };
+    if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
+    return asText ? r.text() : r.json();
+  }
+
+  /* HISTORY and FACTOR take your tickers in a POST body (never the URL). The server enforces the
+     plan's history depth; symbols are capped server-side too (MAX 25). */
   async function freePost(key) {
     var syms = holdingSymbols();
-    var r = await fetch(location.origin + "/api/free/csv/" + key, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
+    var r = await authFetch(BASE + "/csv/" + key, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
     if (r.status === 204 || r.status === 404) return null;
+    if (r.status === 401) throw { code: "needs_reauth", message: "Session expired — sign in again." };
     if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
     var t = await r.text();
     if (key === "HISTORY") { computeLive(t, syms, holdingMap()); loadExtras(syms); }
     return t;
   }
 
-  /* all-time highs + FX rates (ECB) for the holdings table; tickers in a POST body */
+  /* all-time highs + FX rates for the holdings table; tickers in a POST body */
   async function loadExtras(syms) {
     try {
-      var r = await fetch(location.origin + "/api/free/extras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
+      var r = await authFetch(BASE + "/extras", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
       if (!r.ok) return;
       var j = await r.json(), map = holdingMap(), ath = {};
       Object.keys(j.ath || {}).forEach(function (s) { ath[map[s] || s] = j.ath[s]; });
@@ -113,21 +141,25 @@
     } catch (e) { /* the table keeps its other columns */ }
   }
 
-  /* Intrinsic value inputs for your own holdings: tickers in a POST body, never the URL; nothing stored. */
+  /* Valuation inputs for your own holdings: the symbol count follows the plan (server caps too). */
   async function holdPost(path, asText) {
-    var all = holdingSymbols(), syms = all.slice(0, 12);
-    window.PT_VAL_SKIPPED = all.slice(12);
+    var m = await meAsync(), cap = (m && m.limits && m.limits.valSymbols) || 12;
+    var all = holdingSymbols(), syms = all.slice(0, cap);
+    window.PT_VAL_SKIPPED = all.slice(cap);
     if (!syms.length) { if (asText) throw { code: "no_holdings" }; return []; }
-    var r = await fetch(location.origin + "/api/free/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
+    var r = await authFetch(BASE + "/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
     if (r.status === 429) throw { code: "rate_limited", message: "Too many valuation requests; wait a few minutes" };
     if (r.status === 204 || r.status === 404) { if (asText) throw { code: "no_data", message: "The price source returned nothing for your holdings" }; return []; }
+    if (r.status === 401) throw { code: "needs_reauth", message: "Session expired — sign in again." };
     if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
     return asText ? r.text() : r.json();
   }
 
-  /* Premium extras (Alpha Vantage news / estimates); null = not entitled or failed, so the free data is used */
+  /* Alpha Vantage extras (news / estimates): PAID & PREMIUM only; null = not entitled or failed, free data is used */
   async function premiumCollection(n) {
     try {
+      var m = await meAsync();
+      if (!m || (m.tier !== "paid" && m.tier !== "premium" && !m.is_admin)) return null;
       var syms = holdingSymbols().slice(0, 25);
       var r = n === "rev"
         ? await authFetch("/api/av/collection/rev", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) })
@@ -138,38 +170,33 @@
     } catch (e) { return null; }
   }
 
-  var cfg = load();
-  window.PT_SOURCE_LABEL = cfg.type === "premium" ? "Premium (Alpha Vantage + free sources)" : cfg.type === "free" ? "" : cfg.type === "custom" ? "custom data source" : "";
-  if (cfg.type !== "none" && baseOf(cfg)) {
-    window.PT_DATA_SOURCE = {
-      fetchCsv: function (k) { return (cfg.type === "free" || cfg.type === "premium") && (k === "HISTORY" || k === "FACTOR") ? freePost(k) : (cfg.type === "free" || cfg.type === "premium") && k === "VALIN" ? holdPost("csv/VALIN", true) : get(cfg, "/csv/" + encodeURIComponent(k), true); },
-      getDoc: async function (p) { var v = await get(cfg, "/doc?path=" + encodeURIComponent(p), false); return v && typeof v === "object" && !Array.isArray(v) ? v : null; },
-      getCollection: async function (n) {
-        /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */
-        var v = null;
-        if (cfg.type === "premium" && (n === "news" || n === "rev")) v = await premiumCollection(n);
-        if (v == null) v = (cfg.type === "free" || cfg.type === "premium") && (n === "fund" || n === "rev") ? await holdPost("collection/" + n, false) : await get(cfg, "/collection/" + encodeURIComponent(n), false);
-        if (!Array.isArray(v)) return [];
-        return v.filter(function (d) {
-          if (!d || typeof d.id !== "string" || !d.data || typeof d.data !== "object") return false;
-          if (n === "news" && !/^\d{4}-\d{2}-\d{2}$/.test(String(d.data.date))) return false;
-          return true;
-        }).map(function (d) {
-          if (n === "news" && Array.isArray(d.data.items)) {
-            d.data.items = d.data.items.filter(function (it) { return it && typeof it === "object"; }).map(function (it) {
-              if (!/^https?:\/\//i.test(String(it.url || ""))) it.url = "";
-              return it;
-            });
-          }
-          return d;
-        });
-      }
-    };
-  }
-
-  /* The picker lives on the Settings tab (pt-ui.js); it uses these. */
-  window.PT_DS = {
-    load: load, save: save,
-    test: async function (c) { return get(c.type === "premium" ? { type: "free" } : c, "/health", false); }
+  window.PT_DATA_SOURCE = {
+    fetchCsv: function (k) {
+      if (k === "HISTORY" || k === "FACTOR") return freePost(k);
+      if (k === "VALIN") return holdPost("csv/VALIN", true);
+      return get("/csv/" + encodeURIComponent(k), true);
+    },
+    getDoc: async function (p) { var v = await get("/doc?path=" + encodeURIComponent(p), false); return v && typeof v === "object" && !Array.isArray(v) ? v : null; },
+    getCollection: async function (n) {
+      /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */
+      var v = null;
+      if (n === "news" || n === "rev") v = await premiumCollection(n);
+      if (v == null && (n === "fund" || n === "rev")) v = await holdPost("collection/" + n, false);
+      if (v == null) v = await get("/collection/" + encodeURIComponent(n), false);
+      if (!Array.isArray(v)) return [];
+      return v.filter(function (d) {
+        if (!d || typeof d.id !== "string" || !d.data || typeof d.data !== "object") return false;
+        if (n === "news" && !/^\d{4}-\d{2}-\d{2}$/.test(String(d.data.date))) return false;
+        return true;
+      }).map(function (d) {
+        if (n === "news" && Array.isArray(d.data.items)) {
+          d.data.items = d.data.items.filter(function (it) { return it && typeof it === "object"; }).map(function (it) {
+            if (!/^https?:\/\//i.test(String(it.url || ""))) it.url = "";
+            return it;
+          });
+        }
+        return d;
+      });
+    }
   };
 })();

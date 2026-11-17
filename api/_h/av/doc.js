@@ -1,10 +1,10 @@
-const { requirePremium } = require("../../_auth");
+const { requireTier } = require("../../_auth");
 const { av, cached } = require("../../_lib");
 const { macroFrom } = require("../../_mappers");
 
 const DAY = 864e5;
 module.exports = async (req, res) => {
-  if (!(await requirePremium(req, res))) return; // Premium: signed-in subscribers only
+  if (!(await requireTier(req, res, ["paid", "premium"]))) return; // Paid & Premium: signed-in subscribers only
   res.setHeader("Cache-Control", "private, no-store");
   const path = String((req.query && req.query.path) || "");
   try {

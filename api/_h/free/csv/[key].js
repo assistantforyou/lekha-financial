@@ -1,5 +1,8 @@
 // Free tier price datasets: ROTATION / RISK (daily ETF series) and BREADTH (S&P 500 above-average flags).
 // Alpaca primary, Twelve Data fallback; results cached in Supabase so a page load is normally one read.
+// Real data needs a signed-in account: anonymous visitors get the DEMO simulation instead (never /api).
+const { requireTier } = require("../../../_auth");
+const { limitsOf } = require("../../../_tiers");
 const { cacheGetMany, cacheSet } = require("../../../_lib");
 const { getSeries } = require("../../../_prices");
 const { rotationCsv, breadthFlags, breadthCsv } = require("../../../_mappers");
@@ -82,14 +85,17 @@ async function breadth(res) {
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  const p = await requireTier(req, res, ["free", "paid", "premium"]);
+  if (!p) return;
+  const limits = limitsOf(p);
   const key = String(req.query.key || "");
   try {
     if (SETS[key]) return await rotationLike(key, res);
     if (key === "BREADTH") return await breadth(res);
     if (key === "OBOS") return await obos(res);
-    if (key === "HISTORY") return await history(req, res);
+    if (key === "HISTORY") return await history(req, res, { days: limits.historyDays });
     if (key === "FACTOR") return await factor(req, res);
-    if (key === "VALIN") return await valinCsvHandler(req, res);
+    if (key === "VALIN") return await valinCsvHandler(req, res, { max: limits.valSymbols });
     if (key === "PEER") return await peerHandler(res);
     if (key === "VOLATILITY") {
       const d = await volData();

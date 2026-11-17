@@ -1,6 +1,7 @@
 // Accounts: Supabase Auth (GoTrue) called server-side with the service-role key, so the browser needs no Supabase key.
 // Profiles (plan, Stripe ids, synced preferences) live in pt_profiles. Admins: env ADMIN_EMAILS (comma-separated).
 const { sb } = require("./_lib");
+const { TIERS, LIMITS, tierOf } = require("./_tiers");
 
 const gotrue = (path, opts = {}) => fetch(`${process.env.SUPABASE_URL}/auth/v1/${path}`, {
   ...opts,
@@ -48,12 +49,27 @@ async function requireUser(req, res) {
   if (!u) { res.status(401).json({ error: "Sign in first." }); return null; }
   return u;
 }
-async function requirePremium(req, res) {
+
+// Server-authoritative tier guard: resolves the caller's tier from their verified profile
+// and refuses (402) unless it is on the allowed list. `need` in the response body tells the
+// UI which plans would unlock the endpoint; the stored plan is never taken from the client.
+async function requireTier(req, res, allowed) {
+  const list = Array.isArray(allowed) ? allowed.filter((t) => TIERS.includes(t)) : [];
+  if (!list.length) throw new Error("requireTier: no valid tiers allowed");
   const u = await userFrom(req);
-  if (!u) { res.status(401).json({ error: "Premium data needs a signed-in account." }); return null; }
+  if (!u) { res.status(401).json({ error: "This needs a signed-in account." }); return null; }
   const p = await profile(u);
-  if (!p.premium && !p.is_admin) { res.status(402).json({ error: "Premium subscription required." }); return null; }
+  const tier = tierOf(p);
+  if (!list.includes(tier)) {
+    const want = list.includes("premium") ? "Premium" : "Paid";
+    res.status(402).json({ error: `${want} plan required.`, tier, need: list });
+    return null;
+  }
   return p;
+}
+
+async function requirePremium(req, res) {
+  return requireTier(req, res, ["premium"]);
 }
 async function requireAdmin(req, res) {
   const u = await userFrom(req);
@@ -62,7 +78,20 @@ async function requireAdmin(req, res) {
   return u;
 }
 
-// public view of a profile (never Stripe ids)
-const publicProfile = (p) => ({ email: p.email, plan: p.premium ? "premium" : "free", sub_status: p.sub_status || null, period_end: p.period_end || null, is_admin: !!p.is_admin, prefs: p.prefs || {} });
+// public view of a profile (never Stripe ids). `tier` + `limits` drive UI hints only;
+// `plan` stays as the legacy alias the login bundle reads.
+const publicProfile = (p) => {
+  const tier = tierOf(p);
+  return {
+    email: p.email,
+    plan: tier === "paid" || tier === "premium" ? tier : "free",
+    tier,
+    limits: LIMITS[tier],
+    sub_status: p.sub_status || null,
+    period_end: p.period_end || null,
+    is_admin: !!p.is_admin,
+    prefs: p.prefs || {},
+  };
+};
 
-module.exports = { gotrue, admin, userFrom, profile, updateProfile, requireUser, requirePremium, requireAdmin, publicProfile, isAdmin, bearer };
+module.exports = { gotrue, admin, userFrom, profile, updateProfile, requireUser, requireTier, requirePremium, requireAdmin, publicProfile, isAdmin, bearer };

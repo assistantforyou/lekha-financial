@@ -1,3 +1,5 @@
+const { requireTier } = require("../../../_auth");
+const { limitsOf } = require("../../../_tiers");
 const { newsDocs } = require("../../../_news");
 const { etfCollection } = require("../../../_etf");
 const { fundCollection } = require("../../../_valuation");
@@ -7,10 +9,13 @@ const { insiderCollection } = require("../../../_insiders");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+  const p = await requireTier(req, res, ["free", "paid", "premium"]);
+  if (!p) return;
+  const limits = limitsOf(p);
   const name = String((req.query && req.query.name) || "");
   try {
     if (name === "etf") return res.status(200).json(await etfCollection());
-    if (name === "fund") return await fundCollection(req, res);
+    if (name === "fund") return await fundCollection(req, res, { max: limits.valSymbols });
     if (name === "ins") {
       const list = await insiderCollection();
       if (list.length) res.setHeader("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=21600");
@@ -18,7 +23,7 @@ module.exports = async (req, res) => {
     }
     if (name === "rev") {
       // revision snapshot for the caller's holdings (tickers in the POST body)
-      const syms = cleanSymbols(req.method === "POST" && req.body && req.body.symbols).slice(0, 12);
+      const syms = cleanSymbols(req.method === "POST" && req.body && req.body.symbols).slice(0, limits.valSymbols);
       if (!syms.length || (await rateLimited(req))) return res.status(200).json([]);
       const doc = revDoc(await estimatesFor(syms, { fresh: 2, overview: false }));
       return res.status(200).json(doc ? [doc] : []);

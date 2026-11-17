@@ -38,6 +38,10 @@
       "destination": "/api/billing?__r=:r*"
     },
     {
+      "source": "/api/ai/:r*",
+      "destination": "/api/ai?__r=:r*"
+    },
+    {
       "source": "/api/cron/:r*",
       "destination": "/api/cron?__r=:r*"
     }

@@ -56,15 +56,24 @@ async function seriesFor(symbols) {
   return data;
 }
 
-async function history(req, res) {
+// Keep only the last `days` calendar days of a [date, close] series (tier entitlement, server-side).
+function withinDays(rows, days) {
+  if (!days || !Array.isArray(rows) || !rows.length) return rows;
+  const cut = new Date(Date.now() - days * 864e5).toISOString().slice(0, 10);
+  let i = 0;
+  while (i < rows.length && rows[i][0] < cut) i++;
+  return i ? rows.slice(i) : rows;
+}
+
+async function history(req, res, opts = {}) {
   if (await rateLimited(req)) { res.setHeader("Cache-Control", "no-store"); return res.status(429).end(); }
   const body = req.method === "POST" && req.body && typeof req.body === "object" ? req.body : {};
   const symbols = cleanSymbols(body.symbols);
   const fetchList = [...new Set([...symbols, ...Object.values(BENCH)])];
   const [data, y] = await Promise.all([seriesFor(fetchList), tnx()]);
   const labelled = {};
-  for (const s of symbols) if (data[s] && data[s].length) labelled[s] = data[s];
-  for (const [label, etf] of Object.entries(BENCH)) if (data[etf] && data[etf].length) labelled[label] = data[etf];
+  for (const s of symbols) if (data[s] && data[s].length) labelled[s] = withinDays(data[s], opts.days);
+  for (const [label, etf] of Object.entries(BENCH)) if (data[etf] && data[etf].length) labelled[label] = withinDays(data[etf], opts.days);
   const csv = historyCsv(labelled, y);
   if (!csv) return res.status(204).end();
   res.setHeader("Cache-Control", "no-store");

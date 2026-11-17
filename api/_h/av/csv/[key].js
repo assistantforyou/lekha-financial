@@ -1,4 +1,4 @@
-const { requirePremium } = require("../../../_auth");
+const { requireTier } = require("../../../_auth");
 const { av, cacheGetMany, cacheSet } = require("../../../_lib");
 const { dailyFrom, rotationCsv } = require("../../../_mappers");
 
@@ -12,7 +12,7 @@ const COOLDOWN = 30 * 6e4;    // after a failed refresh, wait 30 min before retr
 const MAX_REFRESH = 4;        // per request: 4 calls * 1.2s spacing stays inside the function time limit
 
 module.exports = async (req, res) => {
-  if (!(await requirePremium(req, res))) return; // Premium: signed-in subscribers only
+  if (!(await requireTier(req, res, ["paid", "premium"]))) return; // Paid & Premium: signed-in subscribers only
   res.setHeader("Cache-Control", "no-store");
   const syms = SETS[String(req.query.key || "")];
   if (!syms) return res.status(204).end(); // not provided by Alpha Vantage: panel stays in "no source" state

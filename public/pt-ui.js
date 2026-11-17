@@ -1,13 +1,14 @@
 /* Portfolio Terminal UI layer: Settings tab, display preferences, customizable layout, plain-language panel
-   subtitles, account (email + password), Premium subscription, admin Costs, and extra charts.
+   subtitles, account (email + password), plans (Free / Paid ฿699 / Premium ฿1,299), admin Costs, and extra charts.
    Loaded after index.html's main script; uses its globals (S, $, esc, setTab, render*) and pt-datasource.js
-   (PT_AUTH, PT_DS). Preferences are stored in this browser and, when signed in, synced to the account. */
+   (PT_AUTH, PT_DEMO_MODE, PT_TIER). Preferences are stored in this browser and, when signed in, synced to the account. */
 (function () {
   "use strict";
   var LS = function (k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem("ptpub.v1." + k) || "null"); localStorage.setItem("ptpub.v1." + k, JSON.stringify(v)); } catch (e) { return null; } };
   var h = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var el = function (id) { return document.getElementById(id); };
-  var AUTH = window.PT_AUTH, DS = window.PT_DS, APP = window.PT_APP || {};
+  var AUTH = window.PT_AUTH, APP = window.PT_APP || {};
+  var DEMO = function () { return !!window.PT_DEMO_MODE; };
   var S = APP.S || { tab: "ov", rows: [], news: [] }, setTab = APP.setTab || function () {};
 
   /* ================= display preferences ================= */
@@ -298,43 +299,69 @@
 
   /* ================= Settings tab ================= */
   function card(id, title, body, why) { return "<section class='panel set-card' id='" + id + "'><div class='ph'><h2>" + h(title) + "</h2>" + (why ? "<p class='why'>" + h(why) + "</p>" : "") + "</div>" + body + "</section>"; }
-  function radio(name, val, cur, label, sub, extra) {
-    return "<label class='set-opt" + (val === cur ? " on" : "") + "'><input type='radio' name='" + name + "' value='" + h(val) + "'" + (val === cur ? " checked" : "") + (extra || "") + "><span><b>" + label + "</b>" + (sub ? "<small>" + sub + "</small>" : "") + "</span></label>";
-  }
   function seg(name, opts, cur) { return "<div class='seg' role='group' data-pref='" + name + "'>" + opts.map(function (o) { return "<button type='button' data-v='" + o[0] + "' aria-pressed='" + (o[0] === cur) + "'>" + h(o[1]) + "</button>"; }).join("") + "</div>"; }
+
+  /* ---- one tier card in the pricing grid ---- */
+  function planCell(tier, cur, signed) {
+    var C = {
+      demo: { name: "Demo", price: "Free", tag: "Explore the entire terminal with simulated data.",
+        feats: ["Every feature, all data simulated", "No account or card needed", "Nothing here is real market data"] },
+      free: { name: "Free", price: "Free", tag: "Use Portfolio Terminal with real data.",
+        feats: ["Real prices, macro & market data", "Up to 20 holdings", "5 years of portfolio history", "12 valuation symbols"] },
+      paid: { name: "Paid", price: "฿699<span class='per'>/month</span>", tag: "Unlock the full real-data terminal.",
+        feats: ["Unlimited holdings & full history", "25 valuation symbols", "Analyst estimate revisions", "Fullest data freshness"] },
+      premium: { name: "Premium", price: "฿1,299<span class='per'>/month</span>", tag: "Get your personal AI investment analyst.",
+        feats: ["Everything in Paid", "40 valuation symbols", "Ask-your-analyst AI chat", "Daily briefing, Monte Carlo & stress sims"] },
+    }[tier];
+    var btn = "";
+    if (tier === "demo") btn = cur === "demo" ? "" : "<a class='btn' href='?demo=1'>Try the demo</a>";
+    else if (tier === "free") btn = cur === "free" ? "" : signed ? "" : "<a class='btn' href='#set-account'>Create a free account</a>";
+    else if (tier === "paid") {
+      if (cur === "paid") btn = "";
+      else if (cur !== "premium") btn = "<button class='btn pri' type='button' data-plan='paid'>Choose Paid</button>";
+    } else if (tier === "premium") {
+      if (cur !== "premium") btn = "<button class='btn pri' type='button' data-plan='premium'>" + (cur === "paid" ? "Upgrade to Premium" : "Go Premium") + "</button>";
+    }
+    return "<div class='plan" + (cur === tier ? " cur" : "") + "'><h3>" + C.name + (cur === tier ? " <span class='badge'>CURRENT</span>" : "") + "</h3>" +
+      "<div class='p'>" + C.price + "</div><div class='tag'>" + h(C.tag) + "</div><ul>" + C.feats.map(function (f) { return "<li>" + h(f) + "</li>"; }).join("") + "</ul>" + btn + "</div>";
+  }
 
   async function renderSettings() {
     var pane = el("tab-set"); if (!pane) return;
-    var p = prefs(), src = DS ? DS.load() : { type: "free" }, signed = !!(AUTH && AUTH.session());
+    var p = prefs(), signed = !!(AUTH && AUTH.session() && !DEMO());
     var u = signed ? await loadMe() : null; signed = !!u;
     var qs = new URLSearchParams(location.search), billing = qs.get("billing");
+    var cur = u ? (u.tier || "free") : "demo";
     var html = "";
-    if (billing === "success") html += "<div class='set-banner up'>Payment received. Premium switches on as soon as Stripe confirms it (usually a few seconds). Choose <b>Premium</b> under Data below.</div>";
+    if (billing === "success") html += "<div class='set-banner up'>Payment received. Your plan switches on as soon as Stripe confirms it (usually a few seconds) — this page refreshes itself.</div>";
     if (billing === "cancel") html += "<div class='set-banner'>Checkout was cancelled. Nothing was charged.</div>";
 
     // account
-    var acct = signed
-      ? "<div class='set-kv'><span>Signed in as</span><b>" + h(u.email) + "</b><span>Plan</span><b>" + (u.plan === "premium" ? "Premium" + (u.period_end ? " · renews " + h(u.period_end.slice(0, 10)) : "") : "Free") + "</b>" + (u.is_admin ? "<span>Role</span><b>Admin</b>" : "") + "</div>" +
-        "<div class='set-row'><button class='btn' id='set-logout' type='button'>Sign out</button><details class='set-pw'><summary class='btn'>Change password</summary><div class='set-f'><input type='password' id='set-newpw' placeholder='New password (8+ characters)' autocomplete='new-password'><button class='btn' type='button' id='set-pwgo'>Save password</button></div></details></div>"
-      : "<p class='note'>An account keeps your layout and display settings on every device and is needed for Premium. Your holdings stay in this browser either way.</p>" +
+    var acct;
+    if (DEMO()) {
+      acct = (AUTH && AUTH.session())
+        ? "<p class='note'><b>Demo mode is on.</b> You are signed in but exploring the simulated terminal — none of your real data is loaded.</p><div class='set-row'><a class='btn pri' href='" + location.pathname + "'>Exit demo · load my real portfolio</a></div>"
+        : "<p class='note'><b>You're exploring the DEMO — a fully simulated Portfolio Terminal.</b> Every price, chart and number here is synthetic. Create a free account to use the real product with real data.</p>" +
+          "<form class='set-f' id='set-auth' autocomplete='on'><input type='email' id='set-email' placeholder='Email' autocomplete='email' required><input type='password' id='set-pw' placeholder='Password (8+ characters)' autocomplete='current-password' required>" +
+          "<div class='set-row'><button class='btn pri' type='submit' data-a='login'>Sign in</button><button class='btn' type='submit' data-a='signup'>Create free account</button><button class='btn link' type='button' id='set-forgot'>Forgot password?</button></div></form>";
+    } else if (signed) {
+      var planTxt = u.tier === "premium" ? "Premium" : u.tier === "paid" ? "Paid" : "Free";
+      var renew = (u.tier === "paid" || u.tier === "premium") && u.period_end ? " · renews " + h(String(u.period_end).slice(0, 10)) : "";
+      acct = "<div class='set-kv'><span>Signed in as</span><b>" + h(u.email) + "</b><span>Plan</span><b>" + planTxt + renew + "</b>" + (u.is_admin ? "<span>Role</span><b>Admin</b>" : "") + "</div>" +
+        "<div class='set-row'><button class='btn' id='set-logout' type='button'>Sign out</button><details class='set-pw'><summary class='btn'>Change password</summary><div class='set-f'><input type='password' id='set-newpw' placeholder='New password (8+ characters)' autocomplete='new-password'><button class='btn' type='button' id='set-pwgo'>Save password</button></div></details></div>";
+    } else {
+      acct = "<p class='note'>An account keeps your layout and display settings on every device and is required for real data. Your holdings stay in this browser either way.</p>" +
         "<form class='set-f' id='set-auth' autocomplete='on'><input type='email' id='set-email' placeholder='Email' autocomplete='email' required><input type='password' id='set-pw' placeholder='Password (8+ characters)' autocomplete='current-password' required>" +
         "<div class='set-row'><button class='btn pri' type='submit' data-a='login'>Sign in</button><button class='btn' type='submit' data-a='signup'>Create account</button><button class='btn link' type='button' id='set-forgot'>Forgot password?</button></div></form>";
+    }
     html += card("set-account", "Account", acct + "<div class='set-msg' id='set-amsg' role='status'></div>", null);
 
-    // data source
-    var prem = signed && u.plan === "premium" || (u && u.is_admin);
-    var data = "<div class='set-opts' id='set-src'>" +
-      radio("src", "free", src.type, "Free", "Public sources through this site: FRED, Alpaca and Twelve Data prices, SEC EDGAR, CFTC, Treasury, Cboe, ECB rates, RSS news with an AI summary. No account needed.") +
-      radio("src", "premium", src.type, "Premium · Alpha Vantage · $60/month", "Everything in Free, plus Alpha Vantage: analyst estimate revisions for more holdings, refreshed more often, and AI news sentiment. Needs an account." + (prem ? " <b class='up'>Active on your account.</b>" : ""), prem ? "" : " disabled") +
-      radio("src", "custom", src.type, "Custom server", "Your own endpoint that follows this page's data contract.") +
-      radio("src", "none", src.type, "Off", "No market data; panels show only what you type in.") + "</div>" +
-      "<div class='set-f' id='set-custom'" + (src.type === "custom" ? "" : " hidden") + "><input type='url' id='set-url' placeholder='https://your-server.example.com/pt' value='" + h(src.url || "") + "'><input type='password' id='set-token' placeholder='Bearer token (optional, kept in this browser)' value='" + h(src.token || "") + "'></div>" +
-      "<div class='set-row'>" + (prem ? (u && u.plan === "premium" ? "<button class='btn' id='set-manage' type='button'>Manage subscription</button>" : "") : "<button class='btn pri' id='set-sub' type='button'>Subscribe to Premium · $60/month</button>") +
-      "<button class='btn' id='set-test' type='button'>Test connection</button><button class='btn pri' id='set-save' type='button'>Save &amp; reload</button></div><div class='set-msg' id='set-dmsg' role='status'></div>";
-    html += card("set-data", "Data", data, "Where market panels get their data. Your holdings never leave this browser.");
-
-    // freshness chart
-    html += card("set-fresh", "Data freshness", "<div class='chart' id='set-fresh-chart'><div class='empty'>Checking data sources…</div></div>", "How long ago each free dataset was refreshed. Short bars are fresh; long bars are waiting for the next scheduled update.");
+    // plans / pricing
+    var manage = (u && (u.tier === "paid" || u.tier === "premium")) ? "<div class='set-row'><button class='btn' id='set-manage' type='button'>Manage subscription</button><span class='note'>Switch plans or cancel from the secure billing portal.</span></div>" : "";
+    var planNote = DEMO() ? "<p class='note'>All four tiers run the <b>same</b> Portfolio Terminal — what changes is whether the data is simulated or real, how deep it goes, and (on Premium) your personal AI analyst.</p>" : "";
+    var plans = "<div class='plan-grid'>" + ["demo", "free", "paid", "premium"].map(function (t) { return planCell(t, cur, signed); }).join("") + "</div>" + manage +
+      "<div class='set-msg' id='set-dmsg' role='status'></div>" + planNote;
+    html += card("set-plan", "Plans & data", plans, "One terminal, four levels: Demo (simulated), Free (limited real data), Paid (full real data), Premium (full data + AI analyst). Prices in Thai baht.");
 
     // display
     var disp = "<div class='set-grid'><label>Theme" + seg("theme", [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]], p.theme) + "</label>" +
@@ -354,14 +381,15 @@
     html += card("set-layout", "Dashboard layout", lay + "<p class='note'>Tick to show, untick to hide. To reorder or resize panels, press <b>Customize</b> at the top of the page and drag panels or use the arrows.</p>", "Choose which panels appear and in what order.");
 
     // import
-    html += card("set-import", "Statement import", "<div class='set-f'><input type='password' id='set-imppass' placeholder='Import passcode' value='" + h(LS("importpass") || "") + "' autocomplete='off'><button class='btn' type='button' id='set-impsave'>Save passcode</button></div><p class='note'>Statements are read by Z.ai's free GLM vision model, with Google Gemini as a backup. PDFs are turned into text in your browser first and account numbers are masked.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
+    html += DEMO()
+      ? card("set-import", "Statement import", "<p class='note'>Import is for your real account, so it's switched off in the demo — real statements never mix with simulated data. Create a free account to import a broker PDF, screenshot or CSV.</p>", "Import holdings from a broker PDF, screenshot or CSV.")
+      : card("set-import", "Statement import", "<div class='set-f'><input type='password' id='set-imppass' placeholder='Import passcode' value='" + h(LS("importpass") || "") + "' autocomplete='off'><button class='btn' type='button' id='set-impsave'>Save passcode</button></div><p class='note'>Statements are read by Z.ai's free GLM vision model, with Google Gemini as a backup. PDFs are turned into text in your browser first and account numbers are masked.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
 
     // admin
     if (u && u.is_admin) html += card("set-costs", "Running costs (admin)", "<div id='set-costs-body'><div class='empty'>Loading costs…</div></div>", "What this site costs to run: AI calls metered per request, plus fixed monthly plans. Only admins see this.");
 
     pane.innerHTML = "<div class='set-wrap'>" + html + "</div>";
     wireSettings(u);
-    loadFreshness();
     if (u && u.is_admin) loadCosts();
     if (billing) { try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {} if (billing === "success") setTimeout(function () { loadMe(true).then(function () { if (S.tab === "set") renderSettings(); }); }, 4000); }
   }
@@ -377,10 +405,13 @@
         try {
           var j = await post("/api/auth/" + which, { email: el("set-email").value, password: el("set-pw").value });
           if (j.confirm) return say("set-amsg", j.message);
-          AUTH.setSession(j.session); await loadMe("login"); renderSettings();
+          AUTH.setSession(j.session);
+          if (DEMO()) { location.href = location.pathname; return; }   // leave demo, load real data
+          await loadMe("login"); renderSettings();
         } catch (err) { say("set-amsg", err.message, true); }
       };
-      el("set-forgot").onclick = async function () {
+      var forgot = el("set-forgot");
+      if (forgot) forgot.onclick = async function () {
         var em = el("set-email").value; if (!em) return say("set-amsg", "Type your email first.", true);
         try { var j = await post("/api/auth/recover", { email: em }); say("set-amsg", j.message); } catch (err) { say("set-amsg", err.message, true); }
       };
@@ -388,49 +419,29 @@
     if (el("set-logout")) el("set-logout").onclick = async function () { await post("/api/auth/logout", {}, true).catch(function () {}); AUTH.setSession(null); me = null; renderSettings(); };
     if (el("set-pwgo")) el("set-pwgo").onclick = async function () { try { await post("/api/auth/password", { password: el("set-newpw").value }, true); say("set-amsg", "Password changed."); } catch (err) { say("set-amsg", err.message, true); } };
 
-    var srcBox = el("set-src");
-    srcBox.onchange = function () { var v = srcBox.querySelector("input:checked").value; el("set-custom").hidden = v !== "custom"; srcBox.querySelectorAll(".set-opt").forEach(function (o) { o.classList.toggle("on", o.querySelector("input").checked); }); };
-    var draft = function () { var v = srcBox.querySelector("input:checked"); v = v ? v.value : "free"; return v === "custom" ? { type: "custom", url: el("set-url").value.trim(), token: el("set-token").value } : { type: v }; };
-    var check = function (c) { if (c.type !== "custom") return null; if (!/^https?:\/\//i.test(c.url)) return "Enter a full https:// URL."; if (/^http:\/\//i.test(c.url) && !/^http:\/\/(localhost|127\.0\.0\.1)/i.test(c.url)) return "Use https:// (plain http only for localhost)."; return null; };
-    el("set-test").onclick = async function () {
-      var c = draft(), bad = check(c); if (bad) return say("set-dmsg", bad, true);
-      if (c.type === "none") return say("set-dmsg", "Off: nothing to test.");
-      say("set-dmsg", "Testing…");
-      try { var j = await DS.test(c); say("set-dmsg", j && j.ok ? "Connected" + (j.name ? ": " + j.name : "") + "." : "The server answered but /health did not return {ok:true}.", !(j && j.ok)); }
-      catch (e) { say("set-dmsg", "Could not connect (" + ((e && e.message) || "network or CORS error") + ").", true); }
-    };
-    el("set-save").onclick = function () { var c = draft(), bad = check(c); if (bad) return say("set-dmsg", bad, true); if (!DS.save(c)) return say("set-dmsg", "Could not save (browser storage is blocked).", true); location.reload(); };
-    if (el("set-sub")) el("set-sub").onclick = async function () {
-      if (!AUTH.session()) { say("set-dmsg", "Create an account or sign in above first, then subscribe.", true); el("set-account").scrollIntoView({ behavior: "smooth" }); return; }
-      say("set-dmsg", "Opening secure checkout…");
-      try { var j = await post("/api/billing/checkout", {}, true); location.href = j.url; } catch (e) { say("set-dmsg", e.message, true); }
-    };
+    // plan subscribe buttons
+    var planCard = el("set-plan");
+    if (planCard) planCard.querySelectorAll("button[data-plan]").forEach(function (b) {
+      b.onclick = async function () {
+        if (!AUTH.session() || DEMO()) { say("set-dmsg", "Create a free account first — then pick a paid plan here.", true); var a = el("set-account"); if (a) a.scrollIntoView({ behavior: "smooth" }); return; }
+        say("set-dmsg", "Opening secure checkout…");
+        try { var j = await post("/api/billing/checkout", { plan: b.getAttribute("data-plan") }, true); location.href = j.url; } catch (e) { say("set-dmsg", e.message, true); }
+      };
+    });
     if (el("set-manage")) el("set-manage").onclick = async function () { try { var j = await post("/api/billing/portal", {}, true); location.href = j.url; } catch (e) { say("set-dmsg", e.message, true); } };
 
     document.querySelectorAll("#set-display .seg[data-pref]").forEach(function (g) {
       g.onclick = function (e) { var v = e.target.getAttribute("data-v"); if (!v) return; g.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", b === e.target); }); setPref(g.getAttribute("data-pref"), v); };
     });
-    el("set-usd").onclick = function () { var b = el("cur-usd"); if (b) b.click(); el("set-usd").setAttribute("aria-pressed", true); el("set-thb").setAttribute("aria-pressed", false); };
-    el("set-thb").onclick = function () { var b = el("cur-thb"); if (b) b.click(); el("set-thb").setAttribute("aria-pressed", true); el("set-usd").setAttribute("aria-pressed", false); };
+    if (el("set-usd")) el("set-usd").onclick = function () { var b = el("cur-usd"); if (b) b.click(); el("set-usd").setAttribute("aria-pressed", true); el("set-thb").setAttribute("aria-pressed", false); };
+    if (el("set-thb")) el("set-thb").onclick = function () { var b = el("cur-thb"); if (b) b.click(); el("set-thb").setAttribute("aria-pressed", true); el("set-usd").setAttribute("aria-pressed", false); };
 
     document.querySelectorAll("#set-layout .set-list").forEach(function (ul) {
       ul.onchange = function (e) { var t = ul.getAttribute("data-tab"), pid = e.target.getAttribute("data-pid"), L = layout(t); L.order = currentOrder(t); var i = L.hidden.indexOf(pid); if (e.target.checked && i >= 0) L.hidden.splice(i, 1); if (!e.target.checked && i < 0) L.hidden.push(pid); saveLayout(t, L); applyLayout(t); };
     });
     document.querySelectorAll("#set-layout [data-preset]").forEach(function (b) { b.onclick = function () { applyPreset(b.getAttribute("data-tab"), b.getAttribute("data-preset")); renderSettings(); }; });
-    el("set-impsave").onclick = function () { LS("importpass", el("set-imppass").value.trim()); try { localStorage.setItem("ptpub.v1.importpass", el("set-imppass").value.trim()); } catch (e) {} el("set-impsave").textContent = "Saved"; };
-  }
-
-  async function loadFreshness() {
-    var box = el("set-fresh-chart"); if (!box) return;
-    try {
-      var j = await (await fetch("/api/free/status")).json(), now = Date.now();
-      var rows = (j.sets || []).map(function (s) {
-        var hrs = s.at ? (now - Date.parse(s.at)) / 36e5 : null;
-        var txt = hrs == null ? "not collected yet" : hrs < 1 ? Math.max(1, Math.round(hrs * 60)) + " min ago" : hrs < 48 ? Math.round(hrs) + " h ago" : Math.round(hrs / 24) + " days ago";
-        return { label: s.name, value: hrs == null ? 0 : Math.max(0.05, hrs), text: txt + (s.note ? " · " + s.note : ""), color: hrs == null ? "var(--line)" : hrs < 26 ? "var(--q3)" : hrs < 24 * 8 ? "var(--q4)" : "var(--q2)" };
-      });
-      hbars(box, rows, { tip: function (r) { return "<b>" + h(r.label) + "</b><br>Updated " + h(r.text); } });
-    } catch (e) { box.innerHTML = "<div class='empty'>Could not reach the status endpoint.</div>"; }
+    var imp = el("set-impsave");
+    if (imp) imp.onclick = function () { LS("importpass", el("set-imppass").value.trim()); try { localStorage.setItem("ptpub.v1.importpass", el("set-imppass").value.trim()); } catch (e) {} imp.textContent = "Saved"; };
   }
 
   async function loadCosts() {
@@ -487,7 +498,16 @@
     ".hb-t{height:10px;background:var(--panel-2);border-radius:3px;overflow:hidden}.hb-t i{display:block;height:100%;border-radius:0 3px 3px 0}.hb-v{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);text-align:right}",
     "#news-chart{max-width:560px}#ph-alloc{margin:4px 0 8px}",
     ".set-wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}@media (max-width:900px){.set-wrap{grid-template-columns:1fr}}",
-    "#set-costs,#set-fresh,#set-layout{grid-column:1/-1}",
+    "#set-costs,#set-plan,#set-layout{grid-column:1/-1}",
+    ".plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px}",
+    ".plan{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:7px}",
+    ".plan.cur{border-color:var(--accent);background:var(--accent-soft)}",
+    ".plan h3{margin:0;font-size:15px;display:flex;align-items:center;gap:8px}",
+    ".plan .p{font-family:var(--f-mono);font-weight:600;font-size:16px}.plan .per{font-weight:400;font-size:12px;color:var(--muted)}",
+    ".plan .tag{font-size:12.5px;color:var(--muted);line-height:1.4}",
+    ".plan ul{margin:0;padding-left:16px;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1}",
+    ".plan .badge{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:1px 8px}",
+    ".plan .btn{align-self:flex-start;margin-top:2px}",
     ".set-opts{display:flex;flex-direction:column;gap:8px}.set-opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:6px;cursor:pointer}",
     ".set-opt.on{border-color:var(--accent);background:var(--accent-soft)}.set-opt small{display:block;color:var(--muted);font-size:13px;margin-top:2px;line-height:1.45}.set-opt input{margin-top:4px}",
     ".set-opt:has(input:disabled){opacity:.75;cursor:default}",

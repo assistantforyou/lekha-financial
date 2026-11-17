@@ -266,11 +266,18 @@ td{font-size:13.5px}
 .chart .tip{font-size:12.5px;padding:6px 10px;line-height:1.45}
 .una{font-style:normal}
 .seg button,.btn{font-size:13px;padding:5px 11px}
+#demo-banner{background:var(--accent-soft);color:var(--fg);font-size:12.5px;padding:7px 16px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+#demo-banner b{color:var(--accent);letter-spacing:.08em;font-family:var(--f-mono)}
+#demo-banner a{color:var(--accent);text-decoration:underline;cursor:pointer}
+.tick.demo{color:var(--accent)}
+#pf-hint{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,var(--line));display:none}
+#demo-prompt{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 16px;max-width:540px;box-shadow:0 10px 34px rgba(0,0,0,.35);font-size:13px;line-height:1.5;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#demo-prompt .btn{cursor:pointer}
 </style>
 
 <div class="wrap">
   <header class="bar">
-    <div class="brand">Portfolio Terminal <span class="tick">PUBLIC EDITION</span></div>
+    <div class="brand">Portfolio Terminal <span class="tick" id="brand-tier">FREE</span></div>
     <div class="seg tabs" role="group" aria-label="View"><button id="tb-ov" aria-pressed="true">Overview</button><button id="tb-val" aria-pressed="false">Intrinsic value</button><button id="tb-set" aria-pressed="false">Settings</button></div>
     <div class="status">
       <span class="pill" id="st-prices">Prices: loading</span>
@@ -282,6 +289,8 @@ td{font-size:13.5px}
       <a class="btn" id="acct" href="/login.html" title="Sign in">Sign in</a>
     </div>
   </header>
+
+  <div id="demo-banner" hidden><b>DEMO — SIMULATED DATA</b><span>Every number on this page is a deterministic simulation for demonstration only — it is not real market data and not your portfolio.</span><a id="demo-cta">Create a free account for real data</a></div>
 
   <div id="tab-ov" class="tabpane">
   <section class="kpis" id="kpis" aria-label="Portfolio summary">
@@ -322,7 +331,7 @@ td{font-size:13.5px}
         <div class="seg" id="pf-mode" role="group" aria-label="Chart mode"><button data-m="idx" aria-pressed="true">vs S&amp;P 500 &amp; Nasdaq</button><button data-m="val" aria-pressed="false">Value</button></div>
         <div class="seg" id="pf-range" role="group" aria-label="Chart range">
           <button data-r="1M" aria-pressed="false">1M</button><button data-r="3M" aria-pressed="false">3M</button><button data-r="6M" aria-pressed="false">6M</button><button data-r="YTD" aria-pressed="false">YTD</button><button data-r="1Y" aria-pressed="true">1Y</button>
-        </div></div>
+        </div><span class="pill" id="pf-hint"></span></div>
       <div class="legend" id="pf-legend"></div>
       <div class="chart" id="pf-chart"><div class="empty">Loading price history…</div></div>
       <p class="note" id="pf-note">Today's holdings valued at each day's closing prices and today's exchange rates. Daily recorded totals are added as they accumulate.</p>
@@ -479,28 +488,27 @@ td{font-size:13.5px}
 
   <footer>
     <span id="foot-asof"></span>
-    <span>Market data comes from the configured data source; without one, panels show what is missing. Holdings are entered by you and stored only in this browser. History: Portfolio Price History. Rotation: Market Rotation Data, Sector Breadth Data, Risk Appetite Data, Sector Overbought-Oversold Data, Portfolio Factor Data, Portfolio Volatility Data, Portfolio Peer Valuation.</span>
+     <span>Market data comes from the site's tiered data source — fully simulated in the demo, real (with plan-based depth) for accounts. Holdings are stored in this browser and synced to your account when signed in. History: Portfolio Price History. Rotation: Market Rotation Data, Sector Breadth Data, Risk Appetite Data, Sector Overbought-Oversold Data, Portfolio Factor Data, Portfolio Volatility Data, Portfolio Peer Valuation.</span>
     <span id="foot-est"></span>
   </footer>
 </div>
 
+<script src="pt-demo.js"></script>
 <script src="pt-datasource.js"></script>
 <script src="pt-state.js"></script>
 <script>
-/* ===================== PUBLIC EDITION DATA ADAPTER =====================
-   This build has no connection to any private spreadsheet, database or account.
-   - User data (holdings, valuation settings, saved readings) lives only in this browser's
-     localStorage under the "ptpub.v1." namespace.
-   - Market data comes from an optional host-supplied source:
-       window.PT_DATA_SOURCE = {
-         fetchCsv: async (datasetKey) => csvText,        // ROTATION, BREADTH, RISK, OBOS, FACTOR, PEER, VOLATILITY, VALIN, HISTORY
-         getDoc:   async (path) => object | null,        // e.g. "meta/fredhist", "meta/cftc"
-         getCollection: async (name) => [{id, data}]     // e.g. "fund", "rev", "etf", "ins", "news"
-       };
-     Without it, every market panel shows an explicit "no data source" state. Nothing is fabricated.
-   - Subscription or entitlement checks are NOT done here: client-side checks are not security.
+/* ===================== TIERED DATA ADAPTER =====================
+   This build runs one Portfolio Terminal for every tier (demo / free / paid / premium).
+   - window.PT_DEMO_MODE (set by pt-datasource.js before this script): when true,
+     every market panel is fed by the deterministic local simulation in pt-demo.js
+     and user docs live in the "ptpub.v1.demo." namespace. No /api calls happen.
+   - Otherwise the signed-in adapter (pt-datasource.js) supplies real data from
+     /api/free (and /api/av for paid/premium), gated server-side by tier.
+   - User data (holdings, valuation settings, saved readings) lives in this
+     browser's localStorage and syncs to the account when signed in.
+   - Entitlement checks are NOT done here: client-side checks are not security.
      They belong on the server that implements PT_DATA_SOURCE. */
-const PT_NS = "ptpub.v1.";
+const PT_NS = window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.";
 const PT_MARKET_DOCS = new Set(["meta/macro","meta/fredhist","meta/regime_val","meta/factor_val","meta/f13","meta/cftc","meta/tic","meta/vixeq_hist","meta/valin","meta/fgi"]);
 const PT_MARKET_COLS = new Set(["news","fund","rev","etf","ins"]);
 const PT_USER_DOCS = /^(val\/settings|valhist\/[\w-]+|quant\/[\w-]+|snapshots\/[\w-]+|holdings\/[\w-]+)$/;
@@ -1787,7 +1795,7 @@ function renderValMissing(){const el=$("val-miss");if(!el)return;const rows=[],s
     if(m)why=m.message;
     else if(r&&r.method==="nav")why=null;
     else if(r&&!r.iv)why=(r.conf==="Waiting for price"?"No live price or market cap (shares outstanding missing from SEC data or no price history). ":"Insufficient cash-flow history for a reliable value, so only the reverse DCF is shown. ")+(r.notes||[]).join(" ");
-    else if(!r&&S.fundLoaded&&!S.fund[t])why=(window.PT_VAL_SKIPPED||[]).includes(t)?"Beyond the 12-holding limit of the free valuation source; only your first 12 holdings are valued.":"No fundamentals returned for this ticker.";
+    else if(!r&&S.fundLoaded&&!S.fund[t])why=(window.PT_VAL_SKIPPED||[]).includes(t)?("Beyond your plan's "+((window.PT_LIMITS&&PT_LIMITS.valSymbols)||12)+"-symbol valuation limit. Paid unlocks 25 symbols."):"No fundamentals returned for this ticker.";
     if(why)rows.push(`<tr><td class="l"><b>${esc(t)}</b></td><td class="l">${esc(why)}</td></tr>`)}
   el.hidden=!rows.length;if(rows.length)$("val-miss-body").innerHTML=rows.join("")}
 function renderValA(){const box=$("val-a");if(!S.vres){box.innerHTML=valEmptyHtml();const b=box.querySelector("[data-act]");if(b)b.onclick=()=>{b.dataset.act==="ov"?setTab("ov"):window.PT_RELOAD_VAL&&window.PT_RELOAD_VAL()};return}
@@ -2116,7 +2124,9 @@ $("ob-table").addEventListener("click",obPick);$("ob-table").addEventListener("k
 $("ra-range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.raRange=b.dataset.r;renderRiskApp()});
 $("rot-range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.rotRange=b.dataset.r;renderRotation()});
 $("mc-range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.mcRange=b.dataset.r;renderMacro()});
-$("pf-range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.range=b.dataset.r;try{localStorage.setItem("ptpub.v1.range",S.range)}catch(x){}renderPortfolioChart()});
+$("pf-range").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.range=b.dataset.r;try{localStorage.setItem("ptpub.v1.range",S.range)}catch(x){}renderPortfolioChart();pfHint()});
+function pfHint(){try{const hb=document.getElementById("pf-hint");if(!hb)return;const lim=(window.PT_LIMITS&&window.PT_LIMITS.historyDays)||0;const needMore=lim&&lim<370&&(S.range==="YTD"||S.range==="1Y");hb.style.display=needMore?"":"none";hb.textContent=needMore?("Free plan: "+lim+" days of history — Paid unlocks ~2 years"):""}catch(e){}}
+setTimeout(pfHint,1200);setTimeout(pfHint,4000);
 document.querySelector("#tbl thead").addEventListener("click",e=>{const th=e.target.closest("th");if(!th)return;const k=th.dataset.k;if(S.sortK===k)S.sortDir*=-1;else{S.sortK=k;S.sortDir=(k==="ticker"||k==="theme"||k==="fromAth"||k==="from52")?1:-1}renderTable()});
 $("tbody").addEventListener("click",e=>{const seg=e.target.closest(".seg[data-tk]");if(seg){const b=e.target.closest("button");if(b){S.chartRange[seg.dataset.tk]=b.dataset.r;renderTable()}return}
   const tr=e.target.closest("tr.main");if(!tr)return;const t=tr.dataset.t;S.open.has(t)?S.open.delete(t):S.open.add(t);renderTable()});
@@ -2287,24 +2297,68 @@ window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(
 </script>
 <script src="pt-import.js"></script>
 <script src="pt-ui.js"></script>
+<script src="pt-analyst.js"></script>
 <script>
 (function(){
   var a=document.getElementById("acct");
   if(!a)return;
   function paint(){
     var s=null;try{s=window.PT_AUTH&&PT_AUTH.session&&PT_AUTH.session()}catch(e){}
-    if(s&&s.access_token){
+    var demo=false;try{demo=!!window.PT_DEMO_MODE}catch(e){}
+    var tick=document.getElementById("brand-tier");
+    var banner=document.getElementById("demo-banner");
+    if(tick){
+      if(demo){tick.textContent="DEMO — SIMULATED DATA";tick.className="tick demo";}
+      else{var t=null;try{t=window.PT_TIER}catch(e){}tick.textContent=t==="paid"?"PAID":t==="premium"?"PREMIUM":t?"FREE":"";tick.className="tick";}
+    }
+    if(banner){
+      banner.hidden=!demo;
+      if(demo){
+        var cta=document.getElementById("demo-cta");
+        if(s&&s.access_token){
+          banner.querySelector("span").textContent="Demo mode is showing a simulated portfolio. Your real account data is untouched.";
+          if(cta){cta.textContent="Exit demo";cta.onclick=function(){location.href=location.pathname;};}
+        }else if(cta){
+          cta.textContent="Create a free account for real data";
+          cta.onclick=function(){var b=document.getElementById("tb-set");if(b)b.click();};
+        }
+      }
+    }
+    if(s&&s.access_token&&!demo){
       var who=(s.email||"Account").split("@")[0];
       a.textContent=who;a.href="#";a.title=s.email||"Signed in";
       a.onclick=function(ev){ev.preventDefault();var b=document.getElementById("tb-set");if(b)b.click()};
+    }else if(s&&s.access_token&&demo){
+      a.textContent="Exit demo";a.href=location.pathname;a.title="Leave the simulated demo";
+      a.onclick=null;
     }else{
       a.textContent="Sign in";a.href="/login.html";a.title="Sign in";a.onclick=null;
     }
   }
   paint();
+  function demoPrompt(){
+    try{
+      if(!window.PT_DEMO_MODE)return;
+      var s=null;try{s=window.PT_AUTH&&PT_AUTH.session()}catch(e){}
+      if(s&&s.access_token)return;
+      if(localStorage.getItem("ptpub.v1.demoPrompt"))return;
+      var real=null;try{real=localStorage.getItem("ptpub.v1.db.holdings/all")}catch(e){}
+      if(!real)return;
+      localStorage.setItem("ptpub.v1.demoPrompt","1");
+      var d=document.createElement("div");d.id="demo-prompt";
+      d.innerHTML="You have holdings saved in this browser. Create a free account to use them with real market data — or keep exploring the simulated demo.";
+      var b1=document.createElement("button");b1.className="btn";b1.textContent="Create free account";
+      b1.onclick=function(){d.remove();var t=document.getElementById("tb-set");if(t)t.click();};
+      var b2=document.createElement("button");b2.className="btn";b2.textContent="Keep exploring demo";
+      b2.onclick=function(){d.remove();};
+      d.appendChild(b1);d.appendChild(b2);document.body.appendChild(d);
+      setTimeout(function(){d.remove()},60000);
+    }catch(e){}
+  }
   document.addEventListener("pt:state-hydrated",paint);
   document.addEventListener("pt:state-synced",paint);
   document.addEventListener("visibilitychange",paint);
-  setTimeout(paint,800);setTimeout(paint,2500);
+  setTimeout(paint,800);setTimeout(paint,2500);setTimeout(paint,5000);
+  setTimeout(demoPrompt,600);
 })();
 </script>

@@ -12,7 +12,7 @@ const PORT = Number(process.argv[2]) || 3456;
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 
 // same rewrites as vercel.json: /api/<group>/<rest> -> api/<group>.js?__r=<rest>
-const REWRITE = /^\/api\/(free|av|billing|cron)\/(.+)$/;
+const REWRITE = /^\/api\/(free|av|billing|cron|ai)\/(.+)$/;
 function route(pathname) {
   const rw = REWRITE.exec(pathname);
   if (rw) return { file: join(ROOT, "api", rw[1] + ".js"), query: { __r: rw[2] } };

@@ -1,4 +1,4 @@
-const { requirePremium } = require("../../../_auth");
+const { requireTier } = require("../../../_auth");
 const { av, cached } = require("../../../_lib");
 const { newsFrom } = require("../../../_mappers");
 const { estimatesFor, revDoc } = require("../../../_estimates");
@@ -6,7 +6,7 @@ const { cleanSymbols } = require("../../../_history");
 const { newsDocs } = require("../../../_news");
 
 module.exports = async (req, res) => {
-  if (!(await requirePremium(req, res))) return; // Premium: signed-in subscribers only
+  if (!(await requireTier(req, res, ["paid", "premium"]))) return; // Paid & Premium: signed-in subscribers only
   res.setHeader("Cache-Control", "private, no-store");
   try {
     // NEWS_SENTIMENT is a premium endpoint: only enabled when AV_PREMIUM=1 is set in Vercel
