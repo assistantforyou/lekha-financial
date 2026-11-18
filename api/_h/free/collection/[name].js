@@ -23,7 +23,8 @@ module.exports = async (req, res) => {
     }
     if (name === "rev") {
       // revision snapshot for the caller's holdings (tickers in the POST body)
-      const syms = cleanSymbols(req.method === "POST" && req.body && req.body.symbols).slice(0, limits.valSymbols);
+      // null = unlimited plan: revisions still go in batches of MAX_SYMBOLS (Alpha Vantage budget)
+      const syms = cleanSymbols(req.method === "POST" && req.body && req.body.symbols, limits.valSymbols == null ? undefined : limits.valSymbols);
       if (!syms.length || (await rateLimited(req))) return res.status(200).json([]);
       const doc = revDoc(await estimatesFor(syms, { fresh: 2, overview: false }));
       return res.status(200).json(doc ? [doc] : []);

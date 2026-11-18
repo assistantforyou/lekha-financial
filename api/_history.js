@@ -13,12 +13,14 @@ const RATE = { windowMs: 10 * 60 * 1000, max: 12 };   // per client, per 10 minu
 const MEM_TTL = 10 * 60 * 1000, MEM_MAX = 200;            // per-instance symbol cache
 const BENCH = { "INDEXSP:.INX": "SPY", "INDEXNASDAQ:.IXIC": "QQQ" }; // price-return ETF proxies for the page's two benchmark lines
 
-function cleanSymbols(list) {
+// cap: how many symbols to keep (default MAX_SYMBOLS — also the per-request ceiling everywhere)
+function cleanSymbols(list, cap = MAX_SYMBOLS) {
+  const lim = Math.max(1, Math.min(cap | 0 || MAX_SYMBOLS, MAX_SYMBOLS));
   const out = [];
   for (const s of Array.isArray(list) ? list : []) {
     const t = String(s || "").trim().toUpperCase();
     if (t !== "CASH" && SYMBOL.test(t) && !out.includes(t)) out.push(t);
-    if (out.length >= MAX_SYMBOLS) break;
+    if (out.length >= lim) break;
   }
   return out;
 }

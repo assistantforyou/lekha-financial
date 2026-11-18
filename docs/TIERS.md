@@ -11,8 +11,9 @@ depth and upgrade hints.
 | Data | fully simulated, deterministic | real (public sources) | real + Alpha Vantage layer | real + Alpha Vantage layer |
 | Holdings | 14 demo positions (demo namespace) | 20 | unlimited | unlimited |
 | Own-portfolio history | full simulated | 5 years | full depth the source serves | full depth the source serves |
-| Valuation symbols | 14 | 12 | 25 | 40 |
+| Valuation symbols | 14 | 12 | unlimited | unlimited |
 | Analyst estimate revisions | simulated | — | ✓ | ✓ |
+| 1B Projection Lab (synthetic scenario panel) | ✓ | locked teaser | hidden | ✓ |
 | AI analyst chat / daily briefing / Monte Carlo & stress sims | canned demo answers | teaser | teaser | ✓ (40 asks, 3 briefings, 10 sims per day) |
 
 Market-wide datasets (rotation, breadth, OBOS, factor, peer, volatility, macro, flows)
@@ -41,7 +42,10 @@ is not `active`/`trialing` or is past its `period_end` (+1 day grace) → free;
 - `api/_history.js` — own-portfolio history truncated to `historyDays` (Free 1825,
   subscribers untruncated).
 - `api/_valuation.js` — valuation/fundamentals symbols capped at `valSymbols`
-  (Free 12, Paid 25, Premium 40, absolute ceiling 40).
+  (Free 12; Paid and Premium `null` = unlimited). Every request is still capped at 25
+  symbols (`BATCH`: SEC pacing + the 60 s function limit), so the client
+  (`pt-datasource.js` `holdPost`) sends unlimited plans as batches of 25 and merges the
+  results. Unlimited plans get 120 valuation requests per 10 minutes (Free: 20).
 - `api/_h/av/*` — the Alpha Vantage layer (consensus, revisions, premium news)
   requires Paid or Premium.
 - `api/_h/ai/*` — the AI analyst (ask / briefing / simulate) requires Premium, with
@@ -82,3 +86,13 @@ STRIPE_PRICE_PREMIUM=price_1UcqQNQ0yLOm6KwFJRbgNC8n   # ฿1,299/month
 Not implemented by design: the app has one portfolio per account (broker "accounts"
 are labels inside it). The entitlement layer is where a portfolio-count limit would
 go if that ever changes.
+
+## Display
+
+- **Plans card** (`public/pt-ui.js`): the rows mirror the "Revised pricing structure" table. Copy only — the
+  gating numbers above (`api/_tiers.js`) are what the backend enforces.
+- **Themes** (`public/pt-themes.js`): 100 editor-style themes (74 dark, 26 light) plus LEKHA Auto/Light/Dark, picked
+  from the palette button in the header and stored in the `theme` display preference (synced per account).
+  `node scripts/check-themes.mjs` verifies every theme's contrast.
+- **Demo calendar**: in the Demo tier "today" is frozen at 18 Aug 2026 (`ptNow()` / `PT_DEMO_DATE`), and each date the
+  page shows carries "(Outdated date used for DEMO only)". Other tiers use real time.

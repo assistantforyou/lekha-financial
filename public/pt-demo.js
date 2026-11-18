@@ -22,13 +22,11 @@
   }
   function hash(s) { var h = 2166136261; s = String(s); for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   function iso(d) { return d.toISOString().slice(0, 10); }
-  var _todayOverride = null;
-  function today() { return _todayOverride || iso(new Date(Date.now() - new Date().getTimezoneOffset() === 0 ? 0 : 0)); }
-  function todayIso() {
-    if (_todayOverride) return _todayOverride;
-    var d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-  }
+  /* The demo's "today" is frozen at 18 Aug 2026 (a Tuesday) so the simulated prices read as outdated;
+     the page appends "(Outdated date used for DEMO only)" to every date it shows in this mode. */
+  var DEMO_DATE = "2026-08-18";
+  var _todayOverride = DEMO_DATE;
+  function todayIso() { return _todayOverride || DEMO_DATE; }
   function daysAgoIso(n) { var d = new Date(todayIso() + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - n); return iso(d); }
   function serial(d) { return Math.round(Date.parse(d + "T00:00:00Z") / 864e5) + 25569; }
   function q(v) { v = String(v); return /[",]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
@@ -707,7 +705,7 @@
           var csv = buildHistory(), syms = holdingSymbols(), map = holdingMap();
           var cl = computeLive(csv, syms, map);
           var G = typeof window !== "undefined" ? window : globalThis;
-          G.PT_LIVE = cl.live; G.PT_LIVE_AT = Date.now(); G.PT_LIVE_ASOF = cl.asof;
+          G.PT_LIVE = cl.live; G.PT_LIVE_AT = Date.parse(DEMO_DATE + "T22:00:00Z"); G.PT_LIVE_ASOF = cl.asof;
           G.PT_VAL_SKIPPED = [];
           /* Re-apply once now and once after the page has finished booting: the boot-time
              call can race (or throw into the watcher's catch) while the UI is still coming
@@ -773,6 +771,7 @@
   }
 
   return {
+    DEMO_DATE: DEMO_DATE,
     NS: NS, source: source, holdingsDoc: holdingsDoc, build: build, extras: extras,
     currentHoldings: currentHoldings, quoteSym: quoteSym,
     _today: function (iso) { _todayOverride = iso; SERIES = {}; },

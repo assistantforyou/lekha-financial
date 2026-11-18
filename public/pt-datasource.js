@@ -36,6 +36,15 @@
   var q = location.search || "";
   var demoForced = /[?&]demo=1(?:&|$)/.test(q) || /^#demo/.test(location.hash || "");
   window.PT_DEMO_MODE = demoForced || !sess();
+
+  /* ---- demo clock: in demo mode "now" is frozen at 18 Aug 2026 (after the US close). Every date the page
+     shows in demo mode is followed by "(Outdated date used for DEMO only)"; other tiers see real time. ---- */
+  var DEMO_ISO = "2026-08-18", DEMO_SFX = "(Outdated date used for DEMO only)";
+  window.PT_DEMO_DATE = DEMO_ISO; window.PT_DEMO_SFX = DEMO_SFX;
+  window.ptNow = function () { return window.PT_DEMO_MODE ? Date.parse(DEMO_ISO + "T22:00:00Z") : Date.now(); };
+  /* Asia/Bangkok calendar day (UTC+7), the day the quant log and valuation history are keyed by */
+  window.ptBkkDay = function () { return window.PT_DEMO_MODE ? DEMO_ISO : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); };
+  window.ptSfx = function (s) { return window.PT_DEMO_MODE ? String(s) + " " + DEMO_SFX : String(s); };
   try { localStorage.removeItem("ptpub.v1.source"); } catch (e) {} /* picker config is gone */
 
   /* quote symbol for a holding: US tickers as-is; HKD -> 0700.HK, THB -> PTT.BK (suffix added when missing) */
@@ -78,6 +87,7 @@
     if (changed) (function again(tries) { if (window.PT_HOLD) window.PT_HOLD.apply(); else if (tries < 20) setTimeout(function () { again(tries + 1); }, 250); })(0);
   }
 
+  window.PT_TIER_READY = function () { return Promise.resolve({ tier: "demo" }); };
   if (window.PT_DEMO_MODE) {
     /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ---- */
     window.PT_SOURCE_LABEL = "DEMO — SIMULATED DATA";
@@ -106,6 +116,7 @@
     }).catch(function () { return null; });
     return meP;
   }
+  window.PT_TIER_READY = meAsync; /* resolves to the /api/auth/me record (or null) */
   meAsync(); /* start tier discovery immediately */
 
   async function get(path, asText) {
@@ -141,18 +152,44 @@
     } catch (e) { /* the table keeps its other columns */ }
   }
 
-  /* Valuation inputs for your own holdings: the symbol count follows the plan (server caps too). */
+  /* Valuation inputs for your own holdings. Free/Demo stop at the plan's symbol count (the server caps too);
+     Paid and Premium have no symbol limit (valSymbols === null), so every holding is sent in batches of 25
+     (the server's per-request ceiling) and the replies are merged. */
   async function holdPost(path, asText) {
-    var m = await meAsync(), cap = (m && m.limits && m.limits.valSymbols) || 12;
-    var all = holdingSymbols(), syms = all.slice(0, cap);
-    window.PT_VAL_SKIPPED = all.slice(cap);
+    var m = await meAsync(), lim = m && m.limits ? m.limits.valSymbols : undefined;
+    var cap = lim === null ? Infinity : (lim || 12);
+    var all = holdingSymbols(), syms = cap === Infinity ? all : all.slice(0, cap);
+    window.PT_VAL_SKIPPED = all.slice(syms.length);
+    window.PT_VAL_FAILED = [];
     if (!syms.length) { if (asText) throw { code: "no_holdings" }; return []; }
-    var r = await authFetch(BASE + "/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
-    if (r.status === 429) throw { code: "rate_limited", message: "Too many valuation requests; wait a few minutes" };
-    if (r.status === 204 || r.status === 404) { if (asText) throw { code: "no_data", message: "The price source returned nothing for your holdings" }; return []; }
-    if (r.status === 401) throw { code: "needs_reauth", message: "Session expired — sign in again." };
-    if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
-    return asText ? r.text() : r.json();
+    var C = window.PT_CHUNK, batches = C.chunk(syms, C.BATCH);
+
+    async function one(b) {
+      var r = await authFetch(BASE + "/" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: b }) });
+      if (r.status === 429) throw { code: "rate_limited", message: "Too many valuation requests; wait a few minutes" };
+      if (r.status === 204 || r.status === 404) return null;
+      if (r.status === 401) throw { code: "needs_reauth", message: "Session expired — sign in again." };
+      if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
+      return asText ? r.text() : r.json();
+    }
+
+    var parts;
+    if (batches.length === 1) parts = [await one(batches[0])];
+    else {
+      var total = syms.length;
+      window.PT_VAL_PROGRESS = "valuing 0/" + total + "…";
+      var done = 0;
+      var out = await C.pool(batches.map(function (b) { return async function () { var v = await one(b); done += b.length; window.PT_VAL_PROGRESS = "valuing " + done + "/" + total + "…"; return v; }; }), 2);
+      window.PT_VAL_PROGRESS = null;
+      parts = [];
+      out.forEach(function (o, i) {
+        if (o && o.error) window.PT_VAL_FAILED = window.PT_VAL_FAILED.concat(batches[i]); else parts.push(o);
+      });
+      /* every batch failed: surface the first error like a single request would */
+      if (!parts.length) { var e0 = out.find(function (o) { return o && o.error; }); throw e0.error; }
+    }
+    if (asText) { var csv = C.mergeValin(parts); if (!csv) throw { code: "no_data", message: "The price source returned nothing for your holdings" }; return csv; }
+    return C.mergeDocs(parts);
   }
 
   /* Alpha Vantage extras (news / estimates): PAID & PREMIUM only; null = not entitled or failed, free data is used */

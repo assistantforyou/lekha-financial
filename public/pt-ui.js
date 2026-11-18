@@ -16,18 +16,21 @@
   var ZOOM = { S: 0.92, M: 1, L: 1.12, XL: 1.25 };
   function prefs() { return Object.assign({}, DEF_PREFS, LS("prefs") || {}); }
   function applyPrefs(p) {
-    var r = document.documentElement;
-    if (p.theme === "light" || p.theme === "dark") r.setAttribute("data-theme", p.theme); else r.removeAttribute("data-theme");
+    var r = document.documentElement, T = window.PT_THEMES;
+    if (T) T.clear();
+    if (T && T.has(p.theme)) T.apply(p.theme); /* one of the 100 editor-style themes: sets data-theme + colour tokens */
+    else if (p.theme === "light" || p.theme === "dark") r.setAttribute("data-theme", p.theme); else r.removeAttribute("data-theme");
     r.style.setProperty("--zoom", ZOOM[p.size] || 1);
     r.setAttribute("data-density", p.density === "compact" ? "compact" : "comfortable");
   }
-  function setPref(k, v) { var p = prefs(); p[k] = v; LS("prefs", p); applyPrefs(p); syncPrefs(); redrawCharts(); }
+  function setPref(k, v) { var p = prefs(); p[k] = v; LS("prefs", p); applyPrefs(p); syncPrefs(); redrawCharts(); if (window.PT_THEMES && PT_THEMES.label) PT_THEMES.label(); }
   applyPrefs(prefs());
 
   /* ================= panel registry + plain-language subtitles ================= */
   var WHY = {
     "h-hold": "Type in what you own (or import a statement). Everything else on the page is calculated from this list.",
     "h-perf": "How your portfolio's value moved over time, compared with the S&P 500 and Nasdaq.",
+    "h-proj": "A synthetic growth scenario with five horizons, scenario bands and dated catalysts. Design data only, not a forecast.",
     "h-risk": "Where your money is concentrated, which themes dominate, and what moved most today.",
     "h-macro": "Interest rates and inflation, and which economic regime the data points to. Rising real rates usually pressure stock valuations.",
     "h-rot": "Which parts of the market are leading or lagging the S&P 500 right now.",
@@ -58,8 +61,8 @@
   var PRESETS = {
     ov: {
       Default: null,
-      "Portfolio first": ["kpis", "h-ledger", "h-perf", "h-risk", "h-hold", "h-news", "h-macro", "h-rot", "intel", "h-rrg", "h-lead", "h-flow", "h-br", "h-ra"],
-      "Markets first": ["h-macro", "h-rot", "h-news", "intel", "h-rrg", "h-ra", "h-br", "h-flow", "h-lead", "kpis", "h-perf", "h-risk", "h-ledger", "h-hold"],
+      "Portfolio first": ["kpis", "h-ledger", "h-perf", "h-proj", "h-risk", "h-hold", "h-news", "h-macro", "h-rot", "intel", "h-rrg", "h-lead", "h-flow", "h-br", "h-ra"],
+      "Markets first": ["h-macro", "h-rot", "h-news", "intel", "h-rrg", "h-ra", "h-br", "h-flow", "h-lead", "kpis", "h-perf", "h-proj", "h-risk", "h-ledger", "h-hold"],
     },
     val: { Default: null },
   };
@@ -301,18 +304,26 @@
   function card(id, title, body, why) { return "<section class='panel set-card' id='" + id + "'><div class='ph'><h2>" + h(title) + "</h2>" + (why ? "<p class='why'>" + h(why) + "</p>" : "") + "</div>" + body + "</section>"; }
   function seg(name, opts, cur) { return "<div class='seg' role='group' data-pref='" + name + "'>" + opts.map(function (o) { return "<button type='button' data-v='" + o[0] + "' aria-pressed='" + (o[0] === cur) + "'>" + h(o[1]) + "</button>"; }).join("") + "</div>"; }
 
-  /* ---- one tier card in the pricing grid ---- */
+  /* ---- one tier card in the pricing grid: the "Revised pricing structure" table, one column per card ---- */
+  var PLAN_ROWS = ["Market data", "Portfolio tracking", "Historical analysis", "Valuation coverage", "Advanced indicators",
+    "AI investment analyst", "Five-agent LLM Council", "Billion-path simulations", "Stress testing"];
+  var PLAN_VALS = {
+    demo:    ["Simulated", "Simulated", "Simulated", "Simulated", "Demo", "Demo only", "Demo only", "Demo only", "Demo only"],
+    free:    ["Real", "20 holdings", "5 years", "12 symbols", "Basic", "—", "—", "—", "—"],
+    paid:    ["Real", "Unlimited", "Full history", "Unlimited", "Full", "—", "—", "—", "Standard"],
+    premium: ["Real", "Unlimited", "Full history", "Unlimited", "Full", "Included", "Included", "Included", "Advanced"],
+  };
   function planCell(tier, cur, signed) {
     var C = {
-      demo: { name: "Demo", price: "Free", tag: "Explore the entire terminal with simulated data.",
-        feats: ["Every feature, all data simulated", "No account or card needed", "Nothing here is real market data"] },
-      free: { name: "Free", price: "Free", tag: "Use Portfolio Terminal with real data.",
-        feats: ["Real prices, macro & market data", "Up to 20 holdings", "5 years of portfolio history", "12 valuation symbols"] },
-      paid: { name: "Paid", price: "฿699<span class='per'>/month</span>", tag: "Unlock the full real-data terminal.",
-        feats: ["Unlimited holdings & full history", "25 valuation symbols", "Analyst estimate revisions", "Fullest data freshness"] },
-      premium: { name: "Premium", price: "฿1,299<span class='per'>/month</span>", tag: "Get your personal AI investment analyst.",
-        feats: ["Everything in Paid", "40 valuation symbols", "Ask-your-analyst AI chat", "Daily briefing, Monte Carlo & stress sims"] },
+      demo: { name: "Demo", price: "Free" },
+      free: { name: "Free", price: "Free" },
+      paid: { name: "Paid", price: "฿699<span class='per'>/mo</span>" },
+      premium: { name: "Premium", price: "฿1,299<span class='per'>/mo</span>" },
     }[tier];
+    var rows = PLAN_ROWS.map(function (label, i) {
+      var v = PLAN_VALS[tier][i];
+      return "<div><dt>" + h(label) + "</dt><dd" + (v === "—" ? " class='na' aria-label='Not included'" : v === "Included" ? " class='inc'" : "") + ">" + h(v) + "</dd></div>";
+    }).join("");
     var btn = "";
     if (tier === "demo") btn = cur === "demo" ? "" : "<a class='btn' href='?demo=1'>Try the demo</a>";
     else if (tier === "free") btn = cur === "free" ? "" : signed ? "" : "<a class='btn' href='#set-account'>Create a free account</a>";
@@ -322,8 +333,8 @@
     } else if (tier === "premium") {
       if (cur !== "premium") btn = "<button class='btn pri' type='button' data-plan='premium'>" + (cur === "paid" ? "Upgrade to Premium" : "Go Premium") + "</button>";
     }
-    return "<div class='plan" + (cur === tier ? " cur" : "") + "'><h3>" + C.name + (cur === tier ? " <span class='badge'>CURRENT</span>" : "") + "</h3>" +
-      "<div class='p'>" + C.price + "</div><div class='tag'>" + h(C.tag) + "</div><ul>" + C.feats.map(function (f) { return "<li>" + h(f) + "</li>"; }).join("") + "</ul>" + btn + "</div>";
+    return "<div class='plan" + (cur === tier ? " cur" : "") + (tier === "premium" ? " prem" : "") + "' data-tier='" + tier + "'><h3>" + C.name + (cur === tier ? " <span class='badge'>CURRENT</span>" : "") + "</h3>" +
+      "<div class='p'>" + C.price + "</div><dl>" + rows + "</dl>" + btn + "</div>";
   }
 
   async function renderSettings() {
@@ -361,10 +372,10 @@
     var planNote = DEMO() ? "<p class='note'>All four tiers run the <b>same</b> Portfolio Terminal — what changes is whether the data is simulated or real, how deep it goes, and (on Premium) your personal AI analyst.</p>" : "";
     var plans = "<div class='plan-grid'>" + ["demo", "free", "paid", "premium"].map(function (t) { return planCell(t, cur, signed); }).join("") + "</div>" + manage +
       "<div class='set-msg' id='set-dmsg' role='status'></div>" + planNote;
-    html += card("set-plan", "Plans & data", plans, "One terminal, four levels: Demo (simulated), Free (limited real data), Paid (full real data), Premium (full data + AI analyst). Prices in Thai baht.");
+    html += card("set-plan", "Plans & data", plans, "One terminal, four levels: Demo (simulated), Free (limited real data), Paid (full real data, unlimited valuation coverage), Premium (everything in Paid + AI analyst, LLM Council and billion-path simulations). Prices in Thai baht.");
 
     // display
-    var disp = "<div class='set-grid'><label>Theme" + seg("theme", [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]], p.theme) + "</label>" +
+    var disp = "<div class='set-grid'><label>Theme" + seg("theme", [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]], p.theme) + "<span class='note'>100 more editor-style themes (Dracula, Nord, Tokyo Night, Solarized…) are in the palette button at the top of the page.</span></label>" +
       "<label>Text size" + seg("size", [["S", "Small"], ["M", "Medium"], ["L", "Large"], ["XL", "Extra large"]], p.size) + "</label>" +
       "<label>Density" + seg("density", [["comfortable", "Comfortable"], ["compact", "Compact"]], p.density) + "</label>" +
       "<label>Currency<div class='seg' role='group'><button type='button' id='set-usd' aria-pressed='" + (S.cur === "USD") + "'>USD</button><button type='button' id='set-thb' aria-pressed='" + (S.cur === "THB") + "'>THB</button></div></label></div>";
@@ -477,7 +488,7 @@
   /* ================= styles ================= */
   var css = document.createElement("style");
   css.textContent = [
-    ".lay{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}",
+    ".lay{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;grid-auto-flow:row dense}",
     ":root[data-density='compact'] .lay{gap:10px}",
     ".lay>.lay-item{grid-column:1/-1;min-width:0}.lay>.lay-item.lay-half{grid-column:auto}",
     ".lay>.lay-hidden{display:none!important}",
@@ -499,13 +510,17 @@
     "#news-chart{max-width:560px}#ph-alloc{margin:4px 0 8px}",
     ".set-wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}@media (max-width:900px){.set-wrap{grid-template-columns:1fr}}",
     "#set-costs,#set-plan,#set-layout{grid-column:1/-1}",
-    ".plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px}",
+    ".plan-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}@media (max-width:1000px){.plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:560px){.plan-grid{grid-template-columns:1fr}}",
     ".plan{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:7px}",
     ".plan.cur{border-color:var(--accent);background:var(--accent-soft)}",
     ".plan h3{margin:0;font-size:15px;display:flex;align-items:center;gap:8px}",
     ".plan .p{font-family:var(--f-mono);font-weight:600;font-size:16px}.plan .per{font-weight:400;font-size:12px;color:var(--muted)}",
     ".plan .tag{font-size:12.5px;color:var(--muted);line-height:1.4}",
-    ".plan ul{margin:0;padding-left:16px;font-size:12.5px;color:var(--muted);display:flex;flex-direction:column;gap:3px;flex:1}",
+    ".plan dl{margin:0;display:flex;flex-direction:column;flex:1;font-size:12.5px}.plan dl>div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid var(--line)}",
+    ".plan dt{color:var(--muted)}.plan dd{margin:0;text-align:right;font-weight:500;font-variant-numeric:tabular-nums}.plan dd.na{color:var(--muted);opacity:.7;font-weight:400}.plan dd.inc{color:var(--accent);font-weight:600}",
+    ".plan.prem{border-color:color-mix(in srgb,var(--accent) 80%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent),0 0 14px color-mix(in srgb,var(--accent) 34%,transparent),0 0 34px color-mix(in srgb,var(--accent) 16%,transparent);animation:plan-glow 3.6s ease-in-out infinite}",
+    "@keyframes plan-glow{50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 30%,transparent),0 0 20px color-mix(in srgb,var(--accent) 46%,transparent),0 0 46px color-mix(in srgb,var(--accent) 24%,transparent)}}",
+    "@media (prefers-reduced-motion:reduce){.plan.prem{animation:none}}",
     ".plan .badge{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--accent);border:1px solid var(--accent);border-radius:99px;padding:1px 8px}",
     ".plan .btn{align-self:flex-start;margin-top:2px}",
     ".set-opts{display:flex;flex-direction:column;gap:8px}.set-opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:6px;cursor:pointer}",
@@ -540,6 +555,6 @@
     if (/[?&]billing=/.test(location.search)) setTab("set");
     else if (S.tab === "set") renderSettings();
   }
-  window.PT_UI = { renderSettings: renderSettings, redraw: redrawCharts, setEditing: setEditing, extras: function () { try { drawExtras(); } catch (e) {} } };
+  window.PT_UI = { setPref: setPref, getPref: function (k) { return prefs()[k]; }, renderSettings: renderSettings, redraw: redrawCharts, setEditing: setEditing, extras: function () { try { drawExtras(); } catch (e) {} } };
   boot();
 })();

@@ -9,17 +9,22 @@ const { valinCsv, betaOf } = require("./_fundamentals");
 const { estimatesFor, consensusFc } = require("./_estimates");
 const SP = Object.fromEntries(require("./_data/sp500.json").stocks);
 
-const MAX = 12;
-const RATE = { windowMs: 10 * 60 * 1000, max: 20 };
+const MAX = 12;                 // free-tier default when a handler passes no limit
+const BATCH = 25;               // hard per-request ceiling (SEC pacing + the 60 s function limit); unlimited plans send several batches
+const RATE = { windowMs: 10 * 60 * 1000, max: 20, maxUnlimited: 120 };
 const MEM_TTL = 6 * 3600 * 1000, MEM_MAX = 100;
 const mem = new Map();
 
-async function limited(req) {
-  return !(await rateHit(`rl/val/${clientId(req)}/${Math.floor(Date.now() / RATE.windowMs)}`, RATE.max));
+// max === null means the plan has unlimited valuation coverage: the client sends batches, so allow more requests
+async function limited(req, max) {
+  const allowed = max === null ? RATE.maxUnlimited : RATE.max;
+  return !(await rateHit(`rl/val/${clientId(req)}/${Math.floor(Date.now() / RATE.windowMs)}`, allowed));
 }
+// max: plan limit (number), null = unlimited (one batch per request), undefined = free default
+function capOf(max) { return max === null ? BATCH : Math.min(max || MAX, BATCH); }
 function symbolsOf(req, max) {
   const body = req.method === "POST" && req.body && typeof req.body === "object" ? req.body : {};
-  return cleanSymbols(body.symbols).slice(0, Math.min(max || MAX, 40));
+  return cleanSymbols(body.symbols, capOf(max));
 }
 
 // Alpaca asset record: used only to recognise ETFs/funds (SEC has no company filings for them)
@@ -78,7 +83,7 @@ const whyText = (c) => WHY[c] || "Not enough SEC data to value this holding.";
 async function fundCollection(req, res, opts = {}) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(200).json([]);
-  if (await limited(req)) return res.status(429).json({ error: "rate_limited" });
+  if (await limited(req, opts.max)) return res.status(429).json({ error: "rate_limited" });
   const syms = symbolsOf(req, opts.max);
   if (!syms.length) return res.status(200).json([]);
   const s = await many(syms);
@@ -99,7 +104,7 @@ async function fundCollection(req, res, opts = {}) {
 async function valinCsvHandler(req, res, opts = {}) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(204).end();
-  if (await limited(req)) return res.status(429).json({ error: "rate_limited" });
+  if (await limited(req, opts.max)) return res.status(429).json({ error: "rate_limited" });
   const syms = symbolsOf(req, opts.max);
   if (!syms.length) return res.status(204).end();
   const [s, px] = await Promise.all([many(syms), seriesFor([...new Set([...syms, "SPY"])])]);
@@ -118,4 +123,4 @@ async function valinCsvHandler(req, res, opts = {}) {
   return res.status(200).send(csv);
 }
 
-module.exports = { fundCollection, valinCsvHandler, whyText };
+module.exports = { fundCollection, valinCsvHandler, whyText, symbolsOf, capOf, BATCH };

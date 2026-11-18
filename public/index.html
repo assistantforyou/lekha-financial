@@ -5,7 +5,7 @@
 <title>Portfolio Terminal</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <script>/* apply saved theme / text size / density before first paint */
-try{var p=JSON.parse(localStorage.getItem("ptpub.v1.prefs")||"null")||{};var r=document.documentElement;if(p.theme==="light"||p.theme==="dark")r.setAttribute("data-theme",p.theme);r.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[p.size]||1);if(p.density==="compact")r.setAttribute("data-density","compact")}catch(e){}</script>
+try{var p=JSON.parse(localStorage.getItem("ptpub.v1.prefs")||"null")||{};var r=document.documentElement;if(p.theme==="light"||p.theme==="dark")r.setAttribute("data-theme",p.theme);if(p.theme&&p.theme!=="auto"&&p.theme!=="light"&&p.theme!=="dark"){var tv=JSON.parse(localStorage.getItem("ptpub.v1.themeVars")||"null");if(tv&&tv.id===p.theme){r.setAttribute("data-theme",tv.kind);for(var k in tv.vars)r.style.setProperty(k,tv.vars[k]);r.style.setProperty("color-scheme",tv.kind)}}r.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[p.size]||1);if(p.density==="compact")r.setAttribute("data-density","compact")}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
@@ -39,6 +39,7 @@ header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background
 .brand .tick{color:var(--accent);font-family:var(--f-mono);font-size:12px;font-weight:600;letter-spacing:.08em}
 .status{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-left:auto}
 .pill{font-family:var(--f-mono);font-size:11px;letter-spacing:.04em;padding:3px 8px;border:1px solid var(--line);border-radius:3px;color:var(--muted);white-space:nowrap}
+@media (max-width:620px){header.bar{position:static}.status{margin-left:0;width:100%}.status .pill{white-space:normal;max-width:100%;line-height:1.35}}
 .pill.live{color:var(--up);border-color:color-mix(in srgb,var(--up) 45%,var(--line))}
 .pill.stale{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,var(--line))}
 .pill.err{color:var(--down);border-color:color-mix(in srgb,var(--down) 45%,var(--line))}
@@ -290,7 +291,7 @@ td{font-size:13.5px}
     </div>
   </header>
 
-  <div id="demo-banner" hidden><b>DEMO — SIMULATED DATA</b><span>Every number on this page is a deterministic simulation for demonstration only — it is not real market data and not your portfolio.</span><a id="demo-cta">Create a free account for real data</a></div>
+  <div id="demo-banner" hidden><b>DEMO — SIMULATED DATA</b><span>Every number on this page is a deterministic simulation for demonstration only — it is not real market data and not your portfolio. The demo calendar is frozen at 18 Aug 2026 so prices read as stale — every date shown here is marked “(Outdated date used for DEMO only)”.</span><a id="demo-cta">Create a free account for real data</a></div>
 
   <div id="tab-ov" class="tabpane">
   <section class="kpis" id="kpis" aria-label="Portfolio summary">
@@ -335,6 +336,11 @@ td{font-size:13.5px}
       <div class="legend" id="pf-legend"></div>
       <div class="chart" id="pf-chart"><div class="empty">Loading price history…</div></div>
       <p class="note" id="pf-note">Today's holdings valued at each day's closing prices and today's exchange rates. Daily recorded totals are added as they accumulate.</p>
+    </section>
+
+    <section class="panel" id="proj-panel" aria-labelledby="h-proj" style="display:none">
+      <div class="ph"><h2 id="h-proj">1B Projection Lab</h2><span class="pill lk-tag">DEMO · SYNTHETIC</span></div>
+      <div id="proj-body"></div>
     </section>
 
     <section class="panel" aria-labelledby="h-risk">
@@ -494,6 +500,7 @@ td{font-size:13.5px}
 </div>
 
 <script src="pt-demo.js"></script>
+<script src="pt-chunk.js"></script>
 <script src="pt-datasource.js"></script>
 <script src="pt-state.js"></script>
 <script>
@@ -550,7 +557,7 @@ async function ptFetch(key){
 const ptMcp = {
   async callTool(server,tool,args){return ptFetch(args&&args.fileId)},
   watchTool(server,tool,args,handler){let live=true;
-    ptFetch(args&&args.fileId).then(r=>{if(live)handler({type:"data",result:{...r,cache:{storedAt:Date.now()}}})},e=>{if(live)handler({type:"error",error:e})});
+    ptFetch(args&&args.fileId).then(r=>{if(live)handler({type:"data",result:{...r,cache:{storedAt:ptNow()}}})},e=>{if(live)handler({type:"error",error:e})});
     return ()=>{live=false}}
 };
 const PT_ADAPTER = {async use(n){return n==="db"?ptDb:n==="mcp"?ptMcp:null}};
@@ -641,7 +648,7 @@ function renderKpis(){
   const cg=rows.filter(r=>r.ticker==="CASH"||r.theme==="Gold").reduce((a,r)=>a+(r.valueUSD||0),0);
   $("k-cash").textContent=pct(tot?cg/tot:null,1,false);$("k-cash-sub").textContent=money(cg,0)+" in cash and gold";
   const s=S.pfSeries;if(s&&s.length){const peak=Math.max(...s.map(p=>p[1]),tot);const dd=tot/peak-1;$("k-dd").textContent=pct(dd,1);$("k-dd").className="val "+cls(dd<-0.0005?dd:0);
-    const pi=s.reduce((b,p)=>p[1]>b[1]?p:b,s[0]);$("k-dd-sub").textContent="peak "+compact(peak)+" on "+new Date(pi[0]).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}
+    const pi=s.reduce((b,p)=>p[1]>b[1]?p:b,s[0]);$("k-dd-sub").textContent="peak "+compact(peak)+" on "+ptSfx(new Date(pi[0]).toLocaleDateString("en-GB",{day:"numeric",month:"short"}))}
 }
 
 const COLS=[["ticker","l"],["theme","l"],["price"],["value"],["weight"],["day"],["w1"],["m1"],["ytd"],["fromAth"],["from52"],["avg"],["pnl"],["pnlPct"]];
@@ -818,7 +825,7 @@ function renderRotation(){
     ${bookLine?`<p class="muted">${esc(bookLine)}</p>`:""}
     <p class="muted">Rising ratio = ${P.k} outperforming SPY · falling ratio = underperforming. The percentage is relative performance, not ${P.k}'s own return.</p>`;
   const R=S.rot;const sp=R.D.SPY;const liveNew=R.tdate&&sp.length&&R.tdate>sp[sp.length-1][0]&&R.live[P.k]&&R.live.SPY;
-  $("rot-asof").textContent=`${liveNew?"Live prices":"Daily closes through"} ${new Date(lastT).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"})} · refreshes every 15 min · ${window.PT_SOURCE_LABEL||'market data source'}${(S.rot&&S.rot.D.SPY||[]).length&&S.rot.D.SPY.length<240?` · only ${S.rot.D.SPY.length} trading days of history, so ranges longer than about ${Math.round(S.rot.D.SPY.length/21)} months show less than their label`:''}`}
+  $("rot-asof").textContent=ptSfx(`${liveNew?"Live prices":"Daily closes through"} ${new Date(lastT).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"})} · refreshes every 15 min · ${window.PT_SOURCE_LABEL||'market data source'}${(S.rot&&S.rot.D.SPY||[]).length&&S.rot.D.SPY.length<240?` · only ${S.rot.D.SPY.length} trading days of history, so ranges longer than about ${Math.round(S.rot.D.SPY.length/21)} months show less than their label`:''}`)}
 
 /* ---------- sector rotation intelligence ---------- */
 const RRG_KEYS=["RSP","SMH","XLF","XLV","XLP","ITA","XLE"];
@@ -831,7 +838,7 @@ const SECTOR_ETF={"Financials":"XLF","Health Care":"XLV","Consumer Staples":"XLP
 const SECTOR_SPDR={"Communication Services":"XLC","Consumer Discretionary":"XLY","Consumer Staples":"XLP","Energy":"XLE","Financials":"XLF","Health Care":"XLV","Industrials":"XLI","Information Technology":"XLK","Materials":"XLB","Real Estate":"XLRE","Utilities":"XLU","SEMI":"SMH","AD":"ITA"};
 const SECTOR_SHORT={"Communication Services":"Comm. services","Consumer Discretionary":"Cons. discretionary","Consumer Staples":"Cons. staples","Energy":"Energy","Financials":"Financials","Health Care":"Health care","Industrials":"Industrials","Information Technology":"Info. technology","Materials":"Materials","Real Estate":"Real estate","Utilities":"Utilities"};
 const fmtD=(t,o)=>new Date(t).toLocaleDateString("en-GB",Object.assign({day:"numeric",month:"short",year:"numeric",timeZone:"UTC"},o||{}));
-const fmtT=t=>new Date(t).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+const fmtT=t=>window.PT_DEMO_MODE?fmtD(t):new Date(t).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
 const tagObs='<span class="sig obs">Observed</span>',tagSpec='<span class="sig spec">Speculative</span>';
 
 function toWeekly(pts){const out=[];let key=null;for(const p of pts){const d=new Date(p[0]).getUTCDay();const k=p[0]-((d+6)%7)*864e5;if(k===key)out[out.length-1]=p;else{out.push(p);key=k}}return out}
@@ -856,7 +863,7 @@ function renderRRG(){
   const maxBack=Math.min(...all.map(o=>o.s.length))-S.rrgTail-1;const slider=$("rrg-asof");slider.max=String(Math.min(maxBack,S.rrgFreq==="W"?104:250));if(S.rrgBack>Number(slider.max))S.rrgBack=Number(slider.max);slider.value=String(S.rrgBack);
   const trails=all.map(o=>{const end=o.s.length-1-S.rrgBack;return{k:o.k,pts:o.s.slice(Math.max(0,end-S.rrgTail),end+1)}});
   const endT=trails[0].pts[trails[0].pts.length-1].t;
-  $("rrg-asof-lbl").textContent=S.rrgBack?`As of ${fmtD(endT)} (${S.rrgBack} ${unit}${S.rrgBack>1?"s":""} back)`:`Latest: ${fmtD(endT)}`;
+  $("rrg-asof-lbl").textContent=ptSfx(S.rrgBack?`As of ${fmtD(endT)} (${S.rrgBack} ${unit}${S.rrgBack>1?"s":""} back)`:`Latest: ${fmtD(endT)}`);
   let ex=1.5,ey=1.5;for(const tr of trails)for(const p of tr.pts){ex=Math.max(ex,Math.abs(p.x-100));ey=Math.max(ey,Math.abs(p.y-100))}ex*=1.15;ey*=1.15;
   const W=Math.max(320,Math.round(el.clientWidth||760)),H=Math.round(Math.min(520,Math.max(320,W*0.62))),L=44,R=14,T=14,B=34;
   const X=v=>L+(v-(100-ex))/(2*ex)*(W-L-R),Y=v=>T+(1-(v-(100-ey))/(2*ey))*(H-T-B);const cx=X(100),cy=Y(100);
@@ -903,7 +910,7 @@ function renderRRG(){
   $("rrg-read").innerHTML=`<p>${tagObs} Leading: <b>${list(by("Leading"))}</b> · Improving: <b>${list(by("Improving"))}</b> · Weakening: <b>${list(by("Weakening"))}</b> · Lagging: <b>${list(by("Lagging"))}</b>.</p>
     <p>${tagObs} Over the last ${lb} ${unit}s: ${moves.length?esc(moves.join("; ")):"no quadrant changes"}. Entered leadership: <b>${list(entering)}</b>. Left leadership: <b>${list(leaving)}</b>.</p>
     <p>${tagSpec} RRG rotations usually move clockwise (Improving → Leading → Weakening → Lagging). If that tendency holds, ${by("Improving").length?`<b>${by("Improving").join(", ")}</b> ${by("Improving").length>1?"are":"is"} the next candidate${by("Improving").length>1?"s":""} to lead`:"no ETF is currently in Improving"}${by("Weakening").length?` and <b>${by("Weakening").join(", ")}</b> ${by("Weakening").length>1?"risk":"risks"} sliding into Lagging`:""}. This is a historical pattern, not a forecast; trails can reverse without completing the cycle.</p>`;
-  $("rrg-asof-note").textContent=`${S.rrgFreq==="W"?"Weekly":"Daily"} closes through ${fmtD(S.rot.D.SPY[S.rot.D.SPY.length-1][0])}${S.rotAt?" · updated "+fmtT(S.rotAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`}
+  $("rrg-asof-note").textContent=ptSfx(`${S.rrgFreq==="W"?"Weekly":"Daily"} closes through ${fmtD(S.rot.D.SPY[S.rot.D.SPY.length-1][0])}${S.rotAt?" · updated "+fmtT(S.rotAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`)}
 
 /* ===================== Quant models (v11): factor-adjusted strength, macro regimes, revisions, valuation expectations ===================== */
 const FACTOR_ID="FACTOR",PEER_ID="PEER",VOL_ID="VOLATILITY";
@@ -951,7 +958,7 @@ function parseFactor(text){const rows=parseCSV(text);const h=rows[0]||[];const i
     pts.sort((a,b)=>a[0]-b[0]);out.px[t]=pts;out.kind[t]=r[h.indexOf("Kind")]||""}
   if(iA>=0&&rows[1])out.at=rows[1][iA]||null;return out}
 /* month-end (last completed weekly close in each completed month) returns, aligned on month keys */
-function qfMonthly(F){const nowK=qMK(Date.now()-21.25*3600e3);const R={},PX={};let kmin=Infinity,kmax=-Infinity;
+function qfMonthly(F){const nowK=qMK(ptNow()-21.25*3600e3);const R={},PX={};let kmin=Infinity,kmax=-Infinity;
   for(const [t,pts] of Object.entries(F.px)){const m=new Map();for(const p of pts){if(!obDone(p[0]))continue;const k=qMK(p[0]);if(k>=nowK)continue;m.set(k,p)}
     PX[t]=m;for(const k of m.keys()){kmin=Math.min(kmin,k);kmax=Math.max(kmax,k)}}
   const keys=[];for(let k=kmin;k<=kmax;k++)keys.push(k);const ix=new Map(keys.map((k,i)=>[k,i]));
@@ -1202,7 +1209,7 @@ function renderVix(){const el=$("vx-box");if(!el)return;document.querySelectorAl
   let st=months?(()=>{const d=new Date(L.t);d.setUTCMonth(d.getUTCMonth()-months);return d.getTime()})():-Infinity;
   const rows=X.rows.filter(r=>r.t>=st&&(showH||!r.hyp));const ex=a=>{let mx=null,mn=null;for(const r of a){if(!mx||r.s>mx.s)mx=r;if(!mn||r.s<mn.s)mn=r}return {mx,mn}};const E=ex(rows);
   const k=(lab,v,cl)=>`<div><span>${lab}</span><b class="${cl||""}">${v}</b></div>`;
-  let h=`<div class="ob-head"><h3>Implied dispersion · VIXEQ − VIX</h3>${tagObs}<span class="note">Close ${fmtD(L.t)} · data built ${esc(S.vol.at||"–")}</span></div>
+  let h=`<div class="ob-head"><h3>Implied dispersion · VIXEQ − VIX</h3>${tagObs}<span class="note">Close ${esc(ptSfx(fmtD(L.t)))} · data built ${esc(S.vol.at||"–")}</span></div>
     <div class="macro-now vx-now">${k("VIXEQ",L.eq.toFixed(2))}${k("VIX",L.vx.toFixed(2))}${k("Spread (points)",L.s.toFixed(2))}${k("Ratio",L.r.toFixed(2)+"×")}${k("20-day change",qn(X.c20,2),cls(X.c20))}${k("60-day change",qn(X.c60,2),cls(X.c60))}${k("252-day z-score",qn(L.z,2))}${k("Percentile since launch",X.pctObs!=null?(X.pctObs*100).toFixed(0)+"th <small>n="+X.nObs+"</small>":"–")}${S.vxHyp?k("Percentile incl. back-test",(X.pctAll*100).toFixed(0)+"th <small>n="+X.nAll+"</small>"):""}</div>
     <div class="ctrls"><div class="seg" id="vx-range" role="group" aria-label="Range">${["1M","3M","6M","1Y","MAX"].map(r=>`<button data-r="${r}" aria-pressed="${r===S.vxRange}">${r}</button>`).join("")}</div>
     <label class="chk"><input type="checkbox" id="vx-hyp"${S.vxHypOn?" checked":""}${S.vxHyp?"":" disabled"}> Include Cboe back-tested history (Jun 2014 – Oct 2024)</label></div>
@@ -1243,7 +1250,7 @@ const FL_SIC=[[/closed-end fund|blank check|unit inv|face-amount/i,null],
   [/machinery|machine tools|electrical|construction|fabricated|freight|trucking|railroad|air transport|airline|aircraft|ship|transportation|air-cond|industrial|business services|engineering|wholesale|guided missiles|defense|security & detection/i,"XLI"]];
 const flSicSector=ind=>{for(const [re,s] of FL_SIC)if(re.test(ind||""))return s;return undefined};
 const flDays=(a,b)=>(Date.parse(b)-Date.parse(a))/864e5;
-const flToday=()=>new Date(Date.now()+7*3600e3).toISOString().slice(0,10);
+const flToday=()=>ptBkkDay();
 /* ---- ETF primary-market flows: change in issuer-reported shares outstanding x NAV ---- */
 function flEtf(){const obs={};for(const d of S.etf||[])for(const [t,x] of Object.entries(d.items||{})){if(!x||!(x.so>0)||!(x.nav>0)||!x.asOf)continue;
     /* issuer pages sometimes serve a cached copy months old: keep an observation only if it was fresh when collected */
@@ -1300,7 +1307,7 @@ function renderFlow(){const el=$("fl-box");if(!el)return;
   for(const d of S.ins||[])if(d.check&&d.cluster&&(d.check.n!==d.cluster.length||d.check.value!==d.cluster.reduce((a,r)=>a+(r.value||0),0)))warn.push("insider snapshot "+d.date+" checksum mismatch");const tagDis='<span class="sig dis">Disclosed, delayed</span>',tagNo='<span class="sig nob">Not observable</span>';
   const money=v=>{if(v==null||!isFinite(v))return qNA;const a=Math.abs(v);return (v>0?"+":v<0?"−":"")+"$"+(a>=1e9?(a/1e9).toFixed(2)+"B":a>=1e7?(a/1e6).toFixed(0)+"M":a>=1e6?(a/1e6).toFixed(1)+"M":(a/1e3).toFixed(0)+"K")};
   const etfDays=Object.values(E).reduce((m,e)=>Math.max(m,e.n),0);
-  $("fl-asof").textContent=`ETF data to ${Object.values(E).map(e=>e.last.asOf).sort().pop()||"–"} · insider filings to ${I.rows[0]?I.rows[0].filing:"–"} · 13F ${F?F.q:"–"} · CFTC ${C&&C.s.ES_AM?C.s.ES_AM.last.d:"–"}`;
+  $("fl-asof").textContent=ptSfx(`ETF data to ${Object.values(E).map(e=>e.last.asOf).sort().pop()||"–"} · insider filings to ${I.rows[0]?I.rows[0].filing:"–"} · 13F ${F?F.q:"–"} · CFTC ${C&&C.s.ES_AM?C.s.ES_AM.last.d:"–"}`);
   let h=`<div class="fl-status">
     <div><b>Institutions</b><span>${tagNo} real-time buying/selling</span><span>${tagDis} 13F holder counts, quarterly, 45-day lag</span><span>${tagDis} index-futures positions (CFTC), weekly</span></div>
     <div><b>ETF and fund investors</b><span>${tagObs} creations/redemptions from issuer shares × NAV, daily</span><span class="muted">All ETF holders combined, not only institutions.</span></div>
@@ -1359,11 +1366,11 @@ function flLogRecord(){try{const X=flEvidence();const r4=v=>v==null||!isFinite(v
 /* ---------- daily signal log (prospective record; never mixed with the historical reconstruction) ---------- */
 function qLog(){if(S.qLogged||!S.qfM||!S.rgM||S.rgM.err||!S.factor)return;
   /* wait until every input of the record has loaded (or failed), so a partial reading is never saved */
-  if(!S.revsLoaded||!(S.peer||S.peerErr)||!(S.vol||S.volErr)||!S.flowReady)return;S.qLogged=true;const day=new Date(Date.now()+7*3600000).toISOString().slice(0,10);
+  if(!S.revsLoaded||!(S.peer||S.peerErr)||!(S.vol||S.volErr)||!S.flowReady)return;S.qLogged=true;const day=ptBkkDay();
   const Q=S.qfM,R=S.rgM,V=S.revs&&S.revs.length?rvModel():null,X=S.vol?vxModel():null;const r4=v=>v==null||!isFinite(v)?null:+v.toFixed(4);
   const sec={};for(const a of QF_GROUPS){const sc=Q.now[a].sc;sec[a]={rm12:r4(sc&&sc.rm12),rm6:r4(sc&&sc.rm6),rm3:r4(sc&&sc.rm3),lab:qfLabel(sc).k,rank:Q.rank[a]||null,
     rev4:V?r4(V.grp[a].r4):null,rev12:V?r4(V.grp[a].r12):null,br:V?r4(V.grp[a].br):null}}
-  const doc={date:day,at:new Date().toISOString(),kind:"prospective daily reading",factorMonth:qMKlab(Q.month),macroMonth:qMKlab(R.dims.G.month),sectors:sec,
+  const doc={date:day,at:new Date(ptNow()).toISOString(),kind:"prospective daily reading",factorMonth:qMKlab(Q.month),macroMonth:qMKlab(R.dims.G.month),sectors:sec,
     regime:{G:r4(R.dims.G.p),I:r4(R.dims.I.p),M:r4(R.dims.M.p)},vix:X&&!X.err?{date:new Date(X.last.t).toISOString().slice(0,10),spread:r4(X.last.s),z:r4(X.last.z)}:null,revDate:V?V.date:null,flow:typeof flLogRecord==="function"?flLogRecord():null};
   PT_ADAPTER.use("db").then(db=>db&&db.doc("quant/"+day).set(doc)).catch(()=>{})}
 /* ---------- backtest helpers ---------- */
@@ -1376,7 +1383,7 @@ function renderLead(){const el=$("ld-box");if(!el)return;document.querySelectorA
   if(!S.factor){el.innerHTML=`<div class="empty">${esc(S.factorErr||"Loading weekly factor and sector history…")}</div>`;return}
   let Q;try{Q=qfModel()}catch(e){el.innerHTML=`<div class="empty">Factor model failed: ${esc(e.message)}</div>`;return}
   const V=S.revs&&S.revs.length?rvModel():null;const asof=qMKlab(Q.month);
-  $("ld-asof").textContent=`Factor model: month-end ${asof} · revisions: ${V?"Alpha Vantage consensus "+V.date+" (your holdings)":"collecting the first snapshot"}`;
+  $("ld-asof").textContent=ptSfx(`Factor model: month-end ${asof} · revisions: ${V?"Alpha Vantage consensus "+V.date+" (your holdings)":"collecting the first snapshot"}`);
   const lab=sc=>{const L=qfLabel(sc);return `<span class="ob-lab sm" style="color:${L.c}"><i></i>${L.t}</span>`};
   const sigT=fit=>fit?fit.fac.filter(k=>k!=="MKT").map(k=>`${k} ${qn(fit.b[k],2)} (${qn(fit.t[k],1)})`).join(" · "):"";
   let h="";
@@ -1470,7 +1477,7 @@ const OB_PRI={RC:0,OSW:1,EXW:2,OBW:3,NT:4,NA:5};
 const OB_K=130;
 const obName=g=>g.name||SECTOR_SHORT[g.k]||g.k;
 /* a US session dated D is complete once the 16:00 New York close has passed (21:00 UTC in winter, 20:00 in summer); 21:15 UTC covers both */
-const obDone=t=>Date.now()>=t+21.25*3600e3;
+const obDone=t=>ptNow()>=t+21.25*3600e3;
 function obYMD(s){return Date.UTC(2000+Number(s.slice(0,2)),Number(s.slice(2,4))-1,Number(s.slice(4,6)))}
 function parseObos(text){
   const rows=parseCSV(text);const h=rows[0]||[];const iT=h.indexOf("Ticker"),iG=h.indexOf("Group"),iI=h.indexOf("Industry"),iC=h.indexOf("Codes"),iX=h.indexOf("Closes"),iA=h.indexOf("Calculated at (sheet time)");
@@ -1562,7 +1569,7 @@ function renderObos(){
     <p>${tagObs} Relative vs absolute: ${relOnly.length?`<b>${relOnly.join(", ")}</b> ${relOnly.length>1?"are":"is"} beating SPY over 20 sessions while ${relOnly.length>1?"their":"its"} own price is down, so the strength is relative only (falling less than the market), not a price recovery.`:"no ETF is beating SPY while falling in price."}${absUp.length?` <b>${absUp.join(", ")}</b> ${absUp.length>1?"are":"is"} up in price but lagging SPY.`:""}</p>
     <p>${tagSpec} ${broadUp.length?`<b>${broadUp.join(", ")}</b> combine${broadUp.length>1?"":"s"} RSI 50–70, 60%+ of stocks above the 50-day and positive 20D RS, a profile that has more often marked sustainable trends than overextension. `:""}${narrowOB.length?`<b>${narrowOB.join(", ")}</b> ${narrowOB.length>1?"have":"has"} RSI above 70 with 60% or fewer stocks above the 50-day: momentum resting on fewer names, which has more often preceded fading. `:""}Overbought is not a sell signal and oversold is not a buy signal: in strong trends RSI can stay above 70 for weeks, and in declines below 30.</p>
     <p class="muted small">Method: RSI(14) uses Wilder's smoothing on daily closes; constituent and ETF values at each date use only closes up to that date, and only completed sessions (after the 16:00 New York close) are counted. Oversold = RSI below 30, overbought = above 70. Labels: Oversold Watch = ETF RSI below 30 and under 30% of stocks above the 50-day. Recovery Candidate = ETF RSI back at or above 30 after closing below 30 within the previous 5 sessions, with 50D breadth higher than 5 sessions earlier. Overbought Watch = RSI above 70 and over 80% of stocks above the 50-day. Exhaustion Watch = RSI at or below 70 after closing above 70 within the previous 5 sessions, with 50D breadth lower than 5 sessions earlier. 20D RS = ((ETF/SPY today) ÷ (ETF/SPY 20 sessions ago) − 1) × 100. Sample: ${nOk} of ${M.total} current constituents have RSI data${M.missing.length?` (unavailable: ${esc(M.missing.slice(0,12).join(", "))}${M.missing.length>12?` and ${M.missing.length-12} more`:""})`:""}${M.stale.length?`; ${M.stale.length} ${M.stale.length>1?"have":"has"} no data for the latest session${M.stale.length>1?"s":""} and ${M.stale.length>1?"count":"counts"} as unavailable for the missing days`:""}. Membership is today's list, not point-in-time. Self-check: page-computed ETF RSI matches the sheet's independent calculation on ${aOk} of ${aTot} ETF-sessions.</p>`;
-  $("ob-asof").textContent=`Completed sessions through ${fmtD(M.last)}${S.obos.calc?" · sheet recalculated "+S.obos.calc:""}${S.obAt?" · fetched "+fmtT(S.obAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`}
+  $("ob-asof").textContent=ptSfx(`Completed sessions through ${fmtD(M.last)}${S.obos.calc?" · sheet recalculated "+S.obos.calc:""}${S.obAt?" · fetched "+fmtT(S.obAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`)}
 function obDetailHtml(g){const L=g.lab.slice(-20);
   return `<div class="ob-dhead"><b>${esc(g.name)}</b> <span class="muted">${esc(g.etf)} · ${g.n} constituents${g.note?" · "+esc(g.note):""}</span>
     <span class="ob-strip" title="Status, last 20 sessions (oldest left)">${L.map(k=>`<i style="background:${(OB_LAB[k]||OB_LAB.NA).c}" title="${(OB_LAB[k]||OB_LAB.NA).t}"></i>`).join("")}</span></div>
@@ -1616,7 +1623,7 @@ function renderBreadth(){
     ${conf.length?`<p>${tagObs} RRG check (weekly): ${conf.join("; ")}.</p>`:""}
     <p>${tagSpec} Readings above 70% have often marked crowded, extended sectors and readings below 30% washed-out ones; neither is a timing signal on its own.</p>
     <p class="muted small">Method: each stock's latest close vs its simple ${S.brMetric}-day average, computed from daily closes (${window.PT_SOURCE_LABEL||'market data source'}) for ${priced} of ${tot} current constituents. Historical columns use 5, 21, 63 and 126 trading days ago. Membership is today's list (Wikipedia, retrieved 1 Nov 2026), not point-in-time, so past columns carry survivorship bias. Both share classes of Alphabet, Fox and News Corp count separately. The ↳ rows are S&amp;P 500 stocks in the GICS semiconductor (20) and aerospace &amp; defense (13) sub-industries; SMH and ITA proxy those industries, not the whole IT or Industrials sectors (XLK, XLI).${short.length?` Not enough history for ${short.join(", ")} (excluded where missing).`:""}</p>`;
-  $("br-asof").textContent=`Closes through ${B.last?fmtD(Date.parse(B.last+"T00:00:00Z")):"–"}${S.brAt?" · updated "+fmtT(S.brAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`}
+  $("br-asof").textContent=ptSfx(`Closes through ${B.last?fmtD(Date.parse(B.last+"T00:00:00Z")):"–"}${S.brAt?" · updated "+fmtT(S.brAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`)}
 
 /* ---------- XLY/XLP risk appetite ---------- */
 function riskSeries(){
@@ -1647,7 +1654,7 @@ function renderRiskApp(){
     <p>${tagObs} The ratio (${rfmt(r)}) is ${r>=a?"above":"below"} its 20-day (${rfmt(a)}), ${r>=b?"above":"below"} its 50-day (${rfmt(b)}) and ${r>=c?"above":"below"} its 200-day (${rfmt(c)}). ${ch>=0?"Consumer discretionary has outperformed staples over this period, consistent with stronger cyclical risk appetite.":"Defensive staples have outperformed discretionary over this period, consistent with a more defensive market."}</p>
     <p>${tagObs} Last 20/50 cross: ${l1?`<b class="${l1.dir==="up"?"up":"down"}">${l1.dir==="up"?"bullish":"bearish"}</b> on ${fmtD(l1.t)} (${ago(l1)})`:"none in the data"}. Last 50/200 cross: ${l2?`<b class="${l2.dir==="up"?"up":"down"}">${l2.dir==="up"?"golden cross":"death cross"}</b> on ${fmtD(l2.t)} (${ago(l2)})`:"none in the data"}.</p>
     <p>${tagSpec} Moving-average crosses lag price and often whipsaw in sideways markets. A ${l2&&l2.dir==="down"?"death cross that holds":"golden cross that holds"} has tended to accompany a ${l2&&l2.dir==="down"?"longer defensive phase":"longer risk-on phase"}, but it does not predict the next move.</p>`;
-  $("ra-asof").textContent=`Daily closes through ${fmtD(lastT)}${S.raAt?" · updated "+fmtT(S.raAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`}
+  $("ra-asof").textContent=ptSfx(`Daily closes through ${fmtD(lastT)}${S.raAt?" · updated "+fmtT(S.raAt):""} · ${window.PT_SOURCE_LABEL||'market data source'}`)}
 function renderIntel(){renderRRG();renderLead();renderBreadth();renderRiskApp();renderVix()}
 
 /* ---------- intrinsic value engine (pure functions; tested in node against engine.py) ---------- */
@@ -1795,7 +1802,7 @@ function renderValMissing(){const el=$("val-miss");if(!el)return;const rows=[],s
     if(m)why=m.message;
     else if(r&&r.method==="nav")why=null;
     else if(r&&!r.iv)why=(r.conf==="Waiting for price"?"No live price or market cap (shares outstanding missing from SEC data or no price history). ":"Insufficient cash-flow history for a reliable value, so only the reverse DCF is shown. ")+(r.notes||[]).join(" ");
-    else if(!r&&S.fundLoaded&&!S.fund[t])why=(window.PT_VAL_SKIPPED||[]).includes(t)?("Beyond your plan's "+((window.PT_LIMITS&&PT_LIMITS.valSymbols)||12)+"-symbol valuation limit. Paid unlocks 25 symbols."):"No fundamentals returned for this ticker.";
+    else if(!r&&S.fundLoaded&&!S.fund[t])why=(window.PT_VAL_SKIPPED||[]).includes(t)?("Beyond your plan's "+((window.PT_LIMITS&&PT_LIMITS.valSymbols)||12)+"-symbol valuation limit. Paid and Premium value every holding — no symbol limit."):(window.PT_VAL_FAILED||[]).includes(t)?"This batch could not be fetched just now — use Refresh to retry.":"No fundamentals returned for this ticker.";
     if(why)rows.push(`<tr><td class="l"><b>${esc(t)}</b></td><td class="l">${esc(why)}</td></tr>`)}
   el.hidden=!rows.length;if(rows.length)$("val-miss-body").innerHTML=rows.join("")}
 function renderValA(){const box=$("val-a");if(!S.vres){box.innerHTML=valEmptyHtml();const b=box.querySelector("[data-act]");if(b)b.onclick=()=>{b.dataset.act==="ov"?setTab("ov"):window.PT_RELOAD_VAL&&window.PT_RELOAD_VAL()};return}
@@ -1873,7 +1880,7 @@ function renderValC(){const box=$("val-c"),sel=$("val-sel");if(!S.vres){box.inne
     h+=`<h3>Cash-flow history used</h3><div class="tablebox"><table class="kv hist"><thead><tr><th class="l">Period</th>${lab.map(l=>`<th>${esc(l)}</th>`).join("")}</tr></thead><tbody>
       <tr><th class="l">Revenue</th>${f.rev.map(v=>`<td>${(v*r.fx/1000).toFixed(1)}</td>`).join("")}</tr>
       <tr><th class="l">${f.basis==="oe"?"Owner earnings":"Free cash flow"}${ctx.sbc?" after SBC":""}</th>${r.cash.map(v=>`<td class="${cls(v)}">${(v*r.fx/1000).toFixed(1)}</td>`).join("")}</tr>
-      <tr><th class="l">Margin</th>${r.ms.map(v=>`<td>${v.toFixed(1)}%</td>`).join("")}</tr></tbody></table></div><p class="note">US$ billions${f.cur!=="USD"?", converted from "+f.cur+" at today's rate":""}. ${esc(f.src.cf)}. Balance sheet: ${esc(f.src.bs)}. Fundamentals as of ${esc(f.asOf)}.</p>`}
+      <tr><th class="l">Margin</th>${r.ms.map(v=>`<td>${v.toFixed(1)}%</td>`).join("")}</tr></tbody></table></div><p class="note">US$ billions${f.cur!=="USD"?", converted from "+f.cur+" at today's rate":""}. ${esc(f.src.cf)}. Balance sheet: ${esc(f.src.bs)}. Fundamentals as of ${esc(ptSfx(f.asOf))}.</p>`}
   else if(f.method==="ri"){const ke=r.ke;const roes=[12,14,16,18,20],kes=[ke-1,ke,ke+1];
     h+=`<div class="vc-grid"><div><h3>Residual income · IV per share</h3><table class="heat"><thead><tr><th>ke ╲ ROE</th>${roes.map(x=>`<th>${x}%</th>`).join("")}</tr></thead><tbody>${kes.map(k=>`<tr><th>${k.toFixed(1)}%</th>${roes.map(x=>{const v=vRI(f,x,k,r.payout);const q=Math.max(-1,Math.min(1,v/r.px-1));return `<td style="background:color-mix(in srgb,${q>=0?"var(--up)":"var(--down)"} ${Math.round(Math.abs(q)*45)}%,transparent)">${usd(v,0)}</td>`}).join("")}</tr>`).join("")}</tbody></table></div>
       <div><h3>Inputs</h3><table class="kv"><tbody><tr><th>Book value per share</th><td>${usd(f.bvps)}</td></tr><tr><th>ROE bear / base / bull</th><td>${r.sm.bear.toFixed(1)} / ${r.sm.base.toFixed(1)} / ${r.sm.bull.toFixed(1)}% <span class="muted">min / median / max, 6 periods</span></td></tr>
@@ -1925,19 +1932,19 @@ function renderValSettings(){const el=$("val-set");const m=S.vset.mos;
   $("vs-save").onclick=async()=>{const db=await PT_ADAPTER.use("db");if(!db){$("vs-msg").textContent="Saving is not available in this view.";return}
     try{await db.doc("val/settings").set({...S.vset,updatedAt:new Date().toISOString()});$("vs-msg").textContent="Saved."}catch(e){$("vs-msg").textContent="Could not save: "+(e&&e.code||"error")}}}
 /* ---- valuation history ---- */
-function maybeWriteHist(){if(S.vWritten||!S.vsetLoaded||S.valinSrc!=="live"||!S.vres)return;const day=new Date(Date.now()+7*3600000).toISOString().slice(0,10);
+function maybeWriteHist(){if(S.vWritten||!S.vsetLoaded||S.valinSrc!=="live"||!S.vres)return;const day=ptBkkDay();
   if(S.vhistLoaded!==true)return;if(S.vhist.some(h=>h.date===day)){S.vWritten=true;return}S.vWritten=true;
   const items={};for(const r of Object.values(S.vres.res))if(r.iv)items[r.t]={px:+r.px.toFixed(4),bear:+r.iv.bear.toFixed(4),base:+r.iv.base.toFixed(4),bull:+r.iv.bull.toFixed(4),fundAsOf:r.asOf};
   const P=pvModel();const disp=P?Object.fromEntries(Object.entries(P.st).map(([k,v])=>[k,{md:+v.md.toFixed(5),iqr:+v.iqr.toFixed(5),n:v.n}])):null;
-  PT_ADAPTER.use("db").then(db=>db&&db.doc("valhist/"+day).set({date:day,at:new Date().toISOString(),rf:S.vres.ctx.rf,erp:S.vset.erp,sbc:S.vset.sbc,items,...(disp?{disp}:{})})).catch(()=>{})}
+  PT_ADAPTER.use("db").then(db=>db&&db.doc("valhist/"+day).set({date:day,at:new Date(ptNow()).toISOString(),rf:S.vres.ctx.rf,erp:S.vset.erp,sbc:S.vset.sbc,items,...(disp?{disp}:{})})).catch(()=>{})}
 function vHistHtml(t){const hs=S.vhist.filter(h=>h.items&&h.items[t]);if(!hs.length)return`<h3>Valuation history</h3><p class="note">The first daily record is saved when this tab opens with live prices. Later records split each change in margin of safety into the part caused by the price and the part caused by revised fundamentals.</p>`;
   let rows="",prev=null;for(const h of hs){const x=h.items[t];const mos=(x.base-x.px)/x.base;let dp="–",df="–";
     if(prev){const p=(1-x.px/prev.base)-(1-prev.px/prev.base),q=(1-x.px/x.base)-(1-x.px/prev.base);dp=pc(p,1);df=pc(q,1)}
     rows+=`<tr><td class="l">${esc(h.date)}</td><td>${usd(x.px)}</td><td>${usd(x.base)}</td><td>${pc(mos)}</td><td>${dp}</td><td>${df}</td><td class="l muted">${esc(x.fundAsOf||"")}</td></tr>`;prev=x}
-  return `<h3>Valuation history</h3><div class="tablebox"><table class="kv"><thead><tr><th class="l">Date</th><th>Price</th><th>Base IV</th><th>MOS</th><th>Δ from price</th><th>Δ from fundamentals</th><th class="l">Fundamentals as of</th></tr></thead><tbody>${rows}</tbody></table></div>`}
+  return `<h3>Valuation history</h3><div class="tablebox"><table class="kv"><thead><tr><th class="l">${ptSfx("Date")}</th><th>Price</th><th>Base IV</th><th>MOS</th><th>Δ from price</th><th>Δ from fundamentals</th><th class="l">${ptSfx("Fundamentals as of")}</th></tr></thead><tbody>${rows}</tbody></table></div>`}
 function renderValStatus(){const el=$("val-src");const c=vCtx();
   el.innerHTML=`<span class="pill ${S.valinSrc==="live"?"live":S.valin?"stale":""}">Inputs: ${S.valin?(S.valinSrc==="live"?"live · ":"")+esc(S.valin.updated||""):S.valinErr?esc(S.valinErr):"loading"}</span>
-    <span class="pill">Fundamentals: ${Object.keys(S.fund).length?esc(Object.values(S.fund).map(f=>f.asOf).sort().pop()):S.fundErr?esc(S.fundErr):S.fundLoaded?"none of your holdings could be valued":"loading"}</span>
+    <span class="pill">Fundamentals: ${Object.keys(S.fund).length?esc(ptSfx(Object.values(S.fund).map(f=>f.asOf).sort().pop())):S.fundErr?esc(S.fundErr):S.fundLoaded?"none of your holdings could be valued":esc(window.PT_VAL_PROGRESS||"loading")}</span>
     <span class="pill ${c.rfLive?"live":"stale"}">US 10Y ${c.rf.toFixed(2)}%${c.rfLive?"":" (fallback assumption, not live)"}</span><span class="pill">ERP ${c.erp.toFixed(2)}%</span>`}
 function renderValAll(selOnly,keepSet){if(S.tab!=="val")return;if(!selOnly)computeVal();renderValStatus();for(const id of["h-valb","h-valc","h-valt"]){const e=$(id);const pn=id==="h-valb"?e.closest(".grid2v"):e.closest(".panel");if(pn)pn.hidden=!S.vres}renderValKpis();renderValA();renderValB();renderValC();renderValTable();renderValMissing();if(!keepSet&&!selOnly)renderValSettings();if(!selOnly)renderDisp()}
 function setTab(t){S.tab=t;try{localStorage.setItem("ptpub.v1.tab",t)}catch(e){}for(const k of ["ov","val","set"]){$("tab-"+k).hidden=t!==k;$("tb-"+k).setAttribute("aria-pressed",t===k)}
@@ -1955,7 +1962,7 @@ function buildPortfolioSeries(){
     for(const k in maps){const a=maps[k];while(ptr[k]<a.length&&a[ptr[k]][0]<=d){last[k]=a[ptr[k]][1];ptr[k]++}}
     for(const h of holdings){const p=last[h.sym]!=null?last[h.sym]:(maps[h.sym][0]?maps[h.sym][0][1]:null);if(p==null){ok=false;break}v+=p*h.sh*h.fx}
     if(ok)out.push([d,v])}
-  const tot=rows.reduce((a,r)=>a+(r.valueUSD||0),0);if(out.length&&Math.abs(out[out.length-1][1]-tot)/tot>0.002)out.push([Date.now(),tot]);
+  const tot=rows.reduce((a,r)=>a+(r.valueUSD||0),0);if(out.length&&Math.abs(out[out.length-1][1]-tot)/tot>0.002)out.push([ptNow(),tot]);
   return out}
 function renderPortfolioChart(){
   document.querySelectorAll("#pf-range button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.r===S.range)));
@@ -1983,7 +1990,7 @@ function renderMacro(){renderRegime();renderSummary();
   const m=S.macro;const el=$("mc-chart");if(!m){el.innerHTML='<div class="empty">Rates and inflation: no market-data source connected.</div>';return}
   const toMs=a=>(a||[]).map(([d,v])=>[Date.parse(d+"T00:00:00Z"),v]);
   const cpi=toMs(m.cpiYoY),ff=toMs(m.fedFunds),ty=toMs(m.tenYear);
-  if(S.tnx!=null&&ty.length)ty.push([Date.now(),S.tnx]);
+  if(S.tnx!=null&&ty.length)ty.push([ptNow(),S.tnx]);
   const lastT=Math.max(...[cpi,ff,ty].map(a=>a.length?a[a.length-1][0]:0));const st=lastT-Number(S.mcRange)*365.25*864e5;
   const cut=a=>a.filter(p=>p[0]>=st);
   const ser=[{name:"CPI inflation (YoY)",short:"CPI",color:"var(--down)",pts:cut(cpi)},{name:"Fed funds (effective)",short:"Fed",color:"var(--chart)",w:2.2,pts:cut(ff)},{name:"10-year Treasury",short:"10Y",color:"var(--s2)",pts:cut(ty)}];
@@ -1998,12 +2005,12 @@ function renderMacro(){renderRegime();renderSummary();
   $("mc-note").innerHTML=`Source: FRED (St. Louis Fed) <a href="${esc(m.sources.cpi)}" target="_blank" rel="noopener">CPI</a>, <a href="${esc(m.sources.fedFunds)}" target="_blank" rel="noopener">Fed funds</a>, <a href="${esc(m.sources.tenYear)}" target="_blank" rel="noopener">10-year</a>; the last 10-year point is today's live yield. ${esc(m.notes||"")} ${ft&&ft.note?esc(ft.note):""}`}
 function drawTicker(a){const el=$("tc-"+a.ticker);if(!el)return;const h=S.hist&&S.hist[a.symbol];
   if(!h){el.innerHTML=`<div class="empty">${S.histErr?esc(S.histErr):"Loading price history…"}</div>`;return}
-  const r=S.chartRange[a.ticker]||"1Y";let src=(r==="5Y"?h.W:h.D)||[];if(src.length&&a.price!=null&&Date.now()-src[src.length-1][0]>864e5*0.5)src=[...src,[Date.now(),a.price]];
-  const last=src.length?src[src.length-1][0]:Date.now();const pts=src.filter(p=>p[0]>=rangeStart(r,last));
+  const r=S.chartRange[a.ticker]||"1Y";let src=(r==="5Y"?h.W:h.D)||[];if(src.length&&a.price!=null&&ptNow()-src[src.length-1][0]>864e5*0.5)src=[...src,[ptNow(),a.price]];
+  const last=src.length?src[src.length-1][0]:ptNow();const pts=src.filter(p=>p[0]>=rangeStart(r,last));
   const c=a.cur==="HKD"?"HK$":"$";lineChart(el,pts,{label:a.ticker+" price",h:200,ref:a.ath,refLabel:"ATH "+c+(a.ath||0).toFixed(2),fmt:(v,full)=>c+(full?v.toFixed(2):v>=1000?v.toFixed(0):v.toFixed(v>=100?0:2))})}
 function renderFoot(){const est=S.rows.filter(r=>r.status==="Estimated").length;
   $("foot-est").textContent=est?`${est} positions use estimated share counts (EST).`:"All share counts are actual.";
-  $("foot-asof").textContent=(window.PT_LIVE_ASOF?"Prices from "+(window.PT_SOURCE_LABEL||"the data source")+", close "+window.PT_LIVE_ASOF:"Prices entered by you")+(S.asOf?" · fetched "+new Date(S.asOf).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+" your time":"")+(S.usdthb?` · USD/THB ${S.usdthb.toFixed(3)}`:"")}
+  $("foot-asof").textContent=ptSfx((window.PT_LIVE_ASOF?"Prices from "+(window.PT_SOURCE_LABEL||"the data source")+", close "+window.PT_LIVE_ASOF:"Prices entered by you")+(S.asOf?" · fetched "+(window.PT_DEMO_MODE?fmtD(S.asOf):new Date(S.asOf).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})+" your time"):"")+(S.usdthb?` · USD/THB ${S.usdthb.toFixed(3)}`:""))}
 
 /* ---------- CNN Fear & Greed Index + Safe Haven Demand (inside Rates, inflation & macro regime) ---------- */
 const FG_ZONES=[[0,25,"Extreme fear","var(--down)"],[25,45,"Fear","var(--warn)"],[45,55,"Neutral","var(--muted)"],[55,75,"Greed","var(--q3)"],[75,100,"Extreme greed","var(--up)"]];
@@ -2018,7 +2025,7 @@ function renderFgi(){const box=$("fg-box");if(!box)return;
   const f=g.fgi||{},s=g.shd||{},z=fgZone(f.score);
   const yr=fh.filter(p=>p[0]>=lastT-365*864e5);const pct=yr.length?Math.round(yr.filter(p=>p[1]<f.score).length/yr.length*100):null;
   const d=(a,b)=>a==null||b==null?"":`<small class="${cls(a-b)}">${a-b>=0?"+":""}${(a-b).toFixed(1)}</small>`;
-  const asOf=new Date(g.asOf).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});
+  const asOf=ptSfx(new Date(g.asOf).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"}));
   const shl=sh.length?sh[sh.length-1][1]:null;const sz=fgZone(s.score);
   box.innerHTML=`<div class="fg-head"><h3>Sentiment · CNN Fear &amp; Greed Index and Safe-Haven Demand</h3>
       <div class="seg" id="fg-range" role="group" aria-label="Fear and Greed chart range"><button data-r="3">3M</button><button data-r="6">6M</button><button data-r="12">1Y</button></div></div>
@@ -2092,7 +2099,7 @@ function renderSummary(){const a=$("sm-pf"),b=$("sm-mk");if(!a||!b)return;
 /* ---------- news ---------- */
 function renderNews(){if(window.PT_UI)setTimeout(window.PT_UI.extras,0);const sel=$("news-day");const days=S.news.map(n=>n.date).sort().reverse();
   if(!days.length){sel.hidden=true;return}sel.hidden=false;if(!S.newsDay||!days.includes(S.newsDay))S.newsDay=days[0];
-  sel.innerHTML=days.map(d=>`<option value="${esc(d)}"${d===S.newsDay?" selected":""}>${new Date(d+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}</option>`).join("");
+  sel.innerHTML=days.map(d=>`<option value="${esc(d)}"${d===S.newsDay?" selected":""}>${new Date(d+"T00:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"})}${window.PT_DEMO_MODE?" "+PT_DEMO_SFX:""}</option>`).join("");
   const n=S.news.find(x=>x.date===S.newsDay);$("news-macro").textContent=n.macro||"";
   const items=(n.items||[]);
   $("news").innerHTML=items.length?items.map(it=>{const imp=(it.impact||"").toLowerCase();const c=imp.startsWith("bull")?"bull":imp.startsWith("bear")?"bear":"mixed";
@@ -2145,7 +2152,7 @@ function applyEngine(text,source,at){const p=parseEngine(text);if(!p.rows.length
 (async()=>{
   const db=await PT_ADAPTER.use("db");
   if(!db)return;
-  db.collection("news").onSnapshot(sn=>{S.news=sn.docs.map(d=>d.data()).filter(n=>n&&n.date);setPill("st-news",S.news.length?"News: "+S.news.map(n=>n.date).sort().pop():"News: no source connected",S.news.length?"live":"");renderNews()},()=>setPill("st-news","News: could not load","err"));
+  db.collection("news").onSnapshot(sn=>{S.news=sn.docs.map(d=>d.data()).filter(n=>n&&n.date);setPill("st-news",S.news.length?"News: "+ptSfx(S.news.map(n=>n.date).sort().pop()):"News: no source connected",S.news.length?"live":"");renderNews()},()=>setPill("st-news","News: could not load","err"));
   db.collection("snapshots").onSnapshot(sn=>{S.snapshots=sn.docs.map(d=>d.data()).filter(s=>s&&s.date).sort((a,b)=>a.date<b.date?-1:1);renderPortfolioChart()},()=>{});
   db.doc("meta/macro").onSnapshot(d=>{S.macro=d.exists?d.data():null;renderMacro()},()=>{$("mc-chart").innerHTML='<div class="empty">Could not load the rates and inflation data.</div>'});
   db.collection("fund").onSnapshot(sn=>{const m={},ms={};sn.docs.forEach(d=>{const v=d.data();if(v&&v.t){if(v.missing)ms[v.t]=v;else m[v.t]=v}});S.fund=m;S.fundMissing=ms;S.fundLoaded=true;S.fundErr=null;renderValAll()},e=>{S.fundErr=handleErr(e,"fundamentals");S.fundLoaded=true;renderValAll()});
@@ -2178,14 +2185,14 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   mcp=await PT_ADAPTER.use("mcp");
   if(!mcp){if(S.source!=="snapshot")setPill("st-prices","Prices: live feed unavailable in this view","stale");return}
   const watchEngine=()=>mcp.watchTool(DRIVE,TOOL,{fileId:ENGINE_ID,exportMimeType:"text/csv"},ev=>{
-    if(ev.type==="data"){const t=extractText(ev.result,"Broker,");const at=ev.result.cache?ev.result.cache.storedAt:Date.now();
-      if(t&&applyEngine(t,"live",at)){setPill("st-prices","Prices: live · "+new Date(at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}),"live");renderAll()}
+    if(ev.type==="data"){const t=extractText(ev.result,"Broker,");const at=ev.result.cache?ev.result.cache.storedAt:ptNow();
+      if(t&&applyEngine(t,"live",at)){setPill("st-prices","Prices: live · "+(window.PT_DEMO_MODE?ptSfx(fmtD(at)):new Date(at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})),"live");renderAll()}
       else setPill("st-prices","Prices: unreadable sheet export","err")}
     else{const c=ev.error&&ev.error.code;setPill("st-prices","Prices: "+handleErr(ev.error,"prices"),["needs_reauth","server_not_connected","not_in_manifest","approval_required","blocked_by_policy"].includes(c)?"err":"stale")}
   },{cache:{staleTime:120000,gcTime:3600000},refetchInterval:600000});
   let unwatch=watchEngine();
   $("refresh").onclick=async()=>{setPill("st-prices","Prices: refreshing…","");if(window.PT_DATA_SOURCE)loadHist(true);try{const r=await mcp.callTool(DRIVE,TOOL,{fileId:ENGINE_ID,exportMimeType:"text/csv"},{cache:{refresh:true,staleTime:0,gcTime:3600000}});
-      const t=extractText(r,"Broker,");if(t&&applyEngine(t,"live",Date.now())){setPill("st-prices","Prices: live · "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}),"live");renderAll()}}
+      const t=extractText(r,"Broker,");if(t&&applyEngine(t,"live",ptNow())){setPill("st-prices","Prices: live · "+(window.PT_DEMO_MODE?ptSfx(fmtD(ptNow())):new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})),"live");renderAll()}}
     catch(e){setPill("st-prices","Prices: "+handleErr(e,"prices"),"err")}};
   const loadHist=async(refresh)=>{try{const r=await mcp.callTool(DRIVE,TOOL,{fileId:HISTORY_ID,exportMimeType:"text/csv"},{cache:{staleTime:6*3600000,gcTime:24*3600000,refresh:!!refresh}});
       const t=extractText(r,"D|");if(!t)throw{code:"parse"};S.hist=parseHistory(t);S.histErr=null;renderAll();renderMacro()}
@@ -2199,19 +2206,19 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   mcp.watchTool(DRIVE,TOOL,{fileId:ROT_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"D|SPY");if(!t){if(!S.rot){S.rotErr="Rotation data export could not be read.";renderRotation()}return}
       const R=parseRotation(t);if(!R.D.SPY||!R.D.SPY.length){if(!S.rot){S.rotErr="Rotation data is empty.";renderRotation()}return}
-      S.rot=R;S.rotCache={};S.rrgCache={};S.rotErr=null;S.rotAt=ev.result.cache?ev.result.cache.storedAt:Date.now();renderRotation();renderRRG();renderBreadth()}
+      S.rot=R;S.rotCache={};S.rrgCache={};S.rotErr=null;S.rotAt=ev.result.cache?ev.result.cache.storedAt:ptNow();renderRotation();renderRRG();renderBreadth()}
     else{const c=ev.error&&ev.error.code;if(["needs_reauth","server_not_connected","not_in_manifest","approval_required","blocked_by_policy"].includes(c)){S.rot=null;S.rotCache={}}
       S.rotErr=handleErr(ev.error,"rotation data");if(!S.rot){renderRotation();renderRRG()}}
   },{cache:{staleTime:600000,gcTime:6*3600000},refetchInterval:900000});
   const authz=c=>["needs_reauth","server_not_connected","not_in_manifest","approval_required","blocked_by_policy"].includes(c);
   mcp.watchTool(DRIVE,TOOL,{fileId:BREADTH_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Sector");const B=t&&parseBreadth(t);
-      if(B&&B.stocks.length>400){S.breadth=B;S.brErr=null;S.brAt=ev.result.cache?ev.result.cache.storedAt:Date.now()}else if(!S.breadth)S.brErr="Breadth data export could not be read.";renderBreadth()}
+      if(B&&B.stocks.length>400){S.breadth=B;S.brErr=null;S.brAt=ev.result.cache?ev.result.cache.storedAt:ptNow()}else if(!S.breadth)S.brErr="Breadth data export could not be read.";renderBreadth()}
     else{if(authz(ev.error&&ev.error.code))S.breadth=null;S.brErr=handleErr(ev.error,"breadth data");if(!S.breadth)renderBreadth()}
   },{cache:{staleTime:900000,gcTime:12*3600000},refetchInterval:1800000});
   mcp.watchTool(DRIVE,TOOL,{fileId:OBOS_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Group");const O=t&&parseObos(t);
-      if(O&&O.stocks.length>400&&O.etf.SPY&&O.etf.SPY.pts.length>60){S.obos=O;S.obM=null;S.obErr=null;S.obAt=ev.result.cache?ev.result.cache.storedAt:Date.now()}else if(!S.obos)S.obErr="Overbought/oversold data export could not be read (the sheet may still be calculating).";renderObos()}
+      if(O&&O.stocks.length>400&&O.etf.SPY&&O.etf.SPY.pts.length>60){S.obos=O;S.obM=null;S.obErr=null;S.obAt=ev.result.cache?ev.result.cache.storedAt:ptNow()}else if(!S.obos)S.obErr="Overbought/oversold data export could not be read (the sheet may still be calculating).";renderObos()}
     else{if(authz(ev.error&&ev.error.code)){S.obos=null;S.obM=null}S.obErr=handleErr(ev.error,"overbought/oversold data");if(!S.obos)renderObos()}
   },{cache:{staleTime:900000,gcTime:12*3600000},refetchInterval:1800000});
   const loadValin=()=>mcp.watchTool(DRIVE,TOOL,{fileId:VALIN_ID,exportMimeType:"text/csv"},ev=>{
@@ -2238,7 +2245,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   },{cache:{staleTime:3600000,gcTime:12*3600000},refetchInterval:3600000});
   mcp.watchTool(DRIVE,TOOL,{fileId:RISK_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"D|XLY");const R=t&&parseRotation(t);
-      if(R&&R.D.XLY&&R.D.XLY.length&&R.D.XLP&&R.D.XLP.length){S.risk=R;S.raCache=null;S.raErr=null;S.raAt=ev.result.cache?ev.result.cache.storedAt:Date.now()}else if(!S.risk)S.raErr="XLY/XLP data export could not be read.";renderRiskApp()}
+      if(R&&R.D.XLY&&R.D.XLY.length&&R.D.XLP&&R.D.XLP.length){S.risk=R;S.raCache=null;S.raErr=null;S.raAt=ev.result.cache?ev.result.cache.storedAt:ptNow()}else if(!S.risk)S.raErr="XLY/XLP data export could not be read.";renderRiskApp()}
     else{if(authz(ev.error&&ev.error.code)){S.risk=null;S.raCache=null}S.raErr=handleErr(ev.error,"XLY/XLP data");if(!S.risk)renderRiskApp()}
   },{cache:{staleTime:600000,gcTime:6*3600000},refetchInterval:900000});
 })();
@@ -2275,7 +2282,7 @@ function phRender(){const st=phLoad();const tb=document.querySelector("#ph-table
   $("ph-msg").textContent=(missFx?"Waiting for exchange rates (or enter them above). ":R.auto&&fx?"Exchange rates: "+fx.source+", "+fx.asOf+" (type a rate to override). ":"")+(missPx?"Positions without a live or entered price are not valued yet.":"")}
 function phApply(){const csv=ptHoldingsCsv();phRender();if(window.PT_ONHOLD)window.PT_ONHOLD();
   if(!csv){if(S.rows.length){location.reload();return}setPill("st-prices","Prices: add holdings to begin","stale");return}
-  if(applyEngine(csv,"manual",Date.now())){if(window.PT_LIVE_AT)setPill("st-prices","Prices: "+(window.PT_SOURCE_LABEL||"live")+(window.PT_LIVE_ASOF?" · close "+window.PT_LIVE_ASOF:""),"live");else setPill("st-prices","Prices: manual · entered by you","stale");renderAll()}}
+  if(applyEngine(csv,"manual",ptNow())){if(window.PT_LIVE_AT)setPill("st-prices","Prices: "+(window.PT_SOURCE_LABEL||"live")+(window.PT_LIVE_ASOF?" · close "+ptSfx(window.PT_LIVE_ASOF):""),"live");else setPill("st-prices","Prices: manual · entered by you","stale");renderAll()}}
 (function phInit(){const form=$("ph-form");if(!form)return;
   form.addEventListener("submit",e=>{e.preventDefault();const d=new FormData(form);const st=phLoad();
     const tk=String(d.get("tk")||"").trim().toUpperCase().replace(/[^A-Z0-9.\-:]/g,"");const qty=parseFloat(d.get("qty"));
@@ -2295,9 +2302,11 @@ window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(
   redrawOverview:()=>{for(const f of [renderPortfolioChart,renderMacro,renderFgi,renderRotation,renderRRG,renderRiskApp,renderBreadth,renderObos,renderLead,renderVix,renderNews])try{f()}catch(e){}if(S.flowReady)try{renderFlow()}catch(e){}}};
 })();
 </script>
+<script src="pt-themes.js"></script>
 <script src="pt-import.js"></script>
 <script src="pt-ui.js"></script>
 <script src="pt-analyst.js"></script>
+<script src="pt-projection.js"></script>
 <script>
 (function(){
   var a=document.getElementById("acct");

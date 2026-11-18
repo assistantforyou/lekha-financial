@@ -48,12 +48,13 @@ assert.strictEqual(LIMITS.free.av, false);
 assert.strictEqual(LIMITS.free.ai, false);
 assert.strictEqual(LIMITS.paid.holdings, null); // null = unlimited
 assert.strictEqual(LIMITS.paid.historyDays, null); // full history the source can serve
-assert.strictEqual(LIMITS.paid.valSymbols, 25);
+assert.strictEqual(LIMITS.paid.valSymbols, null); // unlimited valuation coverage (client batches)
 assert.strictEqual(LIMITS.paid.av, true);
 assert.strictEqual(LIMITS.paid.ai, false);
 assert.strictEqual(LIMITS.premium.holdings, null); // null = unlimited
 assert.strictEqual(LIMITS.premium.historyDays, null);
-assert.strictEqual(LIMITS.premium.valSymbols, 40); // the SEC/valuation pipeline ceiling
+assert.strictEqual(LIMITS.premium.valSymbols, null); // unlimited valuation coverage (client batches)
+assert.strictEqual(LIMITS.demo.valSymbols, 14);
 assert.strictEqual(LIMITS.premium.ai, true);
 assert.strictEqual(LIMITS.premium.aiQuestions, 40);
 assert.strictEqual(LIMITS.premium.simulations, true);

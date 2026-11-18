@@ -8,6 +8,7 @@ const TIERS = ["demo", "free", "paid", "premium"];
 // What each tier is entitled to. Numbers the backend enforces; also surfaced via
 // /api/auth/me so the UI can show limits and upgrade hints (display only, never trusted).
 // null means unlimited (no cap enforced; the data source's own depth applies).
+// valSymbols: null = every holding is valued (the client sends batches; each request is still capped server-side).
 // demo numbers are the shape of the simulated dataset, not server-enforced budgets.
 const LIMITS = {
   demo: {
@@ -19,11 +20,11 @@ const LIMITS = {
     av: false, ai: false, aiQuestions: 0, simulations: false, briefing: false,
   },
   paid: {
-    holdings: null, historyDays: null, valSymbols: 25,
+    holdings: null, historyDays: null, valSymbols: null,
     av: true, ai: false, aiQuestions: 0, simulations: false, briefing: false,
   },
   premium: {
-    holdings: null, historyDays: null, valSymbols: 40,
+    holdings: null, historyDays: null, valSymbols: null,
     av: true, ai: true, aiQuestions: 40, simulations: true, briefing: true,
   },
 };
