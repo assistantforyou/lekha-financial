@@ -5,7 +5,7 @@
 <title>Portfolio Terminal</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <script>/* apply saved theme / text size / density before first paint */
-try{var p=JSON.parse(localStorage.getItem("ptpub.v1.prefs")||"null")||{};var r=document.documentElement;if(p.theme==="light"||p.theme==="dark")r.setAttribute("data-theme",p.theme);if(p.theme&&p.theme!=="auto"&&p.theme!=="light"&&p.theme!=="dark"){var tv=JSON.parse(localStorage.getItem("ptpub.v1.themeVars")||"null");if(tv&&tv.id===p.theme){r.setAttribute("data-theme",tv.kind);for(var k in tv.vars)r.style.setProperty(k,tv.vars[k]);r.style.setProperty("color-scheme",tv.kind)}}r.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[p.size]||1);if(p.density==="compact")r.setAttribute("data-density","compact")}catch(e){}</script>
+try{var p=JSON.parse(localStorage.getItem("ptpub.v1.prefs")||"null")||{};var r=document.documentElement;if(p.theme==="light"||p.theme==="dark")r.setAttribute("data-theme",p.theme);if(p.theme&&p.theme!=="auto"&&p.theme!=="light"&&p.theme!=="dark"){var tv=JSON.parse(localStorage.getItem("ptpub.v1.themeVars")||"null");if(tv&&tv.id===p.theme){r.setAttribute("data-theme",tv.kind);for(var k in tv.vars)r.style.setProperty(k,tv.vars[k]);r.style.setProperty("color-scheme",tv.kind)}}if(p.lang&&/^[a-zA-Z-]+$/.test(p.lang)&&p.lang!=="en")document.write('<script src="i18n/'+p.lang+'.js"><\/script>');r.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[p.size]||1);if(p.density==="compact")r.setAttribute("data-density","compact")}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
@@ -499,6 +499,7 @@ td{font-size:13.5px}
   </footer>
 </div>
 
+<script src="pt-i18n.js"></script>
 <script src="pt-demo.js"></script>
 <script src="pt-chunk.js"></script>
 <script src="pt-datasource.js"></script>

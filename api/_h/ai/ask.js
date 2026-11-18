@@ -5,6 +5,7 @@ const { requireTier } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { userContext, portfolioBlock, marketBlock, cleanTk } = require("./_ctx");
+const { langOf, withLang } = require("./_lang");
 
 const DAY = 864e5;
 
@@ -40,6 +41,7 @@ module.exports = async (req, res) => {
   try {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const question = cap(body.question, 600);
+    const lang = langOf(body.lang);
     if (question.length < 3) return res.status(400).json({ error: "Ask a question first." });
 
     const uid = p.user_id;
@@ -58,7 +60,7 @@ module.exports = async (req, res) => {
       question,
     ].filter(Boolean).join("\n");
 
-    const ai = await generateJson({ system: SYSTEM, user, schema: SCHEMA, job: "ai-ask", timeoutMs: 45000 });
+    const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-ask", timeoutMs: 45000 });
     const own = new Set(ctx.rows.map((r) => r.tk));
     const points = (Array.isArray(ai.points) ? ai.points : []).slice(0, 6)
       .filter((x) => x && (x.title || x.detail))

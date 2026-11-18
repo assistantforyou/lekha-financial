@@ -6,6 +6,7 @@
 const { requireTier } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
+const { langOf, withLang } = require("./_lang");
 const { seriesFor, cleanSymbols } = require("../../_history");
 const { userContext } = require("./_ctx");
 
@@ -71,6 +72,7 @@ module.exports = async (req, res) => {
   try {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const years = HORIZONS.includes(Number(body.years)) ? Number(body.years) : 1;
+    const lang = langOf(body.lang);
 
     const uid = p.user_id;
     const ok = await rateHit(`ai/sim/${uid}/${Math.floor(Date.now() / DAY)}`, 10);
@@ -127,7 +129,7 @@ module.exports = async (req, res) => {
     let narrative = "";
     try {
       const ai = await generateJson({
-        system: NARRATIVE_SYSTEM, job: "ai-sim", timeoutMs: 30000,
+        system: withLang(NARRATIVE_SYSTEM, lang), job: "ai-sim", timeoutMs: 30000,
         user: `Portfolio (real holdings, weights of invested part): ${items.map((x) => `${x.tk} ${x.weightPct}% beta ${x.beta}`).join("; ")}\nHorizon: ${years}y, ${PATHS} seeded paths.\nOutcome multipliers: p5 ${percentiles.p5}, p25 ${percentiles.p25}, median ${percentiles.p50}, p75 ${percentiles.p75}, p95 ${percentiles.p95}. Probability of a loss: ${probLoss}%.\nStress impacts: ${stress.map((s) => `${s.name} ${s.impactPct}%`).join("; ")}.\nWrite the narrative.`,
         schema: NARRATIVE_SCHEMA,
       });

@@ -19,6 +19,8 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
+  /* the language picked in the header: the analyst answers in it ("en" when no language support is loaded) */
+  function uiLang() { try { return (window.PT_I18N && PT_I18N.lang) || "en"; } catch (e) { return "en"; } }
   function jget(r) { return r.text().then(function (t) { try { return JSON.parse(t); } catch (e) { return null; } }); }
   function tierNow() { try { return window.PT_TIER || null; } catch (e) { return null; } }
   function demoNow() { try { return !!window.PT_DEMO_MODE; } catch (e) { return false; } }
@@ -214,7 +216,7 @@
       }
       out.innerHTML = '<div class="empty">Thinking…</div>';
       if (document.getElementById("ai-msg")) document.getElementById("ai-msg").hidden = true;
-      PT_AUTH.fetch("/api/ai/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }) })
+      PT_AUTH.fetch("/api/ai/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, lang: uiLang() }) })
         .then(function (r) { return jget(r).then(function (j) { return { s: r.status, j: j }; }); })
         .then(function (x) {
           if (x.s === 200 && x.j && x.j.answer) { out.innerHTML = answerHtml(x.j); return; }
@@ -262,7 +264,7 @@
       host.innerHTML = h;
     }
     if (demo) { show(DEMO_BRIEF, false); return; }
-    PT_AUTH.fetch("/api/ai/briefing", {})
+    PT_AUTH.fetch("/api/ai/briefing" + (uiLang() !== "en" ? "?lang=" + encodeURIComponent(uiLang()) : ""), {})
       .then(function (r) { return jget(r).then(function (j) { return { s: r.status, j: j }; }); })
       .then(function (x) {
         if (x.s === 200 && x.j && x.j.briefing) { lastBriefing = x.j.briefing; show(x.j.briefing, !!x.j.cached); return; }
@@ -298,7 +300,7 @@
     if (run) run.onclick = function () {
       if (demo) { lastSim = JSON.parse(JSON.stringify(DEMO_SIM)); lastSim.years = yrs; showSim(lastSim, true); return; }
       out.innerHTML = '<div class="empty">Simulating…</div>';
-      PT_AUTH.fetch("/api/ai/simulate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ years: yrs }) })
+      PT_AUTH.fetch("/api/ai/simulate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ years: yrs, lang: uiLang() }) })
         .then(function (r) { return jget(r).then(function (j) { return { s: r.status, j: j }; }); })
         .then(function (x) {
           if (x.s === 200 && x.j && x.j.percentiles) { lastSim = x.j; showSim(x.j, false); return; }

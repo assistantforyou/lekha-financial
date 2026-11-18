@@ -225,7 +225,7 @@
     shown = itemsOf().filter(function (it) { return !f || it.name.toLowerCase().indexOf(f) >= 0 || it.id.indexOf(f) >= 0; });
     shown.forEach(function (it, i) {
       if (it.group !== last) { html += '<div class="th-g" role="presentation">' + esc(it.group) + "</div>"; last = it.group; }
-      html += '<div class="th-o' + (it.id === cur ? " cur" : "") + '" role="option" id="th-' + it.id + '" data-i="' + i + '" aria-selected="false">' + swatch(it.c) + "<span>" + esc(it.name) + "</span></div>";
+      html += '<div class="th-o' + (it.id === cur ? " cur" : "") + '" role="option" id="th-' + it.id + '" data-i="' + i + '" aria-selected="false">' + swatch(it.c) + "<span" + (BY_ID[it.id] ? " translate='no'" : "") + ">" + esc(it.name) + "</span></div>";
     });
     list.innerHTML = html || '<div class="th-none">No theme matches “' + esc(filter) + "”.</div>";
     active = -1;
@@ -245,7 +245,7 @@
   }
   function label() {
     var id = currentId(), t = BY_ID[id];
-    btn.querySelector(".th-name").textContent = nameOf(id);
+    btn.querySelector(".th-name").textContent = nameOf(id); btn.querySelector(".th-name").setAttribute("translate", BY_ID[id] ? "no" : "yes");
     btn.querySelector(".th-dots").outerHTML = swatch(t ? [t.c.bg, t.c.panel, t.c.accent, t.c.green] : (BUILTIN.filter(function (b) { return b.id === id; })[0] || BUILTIN[0]).c);
   }
   function place() {

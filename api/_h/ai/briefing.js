@@ -5,6 +5,7 @@ const { requireTier } = require("../../_auth");
 const { cached, cacheGet, rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { userContext, portfolioBlock, marketBlock } = require("./_ctx");
+const { langOf, withLang } = require("./_lang");
 
 const DAY = 864e5, KEEP_MS = 20 * 36e5;
 
@@ -33,7 +34,9 @@ module.exports = async (req, res) => {
   const p = await requireTier(req, res, ["premium"]);
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
-  const uid = p.user_id, day = new Date().toISOString().slice(0, 10), key = `ai/brief/${uid}/${day}`;
+  const uid = p.user_id, day = new Date().toISOString().slice(0, 10);
+  // one cached briefing per user, day and language, so a Thai reader never gets yesterday's English text
+  const lang = langOf(req.query && req.query.lang), key = lang === "en" ? `ai/brief/${uid}/${day}` : `ai/brief/${uid}/${day}/${lang}`;
   try {
     const hit = await cacheGet(key);
     if (hit && hit.payload) return res.status(200).json({ cached: true, briefing: hit.payload });
@@ -52,7 +55,7 @@ module.exports = async (req, res) => {
       market.news ? `\nMARKET BRIEFING (${market.news.date}): ${market.news.macro}\nRecent headlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${h}`).join("\n")}` : "",
     ].filter(Boolean).join("\n");
 
-    const ai = await generateJson({ system: SYSTEM, user, schema: SCHEMA, job: "ai-brief", timeoutMs: 45000 });
+    const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-brief", timeoutMs: 45000 });
     const briefing = {
       date: day,
       headline: clean(ai.headline, 200),

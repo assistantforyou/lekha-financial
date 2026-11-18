@@ -12,7 +12,7 @@
   var S = APP.S || { tab: "ov", rows: [], news: [] }, setTab = APP.setTab || function () {};
 
   /* ================= display preferences ================= */
-  var DEF_PREFS = { theme: "auto", size: "M", density: "comfortable" };
+  var DEF_PREFS = { theme: "auto", size: "M", density: "comfortable", lang: "en" };
   var ZOOM = { S: 0.92, M: 1, L: 1.12, XL: 1.25 };
   function prefs() { return Object.assign({}, DEF_PREFS, LS("prefs") || {}); }
   function applyPrefs(p) {
@@ -102,6 +102,14 @@
     var L = layout(tab), nodes = {};
     Array.prototype.forEach.call(lay.children, function (n) { nodes[n.dataset.pid] = n; });
     var order = L.order.filter(function (p) { return nodes[p]; });
+    /* a panel the saved layout has never seen (a newly shipped one) goes right after the panel that precedes it
+       in the default layout, not at the end of the page; anything still unplaced is appended */
+    var def = defaults[tab] || [];
+    def.forEach(function (p, i) {
+      if (!nodes[p] || order.indexOf(p) >= 0) return;
+      for (var j = i - 1; j >= 0; j--) { var k = order.indexOf(def[j]); if (k >= 0) { order.splice(k + 1, 0, p); return; } }
+      order.push(p);
+    });
     Object.keys(nodes).forEach(function (p) { if (order.indexOf(p) < 0) order.push(p); });
     order.forEach(function (p) {
       var n = nodes[p]; lay.appendChild(n);
@@ -379,7 +387,8 @@
     html += card("set-plan", "Plans & data", plans, "One terminal, four levels: Demo (simulated), Free (limited real data), Paid (full real data, unlimited valuation coverage), Premium (everything in Paid + AI analyst, LLM Council and billion-path simulations). Prices in Thai baht.");
 
     // display
-    var disp = "<div class='set-grid'><label>Theme" + seg("theme", [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]], p.theme) + "<span class='note'>100 more editor-style themes (Dracula, Nord, Tokyo Night, Solarized…) are in the palette button at the top of the page.</span></label>" +
+    var langOpts = (window.PT_I18N ? PT_I18N.LANGS : []).map(function (l) { return "<option value='" + l.code + "'" + (l.code === (window.PT_I18N ? PT_I18N.lang : "en") ? " selected" : "") + ">" + l.native + "</option>"; }).join("");
+    var disp = "<div class='set-grid'><label>Language<select id='set-lang' class='notranslate' translate='no'>" + langOpts + "</select><span class='note'>Changes every label, description and sentence in the terminal, and the language the AI analyst answers in. Live news headlines and filings stay in their original language.</span></label><label>Theme" + seg("theme", [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]], p.theme) + "<span class='note'>100 more editor-style themes (Dracula, Nord, Tokyo Night, Solarized…) are in the palette button at the top of the page.</span></label>" +
       "<label>Text size" + seg("size", [["S", "Small"], ["M", "Medium"], ["L", "Large"], ["XL", "Extra large"]], p.size) + "</label>" +
       "<label>Density" + seg("density", [["comfortable", "Comfortable"], ["compact", "Compact"]], p.density) + "</label>" +
       "<label>Currency<div class='seg' role='group'><button type='button' id='set-usd' aria-pressed='" + (S.cur === "USD") + "'>USD</button><button type='button' id='set-thb' aria-pressed='" + (S.cur === "THB") + "'>THB</button></div></label></div>";
@@ -447,6 +456,8 @@
     });
     if (el("set-manage")) el("set-manage").onclick = async function () { try { var j = await post("/api/billing/portal", {}, true); location.href = j.url; } catch (e) { say("set-dmsg", e.message, true); } };
 
+    var langSel = document.getElementById("set-lang");
+    if (langSel) langSel.onchange = function () { if (window.PT_I18N) PT_I18N.setLang(langSel.value); };
     document.querySelectorAll("#set-display .seg[data-pref]").forEach(function (g) {
       g.onclick = function (e) { var v = e.target.getAttribute("data-v"); if (!v) return; g.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", b === e.target); }); setPref(g.getAttribute("data-pref"), v); };
     });
