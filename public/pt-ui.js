@@ -357,16 +357,16 @@
       acct = (AUTH && AUTH.session())
         ? "<p class='note'><b>Demo mode is on.</b> You are signed in but exploring the simulated terminal — none of your real data is loaded.</p><div class='set-row'><a class='btn pri' href='" + location.pathname + "'>Exit demo · load my real portfolio</a></div>"
         : "<p class='note'><b>You're exploring the DEMO — a fully simulated Portfolio Terminal.</b> Every price, chart and number here is synthetic. Create a free account to use the real product with real data.</p>" +
-          "<form class='set-f' id='set-auth' autocomplete='on'><input type='email' id='set-email' placeholder='Email' autocomplete='email' required><input type='password' id='set-pw' placeholder='Password (8+ characters)' autocomplete='current-password' required>" +
+          "<form class='set-f' id='set-auth' autocomplete='on'><input type='email' id='set-email' name='email' placeholder='Email' autocomplete='username' autocapitalize='none' autocorrect='off' spellcheck='false' inputmode='email' aria-label='Email' required><input type='password' id='set-pw' name='password' placeholder='Password (8+ characters)' autocomplete='current-password' aria-label='Password' required>" +
           "<div class='set-row'><button class='btn pri' type='submit' data-a='login'>Sign in</button><button class='btn' type='submit' data-a='signup'>Create free account</button><button class='btn link' type='button' id='set-forgot'>Forgot password?</button></div></form>";
     } else if (signed) {
       var planTxt = u.tier === "premium" ? "Premium" : u.tier === "paid" ? "Paid" : "Free";
       var renew = (u.tier === "paid" || u.tier === "premium") && u.period_end ? " · renews " + h(String(u.period_end).slice(0, 10)) : "";
       acct = "<div class='set-kv'><span>Signed in as</span><b>" + h(u.email) + "</b><span>Plan</span><b>" + planTxt + renew + "</b>" + (u.is_admin ? "<span>Role</span><b>Admin</b>" : "") + "</div>" +
-        "<div class='set-row'><button class='btn' id='set-logout' type='button'>Sign out</button><details class='set-pw'><summary class='btn'>Change password</summary><div class='set-f'><input type='password' id='set-newpw' placeholder='New password (8+ characters)' autocomplete='new-password'><button class='btn' type='button' id='set-pwgo'>Save password</button></div></details></div>";
+        "<div class='set-row'><button class='btn' id='set-logout' type='button'>Sign out</button><details class='set-pw'><summary class='btn'>Change password</summary><div class='set-f'><input type='password' id='set-newpw' name='new-password' placeholder='New password (8+ characters)' autocomplete='new-password' aria-label='New password'><button class='btn' type='button' id='set-pwgo'>Save password</button></div></details></div>";
     } else {
       acct = "<p class='note'>An account keeps your layout and display settings on every device and is required for real data. Your holdings stay in this browser either way.</p>" +
-        "<form class='set-f' id='set-auth' autocomplete='on'><input type='email' id='set-email' placeholder='Email' autocomplete='email' required><input type='password' id='set-pw' placeholder='Password (8+ characters)' autocomplete='current-password' required>" +
+        "<form class='set-f' id='set-auth' autocomplete='on'><input type='email' id='set-email' name='email' placeholder='Email' autocomplete='username' autocapitalize='none' autocorrect='off' spellcheck='false' inputmode='email' aria-label='Email' required><input type='password' id='set-pw' name='password' placeholder='Password (8+ characters)' autocomplete='current-password' aria-label='Password' required>" +
         "<div class='set-row'><button class='btn pri' type='submit' data-a='login'>Sign in</button><button class='btn' type='submit' data-a='signup'>Create account</button><button class='btn link' type='button' id='set-forgot'>Forgot password?</button></div></form>";
     }
     html += card("set-account", "Account", acct + "<div class='set-msg' id='set-amsg' role='status'></div>", null);
@@ -398,7 +398,7 @@
     // import
     html += DEMO()
       ? card("set-import", "Statement import", "<p class='note'>Import is for your real account, so it's switched off in the demo — real statements never mix with simulated data. Create a free account to import a broker PDF, screenshot or CSV.</p>", "Import holdings from a broker PDF, screenshot or CSV.")
-      : card("set-import", "Statement import", "<div class='set-f'><input type='password' id='set-imppass' placeholder='Import passcode' value='" + h(LS("importpass") || "") + "' autocomplete='off'><button class='btn' type='button' id='set-impsave'>Save passcode</button></div><p class='note'>Statements are read by Z.ai's free GLM vision model, with Google Gemini as a backup. PDFs are turned into text in your browser first and account numbers are masked.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
+      : card("set-import", "Statement import", "<div class='set-f'><input type='password' id='set-imppass' name='passcode' placeholder='Import passcode' value='" + h(LS("importpass") || "") + "' autocomplete='current-password' autocapitalize='none' autocorrect='off' spellcheck='false' aria-label='Import passcode'><button class='btn' type='button' id='set-impsave'>Save passcode</button></div><p class='note'>Pick one or several statements at once; you review every line before it is added.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
 
     // admin
     if (u && u.is_admin) html += card("set-costs", "Running costs (admin)", "<div id='set-costs-body'><div class='empty'>Loading costs…</div></div>", "What this site costs to run: AI calls metered per request, plus fixed monthly plans. Only admins see this.");
