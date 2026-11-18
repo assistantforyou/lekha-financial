@@ -9,12 +9,22 @@ const { insiderCollection } = require("../../../_insiders");
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-  const p = await requireTier(req, res, ["free", "paid", "premium"]);
-  if (!p) return;
-  const limits = limitsOf(p);
   const name = String((req.query && req.query.name) || "");
+  // fund and rev are built from the caller's holdings -> signed-in only.
+  // etf / ins / news are shared market data: public and CDN-cacheable.
+  const PERSONAL = name === "fund" || name === "rev";
+  let limits = null;
+  if (PERSONAL) {
+    const p = await requireTier(req, res, ["free", "paid", "premium"]);
+    if (!p) return;
+    limits = limitsOf(p);
+  }
   try {
-    if (name === "etf") return res.status(200).json(await etfCollection());
+    if (name === "etf") {
+      const list = await etfCollection();
+      if (list.length) res.setHeader("Cache-Control", "public, s-maxage=1800, stale-while-revalidate=21600");
+      return res.status(200).json(list);
+    }
     if (name === "fund") return await fundCollection(req, res, { max: limits.valSymbols });
     if (name === "ins") {
       const list = await insiderCollection();

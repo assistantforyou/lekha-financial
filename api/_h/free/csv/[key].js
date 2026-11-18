@@ -84,11 +84,19 @@ async function breadth(res) {
 }
 
 module.exports = async (req, res) => {
-  res.setHeader("Cache-Control", "no-store");
-  const p = await requireTier(req, res, ["free", "paid", "premium"]);
-  if (!p) return;
-  const limits = limitsOf(p);
   const key = String(req.query.key || "");
+  // Per-user datasets take the caller's symbols in a POST body and need a signed-in account.
+  // The shared market datasets below are identical for every account: they stay public and
+  // CDN-cacheable (Vercel never caches authorized requests, and caching is what keeps the
+  // page fast on the Hobby plan) — same as the pre-tier design, deliberately accepted.
+  const PERSONAL = key === "HISTORY" || key === "FACTOR" || key === "VALIN";
+  let limits = null;
+  if (PERSONAL) {
+    res.setHeader("Cache-Control", "no-store");
+    const p = await requireTier(req, res, ["free", "paid", "premium"]);
+    if (!p) return;
+    limits = limitsOf(p);
+  }
   try {
     if (SETS[key]) return await rotationLike(key, res);
     if (key === "BREADTH") return await breadth(res);

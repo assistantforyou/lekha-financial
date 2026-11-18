@@ -278,9 +278,13 @@
   async function loadMe(force) {
     if (!AUTH || !AUTH.session()) { me = null; return null; }
     if (me && !force) return me;
-    if (!mePending) mePending = AUTH.fetch("/api/auth/me").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+    if (!mePending) mePending = AUTH.fetch("/api/auth/me").then(function (r) {
+      // Only a definitive 401 invalidates the stored session; a transient network/5xx
+      // failure must NOT sign the user out of the browser.
+      if (r.status === 401 && AUTH.session()) AUTH.setSession(null);
+      return r.ok ? r.json() : null;
+    }).then(function (j) {
       me = j; mePending = null;
-      if (!j && AUTH.session()) AUTH.setSession(null);
       if (j && j.prefs && j.prefs.ui && force === "login") { LS("prefs", j.prefs.ui.prefs || prefs()); if (j.prefs.ui.layout) LS("layout", j.prefs.ui.layout); applyPrefs(prefs()); ["ov", "val"].forEach(applyLayout); }
       return j;
     }).catch(function () { mePending = null; return null; });
@@ -417,8 +421,10 @@
           var j = await post("/api/auth/" + which, { email: el("set-email").value, password: el("set-pw").value });
           if (j.confirm) return say("set-amsg", j.message);
           AUTH.setSession(j.session);
-          if (DEMO()) { location.href = location.pathname; return; }   // leave demo, load real data
-          await loadMe("login"); renderSettings();
+          // A full reload is the one flow that is guaranteed correct in every mode:
+          // it leaves demo mode, re-hydrates account state and repaints the header.
+          say("set-amsg", "Signed in — loading your account…");
+          setTimeout(function () { location.reload(); }, 300);
         } catch (err) { say("set-amsg", err.message, true); }
       };
       var forgot = el("set-forgot");
