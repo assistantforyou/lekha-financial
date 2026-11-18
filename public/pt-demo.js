@@ -709,7 +709,12 @@
           var G = typeof window !== "undefined" ? window : globalThis;
           G.PT_LIVE = cl.live; G.PT_LIVE_AT = Date.now(); G.PT_LIVE_ASOF = cl.asof;
           G.PT_VAL_SKIPPED = [];
-          if (G.PT_HOLD) G.PT_HOLD.apply();
+          /* Re-apply once now and once after the page has finished booting: the boot-time
+             call can race (or throw into the watcher's catch) while the UI is still coming
+             up, which would leave the engine built from the price-less CSV. */
+          var reapply = function () { try { if (G.PT_HOLD) G.PT_HOLD.apply(); } catch (e) {} };
+          reapply();
+          setTimeout(reapply, 400); setTimeout(reapply, 1500);
           return Promise.resolve(csv);
         }
         if (k === "ROTATION") return Promise.resolve(buildRotation());

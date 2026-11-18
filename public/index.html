@@ -2194,7 +2194,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   loadHist(false);
   /* re-pull history when the set of US-listed tickers changes, so new holdings get prices and charts */
   const histSigOf=items=>(items||[]).filter(h=>h&&h.tk!=="CASH").map(h=>h.tk+"|"+h.cur).sort().join(",");
-  let histSig=histSigOf((()=>{try{return JSON.parse(localStorage.getItem("ptpub.v1.db.holdings/all")).items}catch(e){return[]}})());
+  let histSig=histSigOf((()=>{try{return JSON.parse(localStorage.getItem(PT_NS+"db.holdings/all")).items}catch(e){return[]}})());
   let valSig=null;window.PT_ONHOLD=()=>{const vs=phLoad().items.map(h=>h.tk).filter(t=>t&&t!=="CASH").sort().join(",");if(valSig!==null&&vs!==valSig&&window.PT_RELOAD_VAL)window.PT_RELOAD_VAL();valSig=vs;const sig=histSigOf(phLoad().items);if(sig!==histSig){histSig=sig;if(window.PT_DATA_SOURCE)loadHist(true)}};
   mcp.watchTool(DRIVE,TOOL,{fileId:ROT_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"D|SPY");if(!t){if(!S.rot){S.rotErr="Rotation data export could not be read.";renderRotation()}return}
