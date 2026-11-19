@@ -1,0 +1,134 @@
+<!doctype html>
+<!--GENERATED-->
+<html lang="en" data-theme="dark">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B1220">
+<title>LEKHA Financials · Investment Intelligence Terminal</title>
+<link rel="icon" href="/v3/brand/lekha-logo-white.png">
+<script>/* V3 pre-paint: LEKHA theme (own key, never V2's), shared text size / density / language */
+try{var r=document.documentElement,p=JSON.parse(localStorage.getItem("ptpub.v1.prefs")||"null")||{},th=JSON.parse(localStorage.getItem("ptpub.v1.v3.theme")||"null")||"lekha-navy";
+if(th==="light"||th==="lekha-light")r.setAttribute("data-theme","light");
+if(th!=="lekha-navy"&&th!=="auto"&&th!=="light"&&th!=="dark"){var tv=JSON.parse(localStorage.getItem("ptpub.v1.themeVars")||"null");if(tv&&tv.id===th){r.setAttribute("data-theme",tv.kind);for(var k in tv.vars)r.style.setProperty(k,tv.vars[k]);r.style.setProperty("color-scheme",tv.kind)}}
+if(p.lang&&/^[a-zA-Z-]+$/.test(p.lang)&&p.lang!=="en")document.write('<script src="/i18n/'+p.lang+'.js"><\/script>');
+r.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[p.size]||1);if(p.density==="compact")r.setAttribute("data-density","compact")}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/v3/lekha-base.css">
+<link rel="stylesheet" href="/v3/lekha-v3.css">
+
+<header class="bar v3bar">
+  <a class="brand" href="/v3#/portfolio/overview" aria-label="LEKHA Financials home"><img src="/v3/brand/lekha-logo-white.png" srcset="/v3/brand/lekha-logo-white.png 1x, /v3/brand/lekha-logo-white@2x.png 2x" alt="LEKHA Financials" width="561" height="162"></a>
+  <span class="tick" id="brand-tier"></span>
+  <div class="seg tabs" hidden><button id="tb-ov">Overview</button><button id="tb-val">Intrinsic value</button><button id="tb-set">Settings</button></div>
+  <div class="status">
+    <span class="pill" id="st-prices">Prices: loading</span>
+    <span class="pill" id="st-news">News: loading</span>
+    <div class="seg" role="group" aria-label="Display currency"><button id="cur-usd" aria-pressed="true">USD</button><button id="cur-thb" aria-pressed="false">THB</button></div>
+    <button class="btn" id="refresh" title="Refresh prices">Refresh</button>
+    <button class="btn" id="v3-settings" type="button" aria-haspopup="dialog">Settings</button>
+    <a class="btn notranslate" translate="no" id="to-v2" href="/v2" title="Open the classic V2 terminal">V2</a>
+    <a class="btn" id="acct" href="/login.html" title="Sign in">Sign in</a>
+  </div>
+</header>
+<nav class="v3nav" id="v3nav" role="tablist" aria-label="LEKHA research areas">
+  <button role="tab" data-t="portfolio" id="nt-portfolio" aria-controls="t-portfolio">My Portfolio</button>
+  <button role="tab" data-t="simulation" id="nt-simulation" aria-controls="t-simulation">Intelligent Simulation</button>
+  <button role="tab" data-t="macro" id="nt-macro" aria-controls="t-macro">Macroeconomics &amp; Indicators</button>
+  <button role="tab" data-t="analysis" id="nt-analysis" aria-controls="t-analysis">Deep Analysis &amp; Council</button>
+  <button role="tab" data-t="sector" id="nt-sector" aria-controls="t-sector">Sector Rotation</button>
+</nav>
+
+<div class="wrap">
+<!--@demo-banner-->
+<p class="v3crumb" id="v3crumb" aria-live="polite"></p>
+
+<main id="v3main">
+<section class="v3tab" id="t-portfolio" role="tabpanel" aria-labelledby="nt-portfolio" hidden>
+  <div class="v3sub" role="tablist" aria-label="My Portfolio"><button role="tab" data-s="overview">Overview</button><button role="tab" data-s="holdings">Holdings</button><button role="tab" data-s="risk">Risk</button></div>
+  <div class="v3pane tabpane" id="tab-pf-overview" data-s="overview">
+<!--@kpis-->
+<!--@summary-->
+<!--@perf-->
+  </div>
+  <div class="v3pane tabpane" id="tab-pf-holdings" data-s="holdings" hidden>
+<!--@hold-->
+<!--@ledger-->
+  </div>
+  <div class="v3pane tabpane" id="tab-pf-risk" data-s="risk" hidden>
+<!--@risk-->
+  </div>
+</section>
+
+<section class="v3tab" id="t-simulation" role="tabpanel" aria-labelledby="nt-simulation" hidden>
+  <div class="v3pane" id="tab-sim" data-s="main"><div id="lekha-sim"><div class="empty">Loading the simulation engine…</div></div></div>
+</section>
+
+<section class="v3tab" id="t-macro" role="tabpanel" aria-labelledby="nt-macro" hidden>
+  <div class="v3sub" role="tablist" aria-label="Macroeconomics and indicators"><button role="tab" data-s="regime">Macro Regime</button><button role="tab" data-s="rotation">Market Rotation</button><button role="tab" data-s="intel">Market Intelligence</button><button role="tab" data-s="appetite">Risk Appetite</button></div>
+  <div class="v3pane tabpane" id="tab-mac-regime" data-s="regime">
+<!--@macro-->
+  </div>
+  <div class="v3pane tabpane" id="tab-mac-rotation" data-s="rotation" hidden>
+<!--@rot-->
+  </div>
+  <div class="v3pane tabpane" id="tab-mac-intel" data-s="intel" hidden>
+<!--@news-->
+  </div>
+  <div class="v3pane tabpane" id="tab-mac-appetite" data-s="appetite" hidden>
+<!--@ra-->
+  </div>
+</section>
+
+<section class="v3tab" id="t-analysis" role="tabpanel" aria-labelledby="nt-analysis" hidden>
+  <div class="v3sub" role="tablist" aria-label="Deep analysis and council"><button role="tab" data-s="value">Intrinsic Value &amp; MOS</button><button role="tab" data-s="deep">Holdings Deep Analysis</button><button role="tab" data-s="council">LLM Council</button><button role="tab" data-s="reports">AI Research Reports</button></div>
+  <div class="v3pane tabpane" id="tab-val" data-s="value">
+<!--@val-->
+  </div>
+  <div class="v3pane" id="tab-an-deep" data-s="deep" hidden><div id="lekha-deep"></div></div>
+  <div class="v3pane" id="tab-an-council" data-s="council" hidden><div id="lekha-council"></div></div>
+  <div class="v3pane" id="tab-an-reports" data-s="reports" hidden><div id="v3-ai-host"></div><div id="lekha-reports"></div></div>
+</section>
+
+<section class="v3tab" id="t-sector" role="tabpanel" aria-labelledby="nt-sector" hidden>
+  <div class="v3sub" role="tablist" aria-label="Sector rotation intelligence"><button role="tab" data-s="now">Right Now</button><button role="tab" data-s="rrg">Rotation Graph</button><button role="tab" data-s="lead">Leadership Quality</button><button role="tab" data-s="breadth">Sector Breadth</button></div>
+  <div class="v3pane tabpane" id="tab-sec-now" data-s="now">
+<!--@intel-->
+<!--@rot-sum-->
+  </div>
+  <div class="v3pane tabpane" id="tab-sec-rrg" data-s="rrg" hidden>
+<!--@rrg-->
+  </div>
+  <div class="v3pane tabpane" id="tab-sec-lead" data-s="lead" hidden>
+<!--@lead-->
+  </div>
+  <div class="v3pane tabpane" id="tab-sec-breadth" data-s="breadth" hidden>
+<!--@br-->
+  </div>
+</section>
+</main>
+<!--@footer-->
+</div>
+
+<div id="v3-drawer-bg" hidden></div>
+<aside id="v3-drawer" role="dialog" aria-modal="true" aria-labelledby="v3-drawer-t" hidden>
+  <div class="v3dh"><h2 id="v3-drawer-t">Settings</h2><button class="btn" id="v3-drawer-x" type="button">Close</button></div>
+  <div id="tab-set" class="tabpane"><div class="empty">Loading settings…</div></div>
+</aside>
+
+<script>window.LEKHA_LAYOUT={tabs:["pf-overview","pf-holdings","pf-risk","mac-regime","mac-rotation","mac-intel","mac-appetite","val","sec-now","sec-rrg","sec-lead","sec-breadth"],
+names:{"pf-overview":"My Portfolio · Overview","pf-holdings":"My Portfolio · Holdings","val":"Deep Analysis · Intrinsic Value","sec-now":"Sector Rotation · Right Now"}};</script>
+<script src="/v2/pt-i18n.js"></script>
+<script src="/pt-demo.js"></script>
+<script src="/pt-chunk.js"></script>
+<script src="/pt-datasource.js"></script>
+<script src="/pt-state.js"></script>
+<script src="/v3/lekha-engine.js"></script>
+<script src="/v3/lekha-themes.js"></script>
+<script src="/v2/pt-import.js"></script>
+<script src="/v3/lekha-ui.js"></script>
+<script src="/v3/lekha-analyst.js"></script>
+<script src="/v3/lekha-account.js"></script>
+<script src="/v3/lekha-shell.js"></script>
+<script type="module" src="/v3/lekha-modules.js"></script>
+</html>

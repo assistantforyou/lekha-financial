@@ -54,6 +54,26 @@ export function plan(inp) {
   return { mu, macroRisk, personas: out };
 }
 
+/* ---------- the daily-return model, shared by CouncilRun and runStream (one copy of the model, no duplicates) ---------- */
+function dailyModel(inp, A, muAnnual) {
+  const byDay = new Map(); for (const e of inp.events) { if (e.day < 1 || e.day > DAYS) continue; if (!byDay.has(e.day)) byDay.set(e.day, []); byDay.get(e.day).push(e); }
+  return {
+    sigM: clamp(inp.market.vol, 0.1, 0.4) / Math.sqrt(DAYS) / Math.sqrt(1.336), mu: muAnnual.map((m) => m / DAYS),
+    idioD: A.map((a) => Math.max(0.01, a.idio) / Math.sqrt(DAYS)), beta: A.map((a) => a.beta), byDay, idx: A.reduce((m, a, i) => (m[a.tk] = i, m), {}),
+  };
+}
+/* standard normal (polar method, keeps the spare); S needs rnd() and spare */
+function gauss(S) { if (S.spare !== null) { const s = S.spare; S.spare = null; return s; } let u, v, s; do { u = S.rnd() * 2 - 1; v = S.rnd() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0); const f = Math.sqrt(-2 * Math.log(s) / s); S.spare = v * f; return u * f; }
+/* per-path regime: 15% of futures are "stormy" (1.8x market vol, 1.32x idiosyncratic vol) */
+const regime = (S) => (S.rnd() < 0.15 ? 1.8 : 1);
+/* one trading day: market shock + dated macro jumps, then each asset's beta * market + own noise + its earnings jump */
+function dayReturns(S, d, sigM, idioMult, rets) {
+  const N = rets.length, mu = S.mu, beta = S.beta, idioD = S.idioD;
+  let m = S.norm() * sigM; const evs = S.byDay.get(d); let jumps = null;
+  if (evs) for (const e of evs) { const jump = KAPPA * e.lean * e.sigma + S.norm() * e.sigma; if (e.kind === "earnings") { const i = S.idx[e.tk]; if (i != null) (jumps || (jumps = {}))[i] = (jumps && jumps[i] || 0) + jump; } else m += jump; }
+  for (let i = 0; i < N; i++) rets[i] = mu[i] + beta[i] * m + S.norm() * idioD[i] * idioMult + (jumps && jumps[i] || 0);
+}
+
 export class CouncilRun {
   constructor(inp) {
     this.inp = inp; this.P = PERSONAS.length; this.N = inp.assets.length; this.paths = inp.paths; this.done = 0;
@@ -63,30 +83,24 @@ export class CouncilRun {
     this.fin = HORIZONS.map(() => PERSONAS.map(() => new Float32Array(this.paths)));
     this.dd = HORIZONS.map(() => PERSONAS.map(() => new Float32Array(this.paths)));
     this.fan = new Float32Array(P * this.fanN * this.cps);
-    this.sigM = clamp(inp.market.vol, 0.1, 0.4) / Math.sqrt(DAYS) / Math.sqrt(1.336);
-    this.mu = this.plan.mu.map((m) => m / DAYS);
-    this.idioD = A.map((a) => Math.max(0.01, a.idio) / Math.sqrt(DAYS));
-    this.beta = A.map((a) => a.beta);
-    this.byDay = new Map(); for (const e of inp.events) { if (e.day < 1 || e.day > DAYS) continue; if (!this.byDay.has(e.day)) this.byDay.set(e.day, []); this.byDay.get(e.day).push(e); }
-    this.idx = inp.assets.reduce((m, a, i) => (m[a.tk] = i, m), {});
+    Object.assign(this, dailyModel(inp, A, this.plan.mu));
     this.vw = new Float64Array(P * N); this.vc = new Float64Array(P);
     this.target = PERSONAS.map((id) => this.plan.personas[id]);
     this.every = PERSONAS.map((id) => RULES[id].every);
     this.cost = COST;
   }
-  norm() { if (this.spare !== null) { const s = this.spare; this.spare = null; return s; } let u, v, s; do { u = this.rnd() * 2 - 1; v = this.rnd() * 2 - 1; s = u * u + v * v; } while (s >= 1 || s === 0); const f = Math.sqrt(-2 * Math.log(s) / s); this.spare = v * f; return u * f; }
+  norm() { return gauss(this); }
   step(n) {
-    const { P, N, inp } = this, A = inp.assets, mu = this.mu, beta = this.beta, idioD = this.idioD, vw = this.vw, vc = this.vc, rf = inp.market.rf / DAYS, ev = this.byDay;
+    const { P, N, inp } = this, A = inp.assets, vw = this.vw, vc = this.vc, rf = inp.market.rf / DAYS;
     const rets = new Float64Array(N), last21 = new Float64Array(N), idxv = new Float64Array(N), peak = new Float64Array(P), mdd = new Float64Array(P), cool = new Int16Array(P);
     const end = Math.min(this.paths, this.done + n);
     for (let p = this.done; p < end; p++) {
-      const storeFan = p < this.fanN, vm = this.rnd() < 0.15 ? 1.8 : 1, sigM = this.sigM * vm, idioMult = 0.6 + 0.4 * vm;
+      const storeFan = p < this.fanN, vm = regime(this), sigM = this.sigM * vm, idioMult = 0.6 + 0.4 * vm;
       for (let k = 0; k < P; k++) { const t = this.target[k]; const tr = t.turnover * this.cost * 2; for (let i = 0; i < N; i++) vw[k * N + i] = t.w[i] * (1 - tr); vc[k] = t.cash * (1 - tr); }
       peak.fill(1); mdd.fill(0); cool.fill(0); idxv.fill(1); last21.fill(1);
       for (let d = 1; d <= DAYS; d++) {
-        let m = this.norm() * sigM; const evs = ev.get(d); let jumps = null;
-        if (evs) for (const e of evs) { const jump = KAPPA * e.lean * e.sigma + this.norm() * e.sigma; if (e.kind === "earnings") { const i = this.idx[e.tk]; if (i != null) (jumps || (jumps = {}))[i] = (jumps && jumps[i] || 0) + jump; } else m += jump; }
-        for (let i = 0; i < N; i++) { const r = mu[i] + beta[i] * m + this.norm() * idioD[i] * idioMult + (jumps && jumps[i] || 0); rets[i] = r; idxv[i] *= 1 + r; }
+        dayReturns(this, d, sigM, idioMult, rets);
+        for (let i = 0; i < N; i++) idxv[i] *= 1 + rets[i];
         for (let k = 0; k < P; k++) {
           let tot = 0, base = k * N; vc[k] *= 1 + rf;
           for (let i = 0; i < N; i++) { const v = vw[base + i] * (1 + rets[i]); vw[base + i] = v; tot += v; }
@@ -135,4 +149,34 @@ export class CouncilRun {
     });
     return out;
   }
+}
+
+/* ---------- streaming: the "hold your current weights" portfolio, one path at a time, nothing stored ----------
+   Same daily-return model as CouncilRun (dailyModel / regime / dayReturns above). Assets you do not hold (w = 0) are left
+   out: holdings are independent given the market shock, so they cannot change your portfolio, only cost time.
+   onPath(p, value, dd) is called once per path with two reused Float64Array(DAYS + 1) buffers:
+   value[d] = portfolio value after day d (value[0] = 1), dd[d] = worst peak-to-trough drawdown seen up to day d.
+   Copy anything you need to keep; the buffers are overwritten by the next path. Returns the number of paths run. */
+export const STREAM_MODEL_VERSION = "council-hold-1";
+export const STREAM_DAYS = DAYS;
+export function runStream(inp, seed, n, onPath) {
+  const pl = plan(inp), you = pl.personas.you, keep = [];
+  for (let i = 0; i < inp.assets.length; i++) if (you.w[i] > 0) keep.push(i);
+  const A = keep.map((i) => inp.assets[i]), w = keep.map((i) => you.w[i]), N = A.length, cash = you.cash, rf = inp.market.rf / DAYS;
+  const S = { ...dailyModel(inp, A, keep.map((i) => pl.mu[i])), rnd: mulberry(seed >>> 0), spare: null, norm() { return gauss(this); } };
+  const rets = new Float64Array(N), vw = new Float64Array(N), value = new Float64Array(DAYS + 1), dd = new Float64Array(DAYS + 1);
+  for (let p = 0; p < n; p++) {
+    const vm = regime(S), sigM = S.sigM * vm, idioMult = 0.6 + 0.4 * vm;
+    for (let i = 0; i < N; i++) vw[i] = w[i];
+    let vc = cash, peak = 1, mdd = 0; value[0] = 1; dd[0] = 0;
+    for (let d = 1; d <= DAYS; d++) {
+      dayReturns(S, d, sigM, idioMult, rets);
+      vc *= 1 + rf; let tot = vc;
+      for (let i = 0; i < N; i++) { const v = vw[i] * (1 + rets[i]); vw[i] = v; tot += v; }
+      if (tot > peak) peak = tot; const x = 1 - tot / peak; if (x > mdd) mdd = x;
+      value[d] = tot; dd[d] = mdd;
+    }
+    onPath(p, value, dd);
+  }
+  return n;
 }

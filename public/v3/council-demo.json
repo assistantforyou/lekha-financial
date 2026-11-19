@@ -1,0 +1,419 @@
+{
+  "version": 1,
+  "label": "SIMULATED DEMONSTRATION — NOT LIVE ANALYSIS",
+  "notice": "Pre-written, deterministic illustrations built on the fictional demo portfolio. No model was called, no market data was read, and nothing here is investment advice. All figures are illustrative.",
+  "scenarios": [
+    {
+      "id": "buy-nvda",
+      "question": "Should I buy NVDA?",
+      "scope": "NVDA",
+      "label": "SIMULATED DEMONSTRATION — NOT LIVE ANALYSIS",
+      "generatedAt": "illustrative",
+      "perspectives": {
+        "investor": {
+          "stance": "bullish",
+          "headline": "A durable franchise, but the demo book already owns the thesis.",
+          "points": [
+            "The moat is the software and systems stack, not the chip alone: developer tooling, networking and full-rack integration raise switching costs well beyond a single product cycle.",
+            "Accelerated compute is still early in its adoption curve outside the largest cloud buyers; enterprise, sovereign and inference workloads broaden the customer base over a multi-year horizon.",
+            "Management has repeatedly reinvested at the frontier rather than harvesting margin, which is the behaviour a long-duration owner wants to see.",
+            "The position is the demo portfolio's largest single holding and sits on a large unrealised gain, so the owner already has meaningful exposure to the outcome."
+          ],
+          "risks": [
+            "Hyperscaler customers are concentrated and are actively designing in-house silicon to capture margin.",
+            "A franchise can be excellent and still deliver poor returns if purchased at a price that already discounts a decade of success."
+          ]
+        },
+        "analyst": {
+          "stance": "neutral",
+          "headline": "Earnings power is real; the debate is the durability of peak margins.",
+          "points": [
+            "Illustratively, if data-centre revenue were to grow at a mid-20s rate for three years and then fade, today's multiple would compress toward the semiconductor group's long-run range without the share price needing to rise; the stock would be a 'hold the line' rather than a re-rating story.",
+            "Gross margin is the swing factor: every few points of mix shift toward lower-margin systems or competitive pricing moves the earnings estimate more than unit volume does.",
+            "Supply, not demand, has set the pace of recent results; normalising lead times would reveal true end-demand for the first time in several cycles.",
+            "Within the demo book, NVDA is also held indirectly through the SMH ETF, so the true look-through weight is higher than the line item suggests."
+          ],
+          "risks": [
+            "Inventory and order data are lagging indicators in a capex cycle; revisions tend to turn faster than consensus models.",
+            "Export controls can remove a regional revenue stream with little notice."
+          ]
+        },
+        "pessimist": {
+          "stance": "bearish",
+          "headline": "Every capex boom ends in digestion, and this one is priced as if it will not.",
+          "points": [
+            "Customer capex is funded by a small number of balance sheets whose own investors are beginning to ask for a return on that spend; a single guidance cut ripples through the whole supply chain.",
+            "Historical semiconductor cycles show peak-to-trough drawdowns that would erase years of gains in a holding with this volatility profile.",
+            "The demo portfolio is already roughly one-third semiconductors before any purchase; adding NVDA increases a bet that is already the dominant driver of the book's risk.",
+            "AMD and TSLA in the same portfolio are underwater, a reminder that high-beta growth exposures can mean-revert together."
+          ],
+          "risks": [
+            "Being early on a bearish call is costly: momentum in leadership stocks can persist far longer than valuation work implies.",
+            "If inference demand proves structurally larger than training demand, the digestion phase may be shallow."
+          ]
+        },
+        "allocator": {
+          "stance": "neutral",
+          "headline": "Size first, thesis second: the marginal dollar should not go here.",
+          "points": [
+            "Combining the direct line, SMH look-through and the AMD and AVGO positions, the book's effective exposure to one AI-capex factor is already the largest single risk budget in the portfolio.",
+            "Kelly-style illustration: assume a 55% chance of a +40% outcome against a 45% chance of a −35% outcome over a year. Full Kelly (p/a − q/b) suggests roughly 45% of capital, an absurd figure that shows how sensitive Kelly is to optimistic inputs.",
+            "Haircut the edge for estimation error (shrink the win probability toward 50%, widen the loss) and apply half-Kelly or less: the defensible position size collapses to the low-to-mid single digits of the book, below what NVDA already represents.",
+            "If conviction is high, the cleaner expression is to keep NVDA and trim overlapping exposure (SMH or AMD) rather than add, keeping total semiconductor risk unchanged."
+          ],
+          "risks": [
+            "Trimming overlap realises gains or losses and may carry tax consequences in a real account.",
+            "Kelly inputs here are illustrative; with real uncertainty the 'right' size is a range, not a point."
+          ]
+        },
+        "optimist": {
+          "stance": "bullish",
+          "headline": "The market keeps underestimating how many workloads move onto accelerators.",
+          "points": [
+            "Each new model generation has required step-changes in compute, and inference at scale turns a training cycle into a recurring utility-like demand stream.",
+            "Platform transitions reward the incumbent that owns the developer ecosystem; competitors are chasing a moving target.",
+            "Software and networking attach rates are rising, which could make the earnings stream less cyclical than historical chip peers.",
+            "A disciplined staged entry on pullbacks lets an owner participate without paying peak sentiment in one ticket."
+          ],
+          "risks": [
+            "Optimistic scenarios are already widely held, limiting upside from positive surprises.",
+            "A technology shift in model architecture could reduce compute intensity per unit of output."
+          ]
+        }
+      },
+      "ceo": {
+        "verdict": "Hold",
+        "executive": "Hold the existing position; do not add. The council agrees on the quality of the franchise and disagrees on price and cycle timing, while the sizing work shows the demo book is already at or above a prudent exposure to this single factor.",
+        "thesis": "NVDA is a high-quality platform business in an early-stage adoption curve, but the decision for this portfolio is about concentration, not about whether the company is good. The incremental dollar improves the book's outcome more if it reduces, rather than deepens, the AI-capex bet.",
+        "bullCase": "Inference becomes a recurring, utility-like demand stream; software and networking attach make margins stickier than prior cycles; enterprise and sovereign buyers broaden revenue beyond a few hyperscalers.",
+        "bearCase": "Customer capex digests after a multi-year build-out, gross margin normalises under competitive and custom-silicon pressure, and a high-beta book with correlated semiconductor holdings draws down together.",
+        "valuation": "On illustrative assumptions the shares already discount sustained high growth followed by a gentle fade. Upside requires growth to persist longer than that path; downside is large if margins revert toward the group average. Valuation is neither a clear buy signal nor a clear sell signal.",
+        "portfolio": "NVDA is the demo portfolio's largest line and carries additional look-through exposure via SMH, alongside AMD and AVGO. Semiconductors are roughly a third of the book and, with megacap tech, the majority of risk. Adding NVDA would push single-factor concentration further.",
+        "agree": [
+          "The franchise is high quality with real switching costs.",
+          "The demo book already holds meaningful direct and indirect NVDA exposure.",
+          "Gross margin durability is the key variable to monitor."
+        ],
+        "dissent": [
+          { "lens": "Optimist", "reason": "Argues a staged entry is justified because the market structurally underestimates inference demand." },
+          { "lens": "Pessimist", "reason": "Would trim rather than hold, viewing the capex cycle as late and the book as already over-exposed." }
+        ],
+        "evidenceQuality": "Moderate. The qualitative competitive picture is well established; forward demand, margin trajectory and customer capex plans are inherently uncertain, and all numbers in this demonstration are illustrative.",
+        "limitations": [
+          "This is a simulated demonstration with pre-written content; no live prices, filings or estimates were used.",
+          "Kelly inputs are hypothetical and chosen to illustrate method, not to forecast returns.",
+          "Tax, account type and the investor's personal circumstances are not considered."
+        ],
+        "final": "Hold NVDA at its current size. If the owner wants more AI exposure, reconsider the overlap between NVDA, SMH and AMD first; any new purchase should be staged and kept within a total semiconductor budget set in advance."
+      },
+      "meta": { "demo": true, "llmRequests": 0 }
+    },
+    {
+      "id": "biggest-risk",
+      "question": "What is my portfolio's biggest risk?",
+      "scope": "portfolio",
+      "label": "SIMULATED DEMONSTRATION — NOT LIVE ANALYSIS",
+      "generatedAt": "illustrative",
+      "perspectives": {
+        "investor": {
+          "stance": "neutral",
+          "headline": "The book is a single thesis wearing thirteen tickers.",
+          "points": [
+            "Semiconductors, megacap platforms and TSLA all depend on the same narrative: sustained technology capex and long-duration growth being rewarded by the market.",
+            "The holdings are individually defensible businesses, so the risk is not company quality but how few genuinely independent bets the portfolio contains.",
+            "A long-horizon owner can tolerate volatility, but should be deliberate that the outcome rests mainly on one secular trend."
+          ],
+          "risks": [
+            "Diversifying away from the best-performing theme can feel like selling winners and may lag in a continued tech-led market.",
+            "Long-horizon tolerance can mask a behavioural risk: selling at the bottom of a deep drawdown."
+          ]
+        },
+        "analyst": {
+          "stance": "bearish",
+          "headline": "Factor concentration in high-beta growth dominates the risk decomposition.",
+          "points": [
+            "Weighting the demo position betas, the equity sleeve runs noticeably above market beta; semiconductors alone contribute a disproportionate share of total variance relative to their capital weight.",
+            "Pairwise correlations among NVDA, AMD, AVGO and SMH are high, so in a stress window they behave close to one position.",
+            "Illustrative stress: a growth-led drawdown similar in shape to past tech corrections would hit the technology cluster far harder than the defensives (JNJ, PEP) and energy names can offset.",
+            "Currency is a secondary exposure: 0700.HK and PTT.BK introduce HKD and THB translation risk, small in weight but uncorrelated to the main factor."
+          ],
+          "risks": [
+            "Correlations are regime-dependent; historical estimates may understate co-movement in a real stress.",
+            "Beta and correlation inputs in the demo are synthetic, so the decomposition is directional only."
+          ]
+        },
+        "pessimist": {
+          "stance": "bearish",
+          "headline": "A rate or earnings shock to long-duration growth would hit most of the book at once.",
+          "points": [
+            "If real yields move higher or AI capex guidance disappoints, the technology cluster reprices together, and the defensive sleeve is too small to cushion it.",
+            "Two of the growth names (AMD, TSLA) are already below cost, a sign that dispersion within the theme is rising.",
+            "Overseas holdings add a policy and regulatory layer (platform regulation, regional politics) that is hard to hedge.",
+            "Concentrated gains in NVDA create a temptation to anchor on past winners rather than on forward risk."
+          ],
+          "risks": [
+            "Defensive repositioning has an opportunity cost if the growth regime continues.",
+            "Shocks are rarely the ones anticipated; over-hedging a single scenario can create new exposures."
+          ]
+        },
+        "allocator": {
+          "stance": "neutral",
+          "headline": "Budget risk, not capital: cap the technology factor and let cash do work.",
+          "points": [
+            "Set an explicit risk budget for the technology factor (for example, no more than half of portfolio volatility from one theme) and size positions to it instead of to dollar weights.",
+            "The cash sleeve is meaningful in the demo book and is the cheapest diversifier available; deploying part of it into low-correlation exposures improves balance without selling winners.",
+            "Kelly framing at the portfolio level: correlated bets should be treated as one bet. Three semiconductor positions each sized at a 'reasonable' fraction add up to a combined Kelly fraction far above what a haircut, uncertainty-adjusted estimate supports.",
+            "A rebalancing band (trim when a theme drifts well above target) turns concentration control into a rule rather than a judgement call under pressure."
+          ],
+          "risks": [
+            "Rules-based trims can repeatedly cut a persistent winner.",
+            "Deploying cash into diversifiers may simply add new, unfamiliar risks if chosen without care."
+          ]
+        },
+        "optimist": {
+          "stance": "neutral",
+          "headline": "The concentration is the source of past returns; manage it, don't abandon it.",
+          "points": [
+            "The technology cluster holds the businesses with the strongest earnings growth in the book; concentration is why the portfolio has compounded well.",
+            "Financials, energy, health care and staples are real ballast, and the cash sleeve already provides optionality to buy into weakness.",
+            "Modest trims plus a cash deployment plan can reduce tail risk while preserving most of the upside."
+          ],
+          "risks": [
+            "Optimism about the theme may underweight how quickly correlated positions fall together.",
+            "Holding cash for 'optionality' has a real cost if the opportunity never arrives."
+          ]
+        }
+      },
+      "ceo": {
+        "verdict": "Reduce",
+        "executive": "The biggest risk is factor concentration: the semiconductor and megacap technology cluster, plus TSLA, drives most of the portfolio's volatility and would fall together in a growth or rate shock. Reduce that concentration at the margin, using cash and trims of overlapping semiconductor exposure.",
+        "thesis": "The portfolio contains good businesses but few independent bets. Risk should be budgeted by factor, and the technology factor currently consumes far more of the risk budget than its share of capital implies.",
+        "bullCase": "Technology leadership persists, earnings growth justifies valuations, and the concentration continues to drive returns while the defensive sleeve and cash cushion modest drawdowns.",
+        "bearCase": "Higher real yields or an AI-capex disappointment reprices long-duration growth together; correlated holdings draw down as one and the small defensive sleeve cannot offset the loss.",
+        "valuation": "Not the primary lens here. The risk arises from correlation and beta rather than from any single holding being mispriced, although rich multiples in the cluster raise sensitivity to rate changes.",
+        "portfolio": "Roughly a third in semiconductors and about a quarter in megacap technology, with a meaningful cash sleeve and a smaller defensive allocation across financials, energy, health care and staples. Two currencies beyond USD add minor translation risk.",
+        "agree": [
+          "The technology cluster is the dominant risk driver.",
+          "Correlations among semiconductor holdings make them behave like one position in stress.",
+          "Cash is the most efficient tool for rebalancing."
+        ],
+        "dissent": [
+          { "lens": "Investor", "reason": "Accepts the concentration as a deliberate long-horizon bet and would rather hold than trim." },
+          { "lens": "Optimist", "reason": "Prefers deploying cash into diversifiers over trimming the winners that drove returns." }
+        ],
+        "evidenceQuality": "Moderate. Directionally robust (concentration is visible from weights and themes), but beta and correlation estimates in the demo are synthetic and stress outcomes are illustrative.",
+        "limitations": [
+          "Simulated demonstration only; no live risk model, prices or correlations were used.",
+          "The investor's horizon, liquidity needs and tax position are unknown.",
+          "Look-through ETF holdings are approximated qualitatively."
+        ],
+        "final": "Reduce the technology factor at the margin: set a risk budget for the theme, trim overlapping semiconductor exposure first, and stage part of the cash sleeve into low-correlation holdings using a rebalancing band."
+      },
+      "meta": { "demo": true, "llmRequests": 0 }
+    },
+    {
+      "id": "overvalued",
+      "question": "Is my portfolio overvalued?",
+      "scope": "portfolio",
+      "label": "SIMULATED DEMONSTRATION — NOT LIVE ANALYSIS",
+      "generatedAt": "illustrative",
+      "perspectives": {
+        "investor": {
+          "stance": "neutral",
+          "headline": "Premium prices for premium businesses; not a bubble, not a bargain.",
+          "points": [
+            "The growth holdings trade at premiums that reflect superior returns on capital and reinvestment runways; a quality premium is not by itself evidence of overvaluation.",
+            "The defensive and value holdings (JPM, XOM, PTT, JNJ, PEP) look more ordinary and balance the blended multiple.",
+            "For a long-term owner the relevant question is whether earnings can grow into today's price over five years, which is plausible for most but not all positions."
+          ],
+          "risks": [
+            "Quality premiums can compress for years even when businesses execute well.",
+            "A 'grow into it' thesis depends on forecasts that are least reliable at long horizons."
+          ]
+        },
+        "analyst": {
+          "stance": "bearish",
+          "headline": "The growth sleeve is priced near the top of its historical range.",
+          "points": [
+            "Illustratively, the capital-weighted earnings multiple of the technology cluster sits well above its own long-run median, while the defensive sleeve sits near its median; the blended book is rich because of mix, not uniformly.",
+            "Reverse-engineering the growth sleeve's price implies sustained double-digit earnings growth for most of a decade, an outcome historically achieved by a minority of large companies.",
+            "TSLA and the semiconductor names carry the widest gap between implied and base-rate growth; MSFT and AAPL are richer than history but supported by more predictable cash flows.",
+            "Energy and staples are fairly valued on normalised earnings but offer limited upside, which makes them ballast rather than return drivers."
+          ],
+          "risks": [
+            "Historical ranges were set in different rate regimes and may not be the right anchor.",
+            "Valuation is a poor timing tool; rich assets can stay rich."
+          ]
+        },
+        "pessimist": {
+          "stance": "bearish",
+          "headline": "Expectations are high enough that 'good' results may disappoint.",
+          "points": [
+            "When the implied growth hurdle is high, in-line results can produce negative returns; the book's largest names now need to beat, not meet.",
+            "Multiple compression and earnings disappointment often coincide, doubling the downside for richly valued holdings.",
+            "The unrealised gains in NVDA, MSFT and AAPL are paper wealth that reverts quickly if sentiment turns."
+          ],
+          "risks": [
+            "Calling overvaluation in leadership stocks has a long record of being early.",
+            "Rotating into 'cheap' holdings can mean buying value traps."
+          ]
+        },
+        "allocator": {
+          "stance": "neutral",
+          "headline": "Use valuation to shape sizing, not to make an all-or-nothing call.",
+          "points": [
+            "Tilt rather than switch: rich valuations lower expected return, which in a Kelly framework lowers the optimal fraction even if the probability of a good outcome is unchanged.",
+            "Kelly illustration: if a holding's expected excess return falls from an illustrative 8% to 4% at the same volatility, the growth-optimal fraction roughly halves. Apply a further uncertainty haircut, because valuation-based return forecasts are noisy.",
+            "Practically, that argues for trimming the richest positions toward a lower target weight and directing new cash toward the holdings or sectors priced nearer their history.",
+            "Keep a rebalancing rule so that further multiple expansion is harvested rather than allowed to raise concentration."
+          ],
+          "risks": [
+            "Expected-return estimates derived from valuation have wide error bands.",
+            "Tilting away from expensive leaders can lag a market that continues to reward them."
+          ]
+        },
+        "optimist": {
+          "stance": "bullish",
+          "headline": "Earnings, not multiples, have driven most of the gains.",
+          "points": [
+            "Much of the price appreciation in the leading holdings has been matched by earnings growth, so the multiple has expanded less than headlines suggest.",
+            "Platform businesses with recurring revenue and high margins deserve structurally higher multiples than the historical market average.",
+            "The book holds a reasonable amount of cash and fairly valued defensives, so its overall valuation risk is lower than its headline growth names imply."
+          ],
+          "risks": [
+            "Earnings growth at the leaders may slow as base effects get harder.",
+            "Structural-premium arguments are most popular near valuation peaks."
+          ]
+        }
+      },
+      "ceo": {
+        "verdict": "Hold",
+        "executive": "The portfolio is not uniformly overvalued. The growth sleeve is priced richly against its own history and implies demanding long-term growth, while the defensive sleeve is near fair value. Hold overall, but tilt new money and modest trims away from the richest positions.",
+        "thesis": "Valuation risk is concentrated in the technology cluster and TSLA. Rich prices lower expected returns rather than guarantee losses, so the response is a sizing tilt, not a wholesale exit.",
+        "bullCase": "Leading businesses keep growing earnings fast enough to absorb their multiples; recurring revenue models justify a structural premium; fairly valued defensives and cash limit downside.",
+        "bearCase": "Growth slows to base rates, multiples compress toward history, and in-line results produce negative returns in the holdings carrying the largest unrealised gains.",
+        "valuation": "Illustratively, the technology cluster's blended multiple sits well above its long-run median and implies sustained double-digit growth for years; the defensive and energy holdings sit near normalised fair value. The blended book screens rich because of mix.",
+        "portfolio": "Valuation exposure overlaps almost exactly with the factor concentration identified elsewhere: the richest holdings are also the largest weights and the most correlated.",
+        "agree": [
+          "Valuation risk sits mainly in the growth sleeve.",
+          "Defensive and energy holdings are close to fair value.",
+          "Valuation is a poor timing signal and should inform sizing, not a binary call."
+        ],
+        "dissent": [
+          { "lens": "Analyst", "reason": "Sees the growth sleeve's implied expectations as high enough to justify a more active reduction." },
+          { "lens": "Optimist", "reason": "Believes earnings growth has validated most of the move and that the book is reasonably priced overall." }
+        ],
+        "evidenceQuality": "Moderate to low for precision, reasonable for direction. Relative valuation versus history is a well-understood signal, but implied-growth estimates and the demo's figures are illustrative and sensitive to assumptions.",
+        "limitations": [
+          "Simulated demonstration only; no live multiples, estimates or prices were used.",
+          "Historical valuation ranges may not apply in a different rate regime.",
+          "No tax or account-level considerations are included."
+        ],
+        "final": "Hold the portfolio, with a tilt: direct new cash toward holdings priced nearer their history, trim the richest positions modestly on strength, and use a rebalancing band so further multiple expansion reduces rather than increases concentration."
+      },
+      "meta": { "demo": true, "llmRequests": 0 }
+    },
+    {
+      "id": "fed-positioning",
+      "question": "How should I position for the next Fed meeting?",
+      "scope": "portfolio",
+      "label": "SIMULATED DEMONSTRATION — NOT LIVE ANALYSIS",
+      "generatedAt": "illustrative",
+      "perspectives": {
+        "investor": {
+          "stance": "insufficient",
+          "headline": "A single meeting is noise to a long-horizon owner.",
+          "points": [
+            "One policy decision rarely changes the multi-year earnings power of the businesses in the book.",
+            "Trading around scheduled events tends to add costs and taxes without reliably improving outcomes.",
+            "The useful question is whether the portfolio can tolerate a range of rate paths, not how to predict one meeting."
+          ],
+          "risks": [
+            "A genuine regime change in policy can matter, and dismissing every meeting risks missing one that does.",
+            "Long-horizon framing can rationalise inaction when rebalancing is overdue."
+          ]
+        },
+        "analyst": {
+          "stance": "neutral",
+          "headline": "The market reaction depends on surprise versus expectations, not on the decision itself.",
+          "points": [
+            "Asset prices typically embed the expected decision ahead of the meeting; the move comes from guidance, projections and the press conference tone relative to that expectation.",
+            "The demo book's sensitivity is asymmetric: long-duration growth holdings respond most to changes in real yields, banks (JPM) respond to curve shape, and staples and health care respond least.",
+            "Overseas holdings react through the dollar: a hawkish surprise that strengthens USD reduces the translated value of the HKD and THB positions.",
+            "Without knowing current market pricing, any specific directional call would be unfounded; this demonstration does not use live expectations data."
+          ],
+          "risks": [
+            "Event-day reactions often reverse within days as the market digests the message.",
+            "Data released between now and the meeting can shift expectations more than the meeting itself."
+          ]
+        },
+        "pessimist": {
+          "stance": "bearish",
+          "headline": "The book is long duration in equity form, and that is the exposure a hawkish surprise punishes.",
+          "points": [
+            "A higher-for-longer message would pressure exactly the richly valued growth holdings that dominate the portfolio.",
+            "The bond-like defensives are too small a weight to offset a repricing of the technology cluster.",
+            "Event volatility can trigger forced selling in crowded growth trades, amplifying moves beyond fundamentals."
+          ],
+          "risks": [
+            "A dovish outcome would reward the existing tilt, and defensive repositioning would lag.",
+            "Hedging a single event is expensive and often mistimed."
+          ]
+        },
+        "allocator": {
+          "stance": "neutral",
+          "headline": "Position for a range of outcomes; do not size a bet on an unknowable coin flip.",
+          "points": [
+            "When the edge on an event is close to zero, Kelly sizing says the optimal bet is close to zero. Absent a genuine informational advantage, no tactical position is the growth-optimal choice.",
+            "Even an investor who believes they have a view should haircut it heavily: halve the estimated edge for uncertainty, then use a fraction of Kelly, which typically leaves a tactical tilt too small to be worth the transaction costs.",
+            "The productive action is structural: confirm that rate sensitivity across the book is within the owner's tolerance, and stage any planned cash deployment across several dates so no single meeting dictates the entry price.",
+            "If the owner is uncomfortable with the downside of a hawkish surprise, that discomfort is a signal the growth weight is already too high, a sizing problem to fix on its own merits."
+          ],
+          "risks": [
+            "Staging deployment can mean buying at higher prices if markets rally after the meeting.",
+            "Rate sensitivity estimates for the demo book are approximate."
+          ]
+        },
+        "optimist": {
+          "stance": "bullish",
+          "headline": "Clarity after the meeting tends to be a tailwind for quality growth.",
+          "points": [
+            "Uncertainty often peaks into the event; removing it can support risk assets regardless of the exact outcome.",
+            "Profitable large-cap technology holdings with net cash balance sheets are less rate-sensitive than unprofitable growth, so the book is better insulated than its growth label suggests.",
+            "The cash sleeve allows the owner to add on any event-driven sell-off rather than needing to predict it."
+          ],
+          "risks": [
+            "Relief rallies can fade if the message points to a longer restrictive stance.",
+            "Net-cash balance sheets do not protect valuations from a higher discount rate."
+          ]
+        }
+      },
+      "ceo": {
+        "verdict": "Insufficient Evidence",
+        "executive": "There is no evidence-based case for a tactical trade around a single Fed meeting in this demonstration. The council's useful output is structural: the portfolio is rate-sensitive through its growth concentration, and that should be addressed through sizing and staged cash deployment, not an event bet.",
+        "thesis": "Event outcomes are priced on surprise relative to expectations that this demonstration does not observe. With no edge, the growth-optimal tactical bet is approximately zero, so attention belongs on the portfolio's standing rate sensitivity.",
+        "bullCase": "A dovish or clarifying message lowers real yields and reduces uncertainty, supporting the long-duration growth holdings that dominate the book; cash can be deployed into any temporary weakness.",
+        "bearCase": "A hawkish surprise lifts real yields and strengthens the dollar, pressuring the richly valued technology cluster and reducing the translated value of the HKD and THB holdings, with too small a defensive sleeve to offset.",
+        "valuation": "Rich growth multiples raise the book's sensitivity to discount-rate changes; fairly valued defensives are less exposed. Valuation does not indicate the direction of a single meeting.",
+        "portfolio": "Rate exposure is concentrated in the semiconductor, megacap technology and TSLA holdings. JPM has a curve-shape sensitivity, energy is driven more by commodities, and staples and health care are the least rate-sensitive. The cash sleeve is the main source of flexibility.",
+        "agree": [
+          "No reliable edge exists on a single meeting without live expectations data.",
+          "The growth concentration is the main channel of rate risk.",
+          "Cash deployment should be staged rather than timed to the event."
+        ],
+        "dissent": [
+          { "lens": "Pessimist", "reason": "Would reduce long-duration growth exposure before the meeting rather than treating it as noise." },
+          { "lens": "Optimist", "reason": "Sees post-meeting clarity as a likely tailwind and would be ready to add on weakness." }
+        ],
+        "evidenceQuality": "Low for any directional call; adequate for the structural observation that the book's rate sensitivity runs through its growth concentration. No live policy expectations, yields or prices were used.",
+        "limitations": [
+          "Simulated demonstration with pre-written content; it does not know current market pricing or the meeting date.",
+          "Rate-sensitivity statements are qualitative and based on the fictional demo book.",
+          "Macro events can be overtaken by data releases before the meeting."
+        ],
+        "final": "Make no event-driven trade. Review whether the portfolio's growth weight is within the owner's tolerance for a range of rate outcomes, and stage any cash deployment across several dates instead of around the meeting."
+      },
+      "meta": { "demo": true, "llmRequests": 0 }
+    }
+  ]
+}
