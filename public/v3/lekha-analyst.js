@@ -169,9 +169,31 @@
     return DEMO.p;
   }
 
+  /* Is this question about the portfolio at all? The analyst answers from this book — prices,
+     weights, P&L, risk, valuation, exposure — and says so plainly when a question is outside it
+     instead of dumping the portfolio summary as if it were an answer. */
+  function onTopic(q, rows) {
+    var lq = " " + String(q || "").toLowerCase() + " ";
+    var terms = /\b(portfolio|holding|holdings|position|positions|book|allocation|weight|weights|p&l|pnl|profit|loss|gain|gains|cost|basis|risk|risky|volatil\w*|beta|concentrat\w*|diversif\w*|sector|sectors|theme|themes|exposure|drawdown|valuation|valued|intrinsic|margin|multiple|pe|price.?to.?earnings|cash|buy|sell|trim|add|rebalance|hedge|performance|doing|worth|value|returns?|today|week|month|quarter|year|fall|fell|rise|rose|move|moved)\b/;
+    if (terms.test(lq)) return true;
+    for (var i = 0; i < rows.length; i++) { var t = String(rows[i].tk || "").toLowerCase(); if (t && lq.indexOf(" " + t) >= 0) return true; }
+    return false;
+  }
+  function demoScopeAnswer() {
+    return {
+      answer: "That is outside what this analyst can answer. It only sees the numbers in your portfolio — positions, weights, P&L, cost basis, risk, exposure and valuation — and it cannot verify or comment on claims about named people, private lives, lawsuits or news it has not been given. Ask it about the book and it will answer with the actual figures.",
+      points: [
+        { title: "Try instead", detail: "\"Which position is my biggest risk?\" · \"What is my sector exposure?\" · \"How is the portfolio doing today?\" · \"Which holdings are furthest below cost?\"" },
+        { title: "Why it stops here", detail: "Answering a question like that from this data would be a guess dressed as analysis, and the demo has no news or filing evidence for it." }
+      ],
+      tickers: []
+    };
+  }
+
   function demoAnswer(q) {
     var c = DEMO.ctx; if (!c) return null;
     var lq = String(q || "").toLowerCase(), rows = c.rows;
+    if (!onTopic(q, rows)) return demoScopeAnswer();
     var day = rows.slice().sort(function (a, b) { return (b.day || 0) - (a.day || 0); });
     var best = day[0], worst = day[day.length - 1];
     var byPnl = rows.slice().sort(function (a, b) { return (b.pnlPct || 0) - (a.pnlPct || 0); });
