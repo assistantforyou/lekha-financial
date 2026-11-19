@@ -69,3 +69,9 @@ open http://localhost:3456/v3?demo=1#/portfolio/overview
 - Server log: `council-v3 failed: 429 upstream_1305` = Z.ai overloaded / rate-limited (its retries were exhausted). Test #1 matched the same ~21 s pattern, so truncation was not the cause; the 4000-token change was reverted.
 - Not a V3 code defect: auth, Premium gate, single request and frontend error handling all PASS. The Council has no fallback model by design (one-model rule), so it fails while Z.ai is busy.
 - Options (owner decision): (a) retry later when Z.ai is not overloaded; (b) allow the existing Gemini fallback only when Z.ai returns 1305/429 (still one inference reaches a model, but a different model); (c) check Z.ai plan concurrency limits for `glm-4.6v-flash` (`NEWS_MODEL`).
+
+## Live Premium Council test #3 (local) — PASS
+- Change: council-v3 falls back to Gemini ONLY when Z.ai returns 429 / 1305 / 1302 (owner-approved). Z.ai budget 30 s + Gemini 24 s stays under Vercel's 60 s. Other Z.ai errors still fail without a second call. The report header and `meta.fallback` disclose when Gemini answered. Tests updated; `_councilv3`, `_llm` pass.
+- Result (scope NVDA, owner's account, local-only Premium override removed afterwards): HTTP 200 in ~30 s; one successful inference (`meta.llmRequests: 1`, Z.ai 429 after 4 retries → Gemini `gemini-3.5-flash-lite`); all five perspectives + CEO (12/12 fields), 2 dissents recorded; frontend rendered five cards, CEO verdict and report.
+- Quality: verdict "Insufficient Evidence" — correct, because NVDA is not held, so no valuation/simulation evidence was sent; the model did not invent figures.
+- Remaining: delete Supabase user `pt-admin-test@example.com` manually. Consider checking Z.ai concurrency limits (it was overloaded in all three tests).

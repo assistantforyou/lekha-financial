@@ -153,18 +153,20 @@ async function extractStatement(input) {
 //   maxTokens   cap on output tokens (max_tokens / maxOutputTokens)
 //   deadlineMs  total time budget for the call, replacing the default 40 s (Z.ai) / 25 s (Gemini) caps
 //   info        object filled with {provider, model, retries} (retries = Z.ai overload re-sends)
-async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", noFallback = false, maxTokens, deadlineMs, info }) {
+//   fallbackOn  with noFallback: a test (error -> bool); when it returns true for the Z.ai error, Gemini is tried once
+//   fallbackDeadlineMs  time budget for that Gemini call
+async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", noFallback = false, maxTokens, deadlineMs, info, fallbackOn, fallbackDeadlineMs }) {
   let last;
   const zm = model || process.env.NEWS_MODEL || "glm-4.6v-flash", gm = process.env.NEWS_GEMINI_MODEL || GEMINI_DEFAULT;
   if (info) Object.assign(info, { provider: null, model: null, retries: 0 });
   if (zaiReady()) {
     if (info) Object.assign(info, { provider: "Z.ai", model: zm });
     try { return await zaiJson({ job, model: zm, system, schema, content: user, timeoutMs: deadlineMs || Math.min(timeoutMs, 40000), maxTokens, info }); }
-    catch (e) { last = e; if (noFallback) throw e; }
+    catch (e) { last = e; if (noFallback && !(fallbackOn && fallbackOn(e) && geminiReady())) throw e; if (info && noFallback) info.fallback = String(e && (e.code || e.status) || "error").slice(0, 40); }
   }
   if (geminiReady()) {
     if (info) Object.assign(info, { provider: "Gemini", model: gm });
-    return geminiJson({ job, model: gm, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: deadlineMs || 25000, maxTokens });
+    return geminiJson({ job, model: gm, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: (info && info.fallback && fallbackDeadlineMs) || deadlineMs || 25000, maxTokens });
   }
   throw last || err("not_configured", 503);
 }

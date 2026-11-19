@@ -209,7 +209,9 @@ module.exports = async (req, res) => {
 
     const info = {};
     const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-council-v3", noFallback: true,
-      maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 2400, 256, 16000), deadlineMs: 50000, info });
+      /* Gemini only when Z.ai is overloaded / rate-limited (429, 1305, 1302); budgets keep the total under 60 s */
+      fallbackOn: (e) => e && (e.status === 429 || /1305|1302/.test(String(e.code || e.message || ""))), fallbackDeadlineMs: 24000,
+      maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 2400, 256, 16000), deadlineMs: 30000, info });
     const v = validateCouncil(ai);
     if (v.empty) throw Object.assign(new Error("empty"), { status: 502 });
 
@@ -218,7 +220,7 @@ module.exports = async (req, res) => {
       perspectives: v.perspectives,
       ceo: v.ceo,
       meta: {
-        model: info.model ? `${info.provider} ${info.model}` : null, llmRequests: 1, retries: info.retries || 0, cached: false,
+        model: info.model ? `${info.provider} ${info.model}` : null, llmRequests: 1, retries: info.retries || 0, cached: false, fallback: info.fallback ? `Z.ai unavailable (${info.fallback}); answered by Gemini` : null,
         generatedAt: new Date().toISOString(),
         dataAsOf: prune({ ...(evidence.asOf || {}), portfolio: ctx && ctx.valDate ? clean(ctx.valDate, 40) : null,
           macro: market && market.macro && market.macro.asOf ? clean(market.macro.asOf, 40) : null,

@@ -92,7 +92,9 @@ const FULL = {
   assert.strictEqual(r._c, 200, JSON.stringify(r._j));
   assert.strictEqual(llmCalls.length, 1, "one LLM request"); assert.strictEqual(rateCalls, 1, "one quota hit");
   const o = llmCalls[0];
-  assert.strictEqual(o.noFallback, true); assert.strictEqual(o.maxTokens, 2400); assert.strictEqual(o.deadlineMs, 50000);
+  assert.strictEqual(o.noFallback, true); assert.strictEqual(o.maxTokens, 2400); assert.strictEqual(o.deadlineMs, 30000); assert.strictEqual(o.fallbackDeadlineMs, 24000);
+  /* fallback only on Z.ai overload / rate limit, never on other errors */
+  assert.strictEqual(o.fallbackOn({ status: 429 }), true); assert.strictEqual(o.fallbackOn({ code: "upstream_1305" }), true); assert.strictEqual(o.fallbackOn({ status: 500, code: "bad_json" }), false);
   assert.ok(/Thai/.test(o.system), "language rule applied");
   assert.ok(/Kelly/.test(o.system) && /haircut/.test(o.system) && /do not repeat/i.test(o.system), "allocator Kelly + no-repeat rule");
   assert.ok(/4800 completed paths of 5000 requested/.test(o.user), "real completed path count reaches the prompt");
