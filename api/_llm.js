@@ -51,7 +51,7 @@ async function timed(url, init, timeoutMs) {
 }
 
 // One Z.ai chat call returning parsed JSON. Retries "overloaded" (code 1305 / 429) a few times.
-async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000 }) {
+async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000, maxTokens, info }) {
   const key = process.env.ZAI_API_KEY;
   if (!key) throw err("not_configured", 503);
   const sys = system + "\n\nReply with ONE JSON object only, no prose, matching this JSON Schema:\n" + JSON.stringify(toJsonSchema(schema));
@@ -59,10 +59,12 @@ async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000 
   for (let attempt = 0; ; attempt++) {
     const left = deadline - Date.now();
     if (left < 3000) throw err("aborted", 502);
+    if (info) info.retries = attempt;
     const r = await timed(`${ZAI}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model, temperature: 0.1, thinking: { type: "disabled" }, response_format: { type: "json_object" },
+        ...(maxTokens ? { max_tokens: maxTokens } : {}),
         messages: [{ role: "system", content: sys }, { role: "user", content }] }),
     }, left);
     const j = await r.json().catch(() => ({}));
@@ -93,7 +95,7 @@ async function zaiOcr({ mime, base64 }) {
   return j.md_results;
 }
 
-async function geminiJson({ job, model, system, parts, schema, temperature = 0.1, timeoutMs = 50000 }) {
+async function geminiJson({ job, model, system, parts, schema, temperature = 0.1, timeoutMs = 50000, maxTokens }) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw err("not_configured", 503);
   const m = model || geminiModel();
@@ -101,7 +103,7 @@ async function geminiJson({ job, model, system, parts, schema, temperature = 0.1
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }],
-      generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema } }),
+      generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema, ...(maxTokens ? { maxOutputTokens: maxTokens } : {}) } }),
   }, timeoutMs);
   if (!r.ok) throw err("upstream_" + r.status, r.status === 429 ? 429 : 502);
   const j = await r.json();
@@ -146,13 +148,24 @@ async function extractStatement(input) {
 }
 
 // Generic structured-JSON call for prompts whose facts are supplied inline (news briefing).
-async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news" }) {
+// Optional (all off by default, so existing callers behave exactly as before):
+//   noFallback  use ONE provider only (Z.ai when configured, else Gemini); never a second provider call
+//   maxTokens   cap on output tokens (max_tokens / maxOutputTokens)
+//   deadlineMs  total time budget for the call, replacing the default 40 s (Z.ai) / 25 s (Gemini) caps
+//   info        object filled with {provider, model, retries} (retries = Z.ai overload re-sends)
+async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", noFallback = false, maxTokens, deadlineMs, info }) {
   let last;
+  const zm = model || process.env.NEWS_MODEL || "glm-4.6v-flash", gm = process.env.NEWS_GEMINI_MODEL || GEMINI_DEFAULT;
+  if (info) Object.assign(info, { provider: null, model: null, retries: 0 });
   if (zaiReady()) {
-    try { return await zaiJson({ job, model: model || process.env.NEWS_MODEL || "glm-4.6v-flash", system, schema, content: user, timeoutMs: Math.min(timeoutMs, 40000) }); }
-    catch (e) { last = e; }
+    if (info) Object.assign(info, { provider: "Z.ai", model: zm });
+    try { return await zaiJson({ job, model: zm, system, schema, content: user, timeoutMs: deadlineMs || Math.min(timeoutMs, 40000), maxTokens, info }); }
+    catch (e) { last = e; if (noFallback) throw e; }
   }
-  if (geminiReady()) return geminiJson({ job, model: process.env.NEWS_GEMINI_MODEL || GEMINI_DEFAULT, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: 25000 });
+  if (geminiReady()) {
+    if (info) Object.assign(info, { provider: "Gemini", model: gm });
+    return geminiJson({ job, model: gm, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: deadlineMs || 25000, maxTokens });
+  }
   throw last || err("not_configured", 503);
 }
 
