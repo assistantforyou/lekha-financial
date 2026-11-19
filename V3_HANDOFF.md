@@ -52,3 +52,7 @@ V2 (`/v2` = classic terminal, `public/v2/*`) is **untouched**: `git diff origin/
 preview_start pt-dev   (or: node scripts/dev-server.mjs 3456 with keys from ~/.config/portfolio-terminal/keys.env)
 open http://localhost:3456/v3?demo=1#/portfolio/overview
 ```
+
+## Merge-readiness check (PR #2)
+- GitHub checks: all passed; branch merges cleanly into `main`. Vercel preview: Ready, `/v3` loads.
+- Live Premium Council: **BLOCKED**. `ZAI_API_KEY` exists locally, but there is no Premium test account (no Premium email/password configured); none was created. To unblock: sign in on the Vercel preview (or local `/v3`) with a Premium account, open Deep Analysis → LLM Council, run one short question, and confirm five perspectives + CEO render with `meta.llmRequests: 1`.
