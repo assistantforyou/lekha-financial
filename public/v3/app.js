@@ -12,11 +12,12 @@ import { icon, bindInfo, money, moneySigned, pct, price, tone, curr, openSheet }
 import { openAuth, openAsk, openAdd, openImport, confirmRemove } from "/v2/sheets.js";
 import { RANGES, rangeLabel, segHtml, bindSeg, lastN, streetBlock, impactPill, leanBar, leanLabel, leanTone, eventName, dateChip, inDays, sectorName } from "/v2/views/shared.js";
 import me from "/v2/views/me.js";
+import analysis from "/v2/views/analysis.js";
 import { personaName, personaStyle, PERSONA_META, reasonText } from "/v2/views/outlook.js";
 import { reasons, PERSONAS } from "/core/council.js";
 
 const $ = (s) => document.querySelector(s);
-let sel = null, range = "1Y", feed = "news", pane = "main", C = null, chart = null, raf = 0, running = false;
+let mode = "desk", sel = null, range = "1Y", feed = "news", pane = "main", C = null, chart = null, raf = 0, running = false;
 
 function applyLook() {
   const p = prefs.get(), r = document.documentElement;
@@ -25,7 +26,8 @@ function applyLook() {
 }
 /* ---------- bar, tape, mobile tabs ---------- */
 function bar() {
-  $("#bar").innerHTML = `<span class="brand">${icon("trend")} <span>Portfolio Terminal</span></span><input id="cmd" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${esc(t("Jump to a ticker…"))}" aria-label="${esc(t("Jump to a ticker…"))}"><span class="sp"></span><span class="live" id="livepill"><b></b><span>…</span></span><button class="btn sm" id="ask">${icon("spark")} ${esc(t("Ask"))}</button><button class="iconbtn" id="cur">${curr() === "THB" ? "THB ฿" : "USD $"}</button>${signedIn() ? `<button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>` : `<button class="btn primary sm" id="signin">${esc(t("Sign in"))}</button><button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>`}`;
+  $("#bar").innerHTML = `<span class="brand">${icon("trend")} <span>Portfolio Terminal</span></span><input id="cmd" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${esc(t("Jump to a ticker…"))}" aria-label="${esc(t("Jump to a ticker…"))}"><div class="seg" id="modes"><button data-m="desk" aria-pressed="${mode === "desk"}">${esc(t("Today"))}</button><button data-m="analysis" aria-pressed="${mode === "analysis"}">${esc(t("Analysis"))}</button></div><span class="sp"></span><span class="live" id="livepill"><b></b><span>…</span></span><button class="btn sm" id="ask">${icon("spark")} ${esc(t("Ask"))}</button><button class="iconbtn" id="cur">${curr() === "THB" ? "THB ฿" : "USD $"}</button>${signedIn() ? `<button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>` : `<button class="btn primary sm" id="signin">${esc(t("Sign in"))}</button><button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>`}`;
+  $("#modes").onclick = (e) => { const b = e.target.closest("button[data-m]"); if (b) setMode(b.dataset.m); };
   $("#ask").onclick = openAsk; $("#acct").onclick = account;
   $("#cur").onclick = () => { prefs.set({ cur: curr() === "THB" ? "USD" : "THB" }); bar(); renderAll(); };
   const s = $("#signin"); if (s) s.onclick = () => openAuth("login");
@@ -33,6 +35,13 @@ function bar() {
   c.addEventListener("keydown", (e) => { if (e.key === "Enter") { const v = c.value.trim().toUpperCase(), r = positions().find((x) => !x.cash && x.tk.startsWith(v)); if (r) { sel = r.tk; pane = "main"; renderAll(); } c.value = ""; } if (e.key === "Escape") { c.value = ""; c.blur(); } });
   pill();
   $("#mtabs").innerHTML = [["hold", t("Holdings")], ["main", t("Price history")], ["feed", t("News")], ["council", t("Outlook")]].map(([k, l]) => `<button data-k="${k}" aria-pressed="${pane === k}">${esc(l)}</button>`).join("");
+}
+let anDone = false;
+function setMode(m) {
+  mode = m; const an = m === "analysis";
+  $("#an").hidden = !an; $("#desk").hidden = an; $("#tape").hidden = an; $("#mtabs").style.display = an ? "none" : "";
+  if (an && !anDone) { $("#an").innerHTML = analysis.render(); analysis.mount($("#an"), { rerender() {} }); anDone = true; }
+  document.querySelectorAll("#modes button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.m === m));
 }
 function pill() { const el = $("#livepill"); if (!el) return; const s = D.session; el.classList.toggle("on", s === "open" || s === "pre" || s === "post"); el.lastElementChild.textContent = !D.loaded.history ? t("Loading…") : s === "open" ? t("Live") : s === "pre" || s === "post" ? t("Extended hours") : t("Market closed"); }
 function tape() {
@@ -90,8 +99,8 @@ function drawChart() {
 /* ---------- render + live paint ---------- */
 function put(sel2, html) { const el = $(sel2), y = el.scrollTop; el.innerHTML = html; el.scrollTop = y; }
 function renderAll() {
-  bar(); tape(); put("#p-hold", holdPane()); put("#p-main", mainPane()); put("#p-feed", feedPane()); put("#p-council", councilPane());
-  $("#desk").dataset.show = pane; drawChart();
+  bar(); setMode(mode); tape(); put("#p-hold", holdPane()); put("#p-main", mainPane()); put("#p-feed", feedPane()); put("#p-council", councilPane());
+  $("#desk").dataset.show = pane; if (mode === "desk") drawChart();
 }
 const schedule = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(renderAll); };
 function flash(el, d) { if (!el || !d) return; el.classList.remove("fl-up", "fl-down"); void el.offsetWidth; el.classList.add(d > 0 ? "fl-up" : "fl-down"); }

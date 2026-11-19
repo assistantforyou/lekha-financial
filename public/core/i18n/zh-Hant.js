@@ -378,4 +378,8 @@ export default {"1 month":"1個月",
 "{tk} earnings":"{tk}財報",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk}造成了約{pct}%的波動。",
 "Jump to a ticker…":"跳轉到股票代碼…",
-"Price":"價格"};
+"Price":"價格",
+"Analysis":"分析",
+"Overview":"概覽",
+"Intrinsic value":"內在價值",
+"Settings and data":"設定與資料"};

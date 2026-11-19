@@ -60,7 +60,7 @@
     { tk: "PTT.BK", acct: "Demo Bank", theme: "Energy", cur: "THB", qty: 200, avg: 32.10, px: 34.25, dr: 1.8e-4, vo: 0.009, be: 0.7 },
     { tk: "JNJ", acct: "Demo Retirement", theme: "Health Care", cur: "USD", qty: 25, avg: 162.3, px: 154.9, dr: -0.5e-4, vo: 0.008, be: 0.55 },
     { tk: "PEP", acct: "Demo Retirement", theme: "Consumer staples", cur: "USD", qty: 30, avg: 142.8, px: 158.2, dr: 3.0e-4, vo: 0.007, be: 0.5 },
-    { tk: "CASH", acct: "Demo Brokerage", theme: "Cash", cur: "USD", qty: 1, avg: 12000, px: 1, dr: 0, vo: 0, be: 0 }
+    { tk: "CASH", acct: "Demo Brokerage", theme: "Cash", cur: "USD", qty: 12000, avg: 1, px: 1, dr: 0, vo: 0, be: 0 }
   ];
   var UNIVERSE = {
     "SPY": { px: 597.8, dr: 3.6e-4, vo: 0.008, be: 1 }, "RSP": { px: 173.4, dr: 3.2e-4, vo: 0.008, be: 0.9 },

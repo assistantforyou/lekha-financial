@@ -378,4 +378,8 @@ export default {"1 month":"1个月",
 "{tk} earnings":"{tk}财报",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk}造成了约{pct}%的波动。",
 "Jump to a ticker…":"跳转到股票代码…",
-"Price":"价格"};
+"Price":"价格",
+"Analysis":"分析",
+"Overview":"概览",
+"Intrinsic value":"内在价值",
+"Settings and data":"设置与数据"};

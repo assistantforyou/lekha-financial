@@ -1,4 +1,62 @@
 {
- "Jump to a ticker…": {"th":"ไปที่ชื่อย่อหุ้น…","zh-Hans":"跳转到股票代码…","ja":"ティッカーへ移動…","ko":"티커로 이동…","es":"Ir a un símbolo…","hi":"किसी टिकर पर जाएँ…","vi":"Đi tới mã cổ phiếu…","fr":"Aller à un symbole…"},
- "Price": {"th":"ราคา","zh-Hans":"价格","ja":"価格","ko":"가격","es":"Precio","hi":"कीमत","vi":"Giá","fr":"Prix"}
+ "Jump to a ticker…": {
+  "th": "ไปที่ชื่อย่อหุ้น…",
+  "zh-Hans": "跳转到股票代码…",
+  "ja": "ティッカーへ移動…",
+  "ko": "티커로 이동…",
+  "es": "Ir a un símbolo…",
+  "hi": "किसी टिकर पर जाएँ…",
+  "vi": "Đi tới mã cổ phiếu…",
+  "fr": "Aller à un symbole…"
+ },
+ "Price": {
+  "th": "ราคา",
+  "zh-Hans": "价格",
+  "ja": "価格",
+  "ko": "가격",
+  "es": "Precio",
+  "hi": "कीमत",
+  "vi": "Giá",
+  "fr": "Prix"
+ },
+ "Analysis": {
+  "th": "วิเคราะห์",
+  "zh-Hans": "分析",
+  "ja": "分析",
+  "ko": "분석",
+  "es": "Análisis",
+  "hi": "विश्लेषण",
+  "vi": "Phân tích",
+  "fr": "Analyse"
+ },
+ "Overview": {
+  "th": "ภาพรวม",
+  "zh-Hans": "概览",
+  "ja": "概要",
+  "ko": "개요",
+  "es": "Resumen",
+  "hi": "अवलोकन",
+  "vi": "Tổng quan",
+  "fr": "Aperçu"
+ },
+ "Intrinsic value": {
+  "th": "มูลค่าที่แท้จริง",
+  "zh-Hans": "内在价值",
+  "ja": "本質的価値",
+  "ko": "내재가치",
+  "es": "Valor intrínseco",
+  "hi": "आंतरिक मूल्य",
+  "vi": "Giá trị nội tại",
+  "fr": "Valeur intrinsèque"
+ },
+ "Settings and data": {
+  "th": "ตั้งค่าและข้อมูล",
+  "zh-Hans": "设置与数据",
+  "ja": "設定とデータ",
+  "ko": "설정 및 데이터",
+  "es": "Ajustes y datos",
+  "hi": "सेटिंग और डेटा",
+  "vi": "Cài đặt và dữ liệu",
+  "fr": "Réglages et données"
+ }
 }

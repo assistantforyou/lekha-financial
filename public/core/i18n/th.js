@@ -378,4 +378,8 @@ export default {"1 month":"1 เดือน",
 "{tk} earnings":"ประกาศกำไร {tk}",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk} อยู่เบื้องหลังประมาณ {pct}% ของความผันผวน",
 "Jump to a ticker…":"ไปที่ชื่อย่อหุ้น…",
-"Price":"ราคา"};
+"Price":"ราคา",
+"Analysis":"วิเคราะห์",
+"Overview":"ภาพรวม",
+"Intrinsic value":"มูลค่าที่แท้จริง",
+"Settings and data":"ตั้งค่าและข้อมูล"};

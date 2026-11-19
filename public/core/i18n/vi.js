@@ -378,4 +378,8 @@ export default {"1 month":"1 tháng",
 "{tk} earnings":"Báo cáo lợi nhuận {tk}",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk} đứng sau khoảng {pct}% các biến động lên xuống.",
 "Jump to a ticker…":"Đi tới mã cổ phiếu…",
-"Price":"Giá"};
+"Price":"Giá",
+"Analysis":"Phân tích",
+"Overview":"Tổng quan",
+"Intrinsic value":"Giá trị nội tại",
+"Settings and data":"Cài đặt và dữ liệu"};

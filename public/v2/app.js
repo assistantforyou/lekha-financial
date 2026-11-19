@@ -5,11 +5,11 @@ import * as live from "/core/live.js";
 import { prefs, isDemo, signedIn, tierName } from "/core/store.js";
 import { esc } from "/core/util.js";
 import { icon, bindInfo, money, moneySigned, pct, price, tone, curr, openSheet } from "./ui.js";
-import today from "./views/today.js"; import holdings from "./views/holdings.js"; import market from "./views/market.js"; import outlook from "./views/outlook.js"; import me from "./views/me.js";
+import today from "./views/today.js"; import holdings from "./views/holdings.js"; import market from "./views/market.js"; import outlook from "./views/outlook.js"; import me from "./views/me.js"; import analysis from "./views/analysis.js";
 import { openAuth, openAsk } from "./sheets.js";
 
-const VIEWS = { today, holdings, market, outlook, me }, ORDER = ["today", "holdings", "market", "outlook", "me"];
-const LABEL = () => ({ today: t("Today"), holdings: t("Holdings"), market: t("Market"), outlook: t("Outlook"), me: t("Me") });
+const VIEWS = { today, holdings, market, outlook, analysis, me }, ORDER = ["today", "holdings", "market", "outlook", "analysis", "me"];
+const LABEL = () => ({ today: t("Today"), holdings: t("Holdings"), market: t("Market"), outlook: t("Outlook"), analysis: t("Analysis"), me: t("Me") });
 const $ = (s) => document.querySelector(s);
 let route = { id: "today", param: null }, raf = 0;
 
@@ -41,7 +41,7 @@ function view() {
   document.querySelectorAll("[data-tab]").forEach((a) => (route.id === a.dataset.tab ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
   window.scrollTo(0, y);
 }
-function schedule() { cancelAnimationFrame(raf); raf = requestAnimationFrame(view); }
+function schedule() { if (VIEWS[route.id].static) return; cancelAnimationFrame(raf); raf = requestAnimationFrame(view); }
 function go() { route = parse(); shell(); $("#view").innerHTML = ""; view(); window.scrollTo(0, 0); if (route.param) { const el = document.getElementById("h-" + route.param); el && el.scrollIntoView({ block: "center" }); } }
 
 /* ---------- live painting: update only the numbers that changed, no re-render ---------- */

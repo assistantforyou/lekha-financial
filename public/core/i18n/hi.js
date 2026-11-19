@@ -378,4 +378,8 @@ export default {"1 month":"1 महीना",
 "{tk} earnings":"{tk} के नतीजे",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk} उतार-चढ़ाव के लगभग {pct}% के पीछे है।",
 "Jump to a ticker…":"किसी टिकर पर जाएँ…",
-"Price":"कीमत"};
+"Price":"कीमत",
+"Analysis":"विश्लेषण",
+"Overview":"अवलोकन",
+"Intrinsic value":"आंतरिक मूल्य",
+"Settings and data":"सेटिंग और डेटा"};

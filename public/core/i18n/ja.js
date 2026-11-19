@@ -378,4 +378,8 @@ export default {"1 month":"1か月",
 "{tk} earnings":"{tk}の決算",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk}が値動きの約{pct}%の要因です。",
 "Jump to a ticker…":"ティッカーへ移動…",
-"Price":"価格"};
+"Price":"価格",
+"Analysis":"分析",
+"Overview":"概要",
+"Intrinsic value":"本質的価値",
+"Settings and data":"設定とデータ"};

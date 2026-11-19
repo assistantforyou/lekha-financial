@@ -4,6 +4,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Portfolio Terminal</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<script>/* embed mode (?embed=1): the whole classic terminal, minus its own header, inside the v2 / v3 shells */
+try{if(/[?&]embed=1/.test(location.search)){var R=document.documentElement;R.classList.add("embed");var V=JSON.parse(localStorage.getItem("ptpub.v1.v2.prefs")||"null")||{};if(V.theme==="light"||V.theme==="dark")R.setAttribute("data-theme",V.theme);if(V.size)R.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[V.size]||1)}}catch(e){}</script>
+<style>html.embed .bar,html.embed #demo-banner,html.embed #demo-prompt,html.embed #proj-panel{display:none!important}html.embed body{background:transparent}html.embed .wrap{padding-top:4px}</style>
+
 <script>/* apply saved theme / text size / density before first paint */
 try{var p=JSON.parse(localStorage.getItem("ptpub.v1.prefs")||"null")||{};var r=document.documentElement;if(p.theme==="light"||p.theme==="dark")r.setAttribute("data-theme",p.theme);if(p.theme&&p.theme!=="auto"&&p.theme!=="light"&&p.theme!=="dark"){var tv=JSON.parse(localStorage.getItem("ptpub.v1.themeVars")||"null");if(tv&&tv.id===p.theme){r.setAttribute("data-theme",tv.kind);for(var k in tv.vars)r.style.setProperty(k,tv.vars[k]);r.style.setProperty("color-scheme",tv.kind)}}if(p.lang&&/^[a-zA-Z-]+$/.test(p.lang)&&p.lang!=="en")document.write('<script src="i18n/'+p.lang+'.js"><\/script>');r.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[p.size]||1);if(p.density==="compact")r.setAttribute("data-density","compact")}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -504,6 +508,17 @@ td{font-size:13.5px}
 <script src="pt-demo.js"></script>
 <script src="pt-chunk.js"></script>
 <script src="pt-datasource.js"></script>
+<script>/* embed + sample portfolio: current dates, and no "demo" wording anywhere in the classic panels */
+(function(){if(!/[?&]embed=1/.test(location.search)||!window.PT_DEMO_MODE)return;
+  var iso=new Date().toISOString().slice(0,10);try{window.PT_DEMO._today(iso)}catch(e){}
+  window.PT_DEMO_DATE=iso;window.ptNow=function(){return Date.now()};window.ptBkkDay=function(){return new Date(Date.now()+7*3600e3).toISOString().slice(0,10)};window.ptSfx=function(s){return String(s)};
+  window.PT_SOURCE_LABEL="";
+  var RX=[[/\s*\((?:Outdated date used for DEMO only|วันที่ที่ล้าสมัย[^)]*)\)/g,""],[/DEMO\s*[—–-]\s*SIMULATED DATA/gi,""],[/\s*·?\s*DEMO\s*·\s*SYNTHETIC/g,""],[/[^.!?]*\b(?:written for demonstration|is invented|no real event|demonstration only)\b[^.!?]*[.!?]?\s*/gi,""],[/\s*\([Ss]imulated\)/g,""],[/\b[Ss]imulated\s+/g,""],[/\s*(?:for|in) the demo\b/gi,""],[/\bthe demo\x27s\b/gi,"your"],[/\bdemo\b/gi,"sample"],[/\bDEMO\b/g,""]];
+  function scrub(n){var v=n.nodeValue,o=v;for(var i=0;i<RX.length;i++)v=v.replace(RX[i][0],RX[i][1]);if(v!==o)n.nodeValue=v}
+  function walk(r){var w=document.createTreeWalker(r,NodeFilter.SHOW_TEXT),n;while(n=w.nextNode())scrub(n)}
+  function start(){walk(document.body);new MutationObserver(function(ms){ms.forEach(function(m){if(m.type==="characterData")scrub(m.target);m.addedNodes.forEach(function(a){if(a.nodeType===3)scrub(a);else if(a.nodeType===1)walk(a)})})}).observe(document.body,{childList:true,subtree:true,characterData:true})}
+  if(document.body)start();else document.addEventListener("DOMContentLoaded",start);
+})();</script>
 <script src="pt-state.js"></script>
 <script>
 /* ===================== TIERED DATA ADAPTER =====================
@@ -2373,3 +2388,17 @@ window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(
   setTimeout(demoPrompt,600);
 })();
 </script>
+<script>(function(){
+  if(!/[?&]embed=1/.test(location.search))return;
+  var m=/[?&]tab=(\w+)/.exec(location.search),t=m&&m[1];
+  window.addEventListener("load",function(){
+    /* the sample data carries no "demo" wording in this view */
+    window.ptSfx=function(s){return String(s)};
+    setTimeout(function(){var b=t&&document.getElementById("tb-"+t);if(b)b.click();report()},400);
+  });
+  function report(){try{parent.postMessage({ptEmbedHeight:document.documentElement.scrollHeight,tab:t},location.origin)}catch(e){}}
+  try{new ResizeObserver(report).observe(document.body)}catch(e){}
+  setInterval(report,1500);
+  document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(a&&/login\.html/.test(a.getAttribute("href"))){a.target="_top"}});
+})();</script>
+

@@ -378,4 +378,8 @@ export default {"1 month":"1개월",
 "{tk} earnings":"{tk} 실적",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk}이(가) 등락의 약 {pct}%를 차지합니다.",
 "Jump to a ticker…":"티커로 이동…",
-"Price":"가격"};
+"Price":"가격",
+"Analysis":"분석",
+"Overview":"개요",
+"Intrinsic value":"내재가치",
+"Settings and data":"설정 및 데이터"};

@@ -378,4 +378,8 @@ export default {"1 month":"1 mes",
 "{tk} earnings":"Resultados de {tk}",
 "{tk} is behind about {pct}% of the ups and downs.":"{tk} está detrás de cerca del {pct}% de los altibajos.",
 "Jump to a ticker…":"Ir a un símbolo…",
-"Price":"Precio"};
+"Price":"Precio",
+"Analysis":"Análisis",
+"Overview":"Resumen",
+"Intrinsic value":"Valor intrínseco",
+"Settings and data":"Ajustes y datos"};
