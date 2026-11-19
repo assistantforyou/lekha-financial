@@ -73,13 +73,28 @@ function personaBody(id) {
 }
 function aiButton(id) {
   const tier = tierName(D.me);
-  if (tier === "premium") return `<button class="btn" data-ai="${id}">${icon("spark")} ${esc(t("Explain in plain words with AI"))}</button>`;
+  if (tier === "premium" || tier === "demo") return `<button class="btn" data-ai="${id}">${icon("spark")} ${esc(t("Explain in plain words with AI"))}</button>`;
   return `<div class="ailock">${icon("lock")} ${esc(t("An AI-written explanation of this persona is part of the Premium plan."))} <a href="#/me">${esc(t("See plans"))}</a></div>`;
+}
+/* Keep markers readable: split the horizon into equal windows and show the most important event
+   in each one. Taking the first seven dates instead stacks whatever falls in one busy week. */
+function spread(list, cut, want = 7) {
+  const sorted = [...list].filter((e) => e.day >= 1 && e.day <= cut).sort((a, b) => a.day - b.day);
+  const rank = (e) => (e.kind === "fomc" ? 4 : e.kind === "earnings" ? 3 : e.kind === "cpi" ? 2 : 1);
+  const out = [];
+  for (let i = 0; i < want; i++) {
+    const lo = (cut * i) / want, hi = (cut * (i + 1)) / want;
+    const bucket = sorted.filter((e) => e.day >= lo && e.day < hi);
+    if (!bucket.length) continue;
+    bucket.sort((a, b) => rank(b) - rank(a) || a.day - b.day);
+    out.push(bucket[0]);
+  }
+  return out.sort((a, b) => a.day - b.day);
 }
 function drawFan(id) {
   const host = document.getElementById("fan-" + id); if (!host || !res) return;
   const P = res.personas[id], Y = res.personas.you, cut = hzDays(), f = P.fan.filter((p) => p.day <= cut), y = Y.fan.filter((p) => p.day <= cut), toV = (p, k) => [p.day, p[k] * 100];
-  const evs = inp.events.filter((e) => e.day <= cut).slice(0, 7).map((e, i) => ({ x: e.day, label: String(i + 1), tone: e.lean > 0.25 ? "up" : e.lean < -0.25 ? "down" : "" }));
+  const evs = spread(inp.events, cut, 7).map((e, i) => ({ x: e.day, label: String(i + 1), tone: e.lean > 0.25 ? "up" : e.lean < -0.25 ? "down" : "" }));
   const series = [{ id: "p", color: META[id].c, pts: f.map((p) => toV(p, "p50")), width: 3 }]; if (id !== "you") series.push({ id: "y", color: "var(--chart2)", pts: y.map((p) => toV(p, "p50")), width: 1.8, dash: "5 4" });
   const opts = { series, bands: [{ hi: f.map((p) => toV(p, "p95")), lo: f.map((p) => toV(p, "p5")), color: META[id].c, opacity: 0.12 }, { hi: f.map((p) => toV(p, "p75")), lo: f.map((p) => toV(p, "p25")), color: META[id].c, opacity: 0.22 }], ref: 0, height: 250, markers: evs, label: t("Range of simulated outcomes"), xFmt: (x) => fmtDate(dateAt(x), { day: "numeric", month: "short" }), yFmt: (v) => (v > 0 ? "+" : "") + Math.round(v) + "%", tip: (x, r) => `<b>${esc(fmtDate(dateAt(x), { day: "numeric", month: "short", year: "numeric" }))}</b><br>${esc(t("Middle outcome"))} ${esc(pct(r[0].p[1] / 100, 1))}${(() => { const q = f.find((p) => p.day === r[0].p[0]); return q ? `<br>${esc(t("Range"))} ${esc(pct(q.p5, 0))} … ${esc(pct(q.p95, 0))}` : ""; })()}` };
   if (chart && chart.id === id) chart.c.update(opts); else { chart && chart.c.destroy(); chart = { id, c: LineChart(host, opts) }; }
@@ -88,7 +103,7 @@ async function start(rerender) {
   if (running) return; running = true; error = ""; prog = 0;
   const rows = positions().filter((r) => !r.cash);
   if (!rows.length) { running = false; return; }
-  const ck = "council:" + (isDemo() ? "d" : "r") + ":" + positions().map((r) => r.tk + Math.round(r.qty)).join("|") + ":" + paths + ":" + new Date().toISOString().slice(0, 10);
+  const ck = "council4:" + (isDemo() ? "d" : "r") + ":" + positions().map((r) => r.tk + Math.round(r.qty)).join("|") + ":" + paths + ":" + new Date().toISOString().slice(0, 10);
   try {
     const hit = await cacheGet(ck, 3 * 36e5);
     if (hit) { res = hit.result; inp = hit.input; }
@@ -114,7 +129,7 @@ function accuracyCard() {
       <li>${esc(t("More runs make the numbers steadier, not truer: the sampling error falls with the square root of the number of paths, but the model's assumptions still set the answer."))}</li>
       <li>${esc(t("Probabilities are the share of simulated futures, not a measured chance. Treat the middle outcome as a centre of gravity and the range as the honest part."))}</li>
       <li>${esc(t("Costs, taxes, spreads and slippage are not modelled. Real rebalancing keeps less than the simulation shows."))}</li>
-      <li>${esc(t("Every persona can only buy your holdings plus index and sector ETFs. It is a realistic menu, not the whole US market."))}</li>
+      <li>${esc(t("Every persona can buy your current holdings, the main US index and sector ETFs, and the largest single names (Apple, Microsoft, Nvidia, Amazon, Alphabet, Meta, Tesla, JPMorgan, Visa, Walmart and more). It is a broad menu, not every listed company."))}</li>
     </ul></div>`;
 }
 

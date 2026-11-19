@@ -91,21 +91,30 @@ const mkRes = () => ({ _c: 0, _j: null, setHeader() {}, status(c) { this._c = c;
   assert.strictEqual(res._c, 200);
   assert.ok(res._j.ok);
 
-  // 6. AI endpoints are premium-only: a free (or even paid) caller is refused at the gate.
+  // 6. AI endpoints are open to every tier while the preview runs: a free or paid caller reaches
+  // the handler and is only stopped when there is no portfolio to talk about.
   const ask = require("./_h/ai/ask");
   res = mkRes();
   await ask({ method: "POST", headers: { authorization: "Bearer t" }, body: { question: "Why did my portfolio fall today?" } }, res, {});
-  assert.strictEqual(res._c, 402);
+  assert.strictEqual(res._c, 400);
+  assert.strictEqual(res._j.code, "no_holdings");
 
   profileRow = { user_id: "u1", email: "user@example.com", plan: "paid", sub_status: "active", period_end: new Date(Date.now() + 864e5 * 10).toISOString() };
   res = mkRes();
   await ask({ method: "POST", headers: { authorization: "Bearer t" }, body: { question: "Am I too concentrated in technology?" } }, res, {});
-  assert.strictEqual(res._c, 402); // Paid is not Premium: the AI layer stays premium-only.
+  assert.strictEqual(res._c, 400);
+  assert.strictEqual(res._j.code, "no_holdings");
 
   const briefing = require("./_h/ai/briefing");
   res = mkRes();
   await briefing({ method: "GET", headers: { authorization: "Bearer t" } }, res, {});
-  assert.strictEqual(res._c, 402);
+  assert.strictEqual(res._c, 400);
+  assert.strictEqual(res._j.code, "no_holdings");
+
+  // Anonymous visitors get the public demo profile instead of a 401 on gates that allow "demo".
+  res = mkRes();
+  p = await requireTier({ headers: {} }, res, ["demo", "free", "paid", "premium"]);
+  assert.ok(p && p.user_id === "demo" && p.demo === true);
 
   // Anonymous on the free data gate: the /api/free handlers all call the same requireTier.
   res = mkRes();

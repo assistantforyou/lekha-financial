@@ -35,7 +35,7 @@ function clean(s, n) { return String(s || "").replace(/[\u0000-\u001f]/g, " ").t
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
-  const p = await requireTier(req, res, ["premium"]);
+  const p = await requireTier(req, res, ["demo", "free", "paid", "premium"]);
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
     if (question.length < 3) return res.status(400).json({ error: "Ask a question first." });
 
     const uid = p.user_id;
-    const ok = await rateHit(`ai/ask/${uid}/${Math.floor(Date.now() / DAY)}`, 40);
+    const ok = await rateHit(`ai/ask/${uid}/${Math.floor(Date.now() / DAY)}`, p.demo ? 400 : 40);
     if (!ok) return res.status(429).json({ error: "Daily question limit reached (40/day on Premium).", code: "ai_limit" });
 
     const [ctx, market] = await Promise.all([userContext(uid), marketBlock()]);

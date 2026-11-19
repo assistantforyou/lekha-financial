@@ -66,7 +66,7 @@ const STRESS = [
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
-  const p = await requireTier(req, res, ["premium"]);
+  const p = await requireTier(req, res, ["demo", "free", "paid", "premium"]);
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
     const lang = langOf(body.lang);
 
     const uid = p.user_id;
-    const ok = await rateHit(`ai/sim/${uid}/${Math.floor(Date.now() / DAY)}`, 10);
+    const ok = await rateHit(`ai/sim/${uid}/${Math.floor(Date.now() / DAY)}`, p.demo ? 100 : 10);
     if (!ok) return res.status(429).json({ error: "Daily simulation limit reached (10/day on Premium).", code: "ai_limit" });
 
     const ctx = await userContext(uid);

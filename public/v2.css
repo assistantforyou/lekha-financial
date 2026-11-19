@@ -4,7 +4,7 @@
 :root[data-theme="dark"]{--bg:#0b0e11;--card:#13181d;--card2:#191f26;--ink:#edf0f3;--muted:#98a2ad;--line:#242c34;--accent:#3dcdaa;--accent-ink:#06231d;--accent-soft:#12372f;--up:#3fd18d;--down:#ff6f63;--warn:#f0a33a;--chart:#3dcdaa;--chart2:#8795a5;--chart3:#e3a93c;--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);color-scheme:dark}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b0e11;--card:#13181d;--card2:#191f26;--ink:#edf0f3;--muted:#98a2ad;--line:#242c34;--accent:#3dcdaa;--accent-ink:#06231d;--accent-soft:#12372f;--up:#3fd18d;--down:#ff6f63;--warn:#f0a33a;--chart:#3dcdaa;--chart2:#8795a5;--chart3:#e3a93c;--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);color-scheme:dark}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{font-size:calc(clamp(15px,.32vw + 13.9px,18.5px)*var(--z));-webkit-text-size-adjust:100%}
+html{font-size:calc(clamp(15px,.32vw + 13.9px,18.5px)*var(--z));-webkit-text-size-adjust:100%;scroll-padding-top:4.6rem}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,-apple-system,"SF Pro Text","Segoe UI","Noto Sans","Noto Sans Thai","Sukhumvit Set","Hiragino Sans","Noto Sans CJK SC","Noto Sans CJK JP","Noto Sans KR","Noto Sans Devanagari",system-ui,sans-serif;line-height:1.45;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;padding:0}
@@ -18,7 +18,7 @@ svg{display:block}
 #app{display:grid;grid-template-columns:minmax(0,1fr);min-height:100dvh}
 #rail{display:none}
 #main{width:100%;max-width:1240px;margin:0 auto;padding:0 clamp(14px,3.2vw,32px) calc(5.6rem + env(safe-area-inset-bottom))}
-#top{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:.6rem;padding:calc(.55rem + env(safe-area-inset-top)) 0 .55rem;background:linear-gradient(var(--bg) 78%,transparent)}
+#top{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:.6rem;padding:calc(.55rem + env(safe-area-inset-top)) 0 .55rem;background:var(--bg);box-shadow:0 1px 0 var(--line)}
 .brand{font-weight:750;letter-spacing:-.01em;font-size:1.05rem;display:flex;align-items:center;gap:.5rem;margin-right:auto;min-width:0}
 .brand>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand i{width:1.55rem;height:1.55rem;border-radius:.5rem;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}

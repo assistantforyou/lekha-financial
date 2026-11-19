@@ -31,7 +31,7 @@ const clean = (s, n) => String(s || "").replace(/[\u0000-\u001f]/g, " ").trim().
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") return res.status(405).json({ error: "GET only." });
-  const p = await requireTier(req, res, ["premium"]);
+  const p = await requireTier(req, res, ["demo", "free", "paid", "premium"]);
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   const uid = p.user_id, day = new Date().toISOString().slice(0, 10);
@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
     const hit = await cacheGet(key);
     if (hit && hit.payload) return res.status(200).json({ cached: true, briefing: hit.payload });
 
-    const ok = await rateHit(`ai/briefgen/${uid}/${Math.floor(Date.now() / DAY)}`, 3);
+    const ok = await rateHit(`ai/briefgen/${uid}/${Math.floor(Date.now() / DAY)}`, p.demo ? 30 : 3);
     if (!ok) return res.status(429).json({ error: "Briefing refresh limit reached for today; the cached briefing will return tomorrow.", code: "ai_limit" });
 
     const ctx = await userContext(uid);

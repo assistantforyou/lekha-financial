@@ -10,6 +10,7 @@ import { swr, cacheGet } from "./cache.js";
 import { isDemo, loadHoldings, me as getMe } from "./store.js";
 import { t } from "./i18n.js";
 import { hash, rng, mean, stdev, sum } from "./util.js";
+import { nextReport } from "./calendar.js";
 
 export const D = {
   holdings: { items: [] }, fx: { usdthb: 34.5, hkdusd: 0.128 }, series: {}, bench: { sp: [], nq: [] }, stats: {}, risk: {},
@@ -185,7 +186,10 @@ function demoStreet(rows) {
     st[r.tk] = { name: null, pt: { mean, median: mean * (0.99 + rnd() * 0.02), high: hi, low: lo }, rating: { sb, b, h, s, ss, n: sb + b + h + s + ss }, src: [], asOf: today() };
     const tone = clampN(up * 2.2 + (rnd() - 0.5) * 0.4, -0.9, 0.9);
     news[r.tk] = { tone, items: [] };
-    if (!r.tk.includes(".")) earn[r.tk] = { date: new Date(Date.now() + (6 + Math.floor(rnd() * 55)) * 864e5).toISOString().slice(0, 10), eps: null };
+    /* the company's real reporting slot, anchored to the demo clock; never a random day */
+    const anchor = (window.PT_DEMO && window.PT_DEMO.DEMO_DATE) || today();
+    const rep = nextReport(r.tk, anchor);
+    if (rep) earn[r.tk] = { date: rep, eps: null };
   }
   return { street: st, news, earnings: earn };
 }

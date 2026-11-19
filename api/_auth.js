@@ -59,7 +59,13 @@ async function requireTier(req, res, allowed) {
   const list = Array.isArray(allowed) ? allowed.filter((t) => TIERS.includes(t)) : [];
   if (!list.length) throw new Error("requireTier: no valid tiers allowed");
   const u = await userFrom(req);
-  if (!u) { res.status(401).json({ error: "This needs a signed-in account." }); return null; }
+  // Demo is a real entitlement: while the product is in preview every plan is open to anonymous
+  // visitors, so a request with no signed-in user resolves to the demo profile instead of a 401.
+  // The token-on-disk demo profile never reaches Supabase and is created fresh per request.
+  if (!u) {
+    if (!list.includes("demo")) { res.status(401).json({ error: "This needs a signed-in account." }); return null; }
+    return { user_id: "demo", email: null, plan: "demo", demo: true, sub_status: "active", period_end: "2999-01-01T00:00:00Z", is_admin: false, prefs: {} };
+  }
   const p = await profile(u);
   const tier = tierOf(p);
   if (!list.includes(tier)) {

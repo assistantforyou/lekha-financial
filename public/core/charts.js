@@ -63,6 +63,7 @@ export function LineChart(host, opts) {
     const hit = mk("rect", { x: L, y: T, width: pw, height: ph, fill: "transparent", style: "touch-action:pan-y;cursor:crosshair" }); svg.append(hit);
     const bsearch = (pts, x) => { let lo = 0, hi = pts.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (pts[m][0] < x) lo = m + 1; else hi = m; } return lo > 0 && Math.abs(pts[lo - 1][0] - x) < Math.abs(pts[lo][0] - x) ? lo - 1 : lo; };
     /* drag to measure: press, drag across the chart, and the shaded window reports the change between the two ends */
+    let dragging = false, measured = false;
     if (o.measure) {
       const sel = mk("g", { visibility: "hidden", "pointer-events": "none" });
       const shade = mk("rect", { y: T, height: ph, fill: "var(--accent)", opacity: "0.14" });
@@ -72,7 +73,7 @@ export function LineChart(host, opts) {
       const pxOf = (ev) => { const b = svg.getBoundingClientRect(); return Math.max(L, Math.min(W - R, ((ev.clientX - b.left) / b.width) * W)); };
       const xvOf = (px) => x0 + ((px - L) / pw) * (x1 - x0);
       let from = null;
-      const clear = () => { sel.setAttribute("visibility", "hidden"); mtip.hidden = true; };
+      const clear = () => { sel.setAttribute("visibility", "hidden"); mtip.hidden = true; measured = false; };
       const render = (a, b) => {
         const lo = Math.min(a, b), hi = Math.max(a, b);
         sel.setAttribute("visibility", "visible");
@@ -82,16 +83,17 @@ export function LineChart(host, opts) {
         const p1 = s.pts[bsearch(s.pts, xvOf(lo))], p2 = s.pts[bsearch(s.pts, xvOf(hi))];
         const d = p2[1] - p1[1], pc = p1[1] ? d / p1[1] : 0;
         mtip.innerHTML = o.measureFmt ? o.measureFmt(p1, p2, d, pc) : `<b>${o.xFmt ? o.xFmt(p1[0]) : p1[0]} → ${o.xFmt ? o.xFmt(p2[0]) : p2[0]}</b><span class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : "−"}${o.yFmt ? o.yFmt(Math.abs(d)) : Math.abs(d).toFixed(2)} · ${(pc * 100).toFixed(1)}%</span>`;
-        mtip.hidden = false;
+        mtip.hidden = false; measured = true;
         const rel = (((lo + hi) / 2) / W) * host.clientWidth, tw = mtip.offsetWidth;
         mtip.style.left = Math.max(2, Math.min(rel - tw / 2, host.clientWidth - tw - 2)) + "px";
       };
-      hit.addEventListener("pointerdown", (ev) => { from = pxOf(ev); try { hit.setPointerCapture(ev.pointerId); } catch (e) {} render(from, from); move(ev); });
-      hit.addEventListener("pointermove", (ev) => { if (from != null) { render(from, pxOf(ev)); move(ev); } });
-      const done = (ev) => { if (from == null) return; const to = pxOf(ev); if (Math.abs(to - from) < 8) clear(); else render(from, to); from = null; };
+      hit.addEventListener("pointerdown", (ev) => { from = pxOf(ev); dragging = true; tip.hidden = true; cur.setAttribute("visibility", "hidden"); try { hit.setPointerCapture(ev.pointerId); } catch (e) {} render(from, from); });
+      hit.addEventListener("pointermove", (ev) => { if (from != null) render(from, pxOf(ev)); });
+      const done = (ev) => { if (from == null) return; const to = pxOf(ev); if (Math.abs(to - from) < 8) clear(); else render(from, to); from = null; dragging = false; };
       hit.addEventListener("pointerup", done); hit.addEventListener("pointercancel", done);
     }
     function move(ev) {
+      if (dragging || measured) return;  // one tooltip at a time: the measure readout wins until it is cleared
       const b = svg.getBoundingClientRect(), px = ((ev.clientX - b.left) / b.width) * W, xv = x0 + ((px - L) / pw) * (x1 - x0);
       const rows = o.series.map((s, i) => { if (!s.pts.length) return null; const p = s.pts[bsearch(s.pts, xv)]; dots[i].setAttribute("cx", sx(p[0])); dots[i].setAttribute("cy", sy(p[1])); return { s, p }; }).filter(Boolean);
       if (!rows.length) return;

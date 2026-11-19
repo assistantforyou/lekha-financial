@@ -9,8 +9,33 @@ const FX_DEF = { usdthb: 34.5, hkdusd: 0.128 };
 const cleanTk = (t) => String(t || "").trim().toUpperCase().slice(0, 12);
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
+// The public demo has no Supabase rows: the same sample portfolio the browser shows is built here,
+// so the AI analyst and the stress test answer about something real instead of refusing.
+const DEMO_ROWS = [
+  ["NVDA", 60, 186.4, 66.57, "USD", "Semiconductors"], ["AMD", 40, 142.3, 152.0, "USD", "Semiconductors"],
+  ["AVGO", 25, 168.5, 128.4, "USD", "Semiconductors"], ["SMH", 30, 245.2, 210.0, "USD", "Semiconductors"],
+  ["MSFT", 15, 428.9, 342.5, "USD", "Megacap tech"], ["AAPL", 40, 232.1, 195.4, "USD", "Megacap tech"],
+  ["0700.HK", 100, 415.0, 362.0, "HKD", "Megacap tech"], ["TSLA", 18, 214.6, 331.2, "USD", "Electric vehicles"],
+  ["JPM", 30, 244.8, 210.1, "USD", "Financials"], ["XOM", 35, 118.4, 108.2, "USD", "Energy"],
+  ["PTT.BK", 200, 34.25, 32.1, "THB", "Energy"], ["JNJ", 25, 154.9, 162.3, "USD", "Health Care"],
+  ["PEP", 30, 158.2, 142.8, "USD", "Consumer staples"], ["CASH", 12000, 1, 1, "USD", "Cash"],
+];
+function demoContext() {
+  const fx = { usdthb: 34.25, hkdusd: 0.1282 };
+  const rows = DEMO_ROWS.map(([tk, qty, px, cost, cur, theme]) => {
+    const rate = cur === "THB" ? 1 / fx.usdthb : cur === "HKD" ? fx.hkdusd : 1;
+    return { tk, cur, qty, theme, valUsd: +(qty * px * rate).toFixed(2), costUsd: +(qty * cost * rate).toFixed(2), px: px || null };
+  });
+  const invested = rows.filter((r) => r.tk !== "CASH").reduce((s, r) => s + r.valUsd, 0);
+  const cash = rows.filter((r) => r.tk === "CASH").reduce((s, r) => s + r.valUsd, 0);
+  const total = invested + cash;
+  for (const r of rows) r.weightPct = total > 0 ? Math.round((r.valUsd / total) * 1000) / 10 : 0;
+  return { rows, invested, cash, total, fx, valDate: null, dispersion: null, demo: true };
+}
+
 // The user's own rows: holdings + latest valuation snapshot + weights, all derived one way.
 async function userContext(userId) {
+  if (userId === "demo") return demoContext();
   const docs = await listState(userId);
   const hDoc = docs.find((d) => d.key === "holdings/all");
   const items = hDoc && hDoc.data && Array.isArray(hDoc.data.items) ? hDoc.data.items : [];

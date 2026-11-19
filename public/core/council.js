@@ -6,14 +6,15 @@
 import { D, positions, totals, isCash, rateOf } from "./data.js";
 import { hash, clamp, mean } from "./util.js";
 import { PERSONAS, CouncilRun } from "./engine.js";
+import { FOMC, CPI, JOBS, nextReport } from "./calendar.js";
+import { isDemo } from "./store.js";
 export { PERSONAS, HORIZONS } from "./engine.js";
 
-const FOMC = ["2026-12-09"];   // decision days (the Fed publishes a year ahead; later dates are added as they are announced)
 const dayMs = 864e5;
 const iso = (d) => d.toISOString().slice(0, 10);
+/* The demo's clock is frozen in the past; anchor the calendar to it, not to the wall clock. */
+const anchorIso = () => (isDemo() && window.PT_DEMO && window.PT_DEMO.DEMO_DATE) || iso(new Date());
 function tradingDaysBetween(from, to) { let n = 0; const d = new Date(from); while (d < to) { d.setUTCDate(d.getUTCDate() + 1); const w = d.getUTCDay(); if (w !== 0 && w !== 6) n++; } return n; }
-function firstFriday(y, m) { const d = new Date(Date.UTC(y, m, 1)); while (d.getUTCDay() !== 5) d.setUTCDate(d.getUTCDate() + 1); return d; }
-function midMonth(y, m) { const d = new Date(Date.UTC(y, m, 13)); while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1); return d; }
 
 /* ---------- what the Street and the media lean towards, each in -1 .. +1 ---------- */
 export function analystLean(tk) {
@@ -36,19 +37,17 @@ const avg = (a) => { const v = a.filter((x) => x != null); return v.length ? mea
 
 /* ---------- upcoming events with their leanings ---------- */
 export function buildEvents(rows = positions(), maxDays = 130) {
-  const now = new Date(iso(new Date()) + "T00:00:00Z"), end = new Date(+now + maxDays * dayMs), ev = [];
+  const now = new Date(anchorIso() + "T00:00:00Z"), end = new Date(+now + maxDays * dayMs), ev = [];
   const push = (e) => { const dt = new Date(e.date + "T00:00:00Z"); if (dt <= now || dt > end) return; ev.push({ ...e, calDays: Math.round((dt - now) / dayMs), day: Math.max(1, tradingDaysBetween(now, dt)) }); };
   const streetAvg = avg(rows.filter((r) => !r.cash).map((r) => analystLean(r.tk)));
-  for (const d of FOMC) push({ id: "fomc-" + d, kind: "fomc", date: d, sigma: 0.011, parts: { analyst: streetAvg, media: macroMedia(), mood: moodLean() } });
-  for (let k = 0; k < 5; k++) {
-    const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + k, 1));
-    push({ id: "jobs-" + k, kind: "jobs", date: iso(firstFriday(base.getUTCFullYear(), base.getUTCMonth())), sigma: 0.008, approx: true, parts: { analyst: streetAvg, media: macroMedia(), mood: moodLean() } });
-    push({ id: "cpi-" + k, kind: "cpi", date: iso(midMonth(base.getUTCFullYear(), base.getUTCMonth())), sigma: 0.009, approx: true, parts: { analyst: streetAvg, media: macroMedia(), mood: moodLean() } });
-  }
+  const macroParts = () => ({ analyst: streetAvg, media: macroMedia(), mood: moodLean() });
+  for (const d of FOMC) push({ id: "fomc-" + d, kind: "fomc", date: d, sigma: 0.011, parts: macroParts() });
+  for (const d of CPI) push({ id: "cpi-" + d, kind: "cpi", date: d, sigma: 0.009, parts: macroParts() });
+  for (const d of JOBS) push({ id: "jobs-" + d, kind: "jobs", date: d, sigma: 0.008, parts: macroParts() });
   for (const r of rows) {
-    if (r.cash) continue; const e = D.earnings[r.tk]; if (!e) continue;
+    if (r.cash) continue; const e = D.earnings[r.tk]; const date = (e && e.date) || nextReport(r.tk, anchorIso()); if (!date) continue;
     const idio = D.risk[r.tk] ? D.risk[r.tk].idio : 0.3, st = D.stats[r.tk];
-    push({ id: "earn-" + r.tk, kind: "earnings", tk: r.tk, date: e.date, sigma: clamp((3 * idio) / Math.sqrt(252), 0.04, 0.12), parts: { analyst: analystLean(r.tk), media: mediaLean(r.tk), runup: st && st.m1 != null ? st.m1 : null } });
+    push({ id: "earn-" + r.tk, kind: "earnings", tk: r.tk, date, sigma: clamp((3 * idio) / Math.sqrt(252), 0.04, 0.12), parts: { analyst: analystLean(r.tk), media: mediaLean(r.tk), runup: st && st.m1 != null ? st.m1 : null } });
   }
   for (const e of ev) {
     const p = e.parts; let lean;
@@ -64,13 +63,14 @@ export function buildEvents(rows = positions(), maxDays = 130) {
 export function buildInput(paths = 10000) {
   const rows = positions(), tot = totals(rows), inv = rows.filter((r) => !r.cash).sort((a, b) => b.valueUsd - a.valueUsd).slice(0, 25);
   if (!inv.length || !(tot.value > 0)) return null;
-  const events = buildEvents(rows);
+  const events = buildEvents(rows, 420);  // a full year of real calendar dates, not just the next quarter
   const assets = inv.map((r) => {
     const rk = D.risk[r.tk] || {}, st = D.stats[r.tk] || {}, s = D.street[r.tk], px = r.px, v = D.val[r.tk];
     return { tk: r.tk, w0: r.valueUsd / tot.value, beta: rk.beta != null ? rk.beta : 1, vol: rk.vol != null ? rk.vol : 0.3, idio: rk.idio != null ? rk.idio : 0.25, upside: s && s.pt && s.pt.mean && px ? s.pt.mean / px - 1 : null, mos: v && px ? v.base / px - 1 : null, mom: rk.mom != null ? rk.mom : st.y1 != null ? st.y1 : null, dd: st.from52 != null ? st.from52 : 0, m1: st.m1 != null ? st.m1 : 0, tone: mediaLean(r.tk) || 0 };
   });
   /* a wider investable universe: index and sector ETFs the personas can rotate into, not only what you already own */
-  const UNIVERSE = ["SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLP", "XLY", "XLI", "XLU", "XLB", "XLC", "XLRE", "SMH", "ITA"];
+  const UNIVERSE = ["SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLP", "XLY", "XLI", "XLU", "XLB", "XLC", "XLRE", "SMH", "ITA",
+    "GOOGL", "AMZN", "META", "V", "MA", "WMT", "COST", "HD", "UNH", "BRK.B"];
   const have = new Set(assets.map((a) => a.tk));
   for (const tk of UNIVERSE) {
     if (have.has(tk)) continue;

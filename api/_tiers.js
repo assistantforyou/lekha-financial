@@ -12,8 +12,9 @@ const TIERS = ["demo", "free", "paid", "premium"];
 // demo numbers are the shape of the simulated dataset, not server-enforced budgets.
 const LIMITS = {
   demo: {
+    // the public preview is deliberately open: every screen, the AI analyst and the simulations work
     holdings: 14, historyDays: null, valSymbols: 14,
-    av: false, ai: false, aiQuestions: 0, simulations: false, briefing: false,
+    av: true, ai: true, aiQuestions: 40, simulations: true, briefing: true,
   },
   free: {
     holdings: 20, historyDays: 1825, valSymbols: 12,

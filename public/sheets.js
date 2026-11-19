@@ -33,11 +33,8 @@ export function openAuth(mode = "login", why = "") {
     wire(mode);
   } });
 }
-const needAccount = () => { openAuth("signup", t("Create a free account to add your own holdings. Your sample portfolio stays here until you do.")); };
-
 /* ---------- add / edit a holding ---------- */
 export function openAdd(tk) {
-  if (isDemo()) return needAccount();
   const doc = loadHoldings(), cur = tk ? doc.items.find((h) => h.tk === tk) : null;
   const lim = D.me && D.me.limits ? D.me.limits.holdings : null;
   if (!cur && lim != null && doc.items.filter((h) => h.tk !== "CASH").length >= lim) return upgradeNote(t("Your plan holds up to {n} holdings. Remove one or upgrade for more.", { n: lim }));
@@ -61,7 +58,6 @@ export function openAdd(tk) {
   } });
 }
 export function confirmRemove(tk) {
-  if (isDemo()) return needAccount();
   openSheet({ title: t("Remove holding"), body: `<p>${esc(t("Remove {tk} from your portfolio? This cannot be undone.", { tk }))}</p><div class="row"><button class="btn danger" id="rm">${esc(t("Remove"))}</button><button class="btn" data-close>${esc(t("Cancel"))}</button></div>`, onMount(el) {
     el.querySelector("[data-close]").addEventListener("click", closeSheet);
     el.querySelector("#rm").addEventListener("click", () => { const d = loadHoldings(); d.items = d.items.filter((h) => h.tk !== tk); saveHoldings(d); closeSheet(); toast(t("Removed")); reload(); });
@@ -83,7 +79,6 @@ async function pdfBody(buf) {
 }
 const readFile = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onerror = rej; if (/\.(csv|tsv|txt)$/i.test(f.name) || /^text\//.test(f.type)) { r.onload = () => res({ text: String(r.result).replace(/\b\d{8,}\b/g, (m) => "*".repeat(m.length - 4) + m.slice(-4)) }); r.readAsText(f); } else if (f.type === "application/pdf" || /\.pdf$/i.test(f.name)) { r.onload = () => pdfBody(new Uint8Array(r.result)).then(res, () => { const r2 = new FileReader(); r2.onload = () => res({ mime: "application/pdf", data: String(r2.result).split(",")[1] }); r2.readAsDataURL(f); }); r.readAsArrayBuffer(f); } else { r.onload = () => res({ mime: f.type || "image/jpeg", data: String(r.result).split(",")[1] }); r.readAsDataURL(f); } });
 export function openImport() {
-  if (isDemo()) return needAccount();
   openSheet({ title: t("Import a statement"), body: `<div id="imp"><p class="small muted" style="margin-top:0">${esc(t("Pick one or more broker statements (PDF, screenshot or CSV). An AI model reads them, then you check every line before anything is saved. Nothing is stored on our servers."))}</p>
     <form id="if" class="stack" autocomplete="on"><label class="field">${esc(t("Statements"))}<input type="file" id="ifile" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.csv,.tsv,.txt"></label>
     <label class="field">${esc(t("Import passcode"))}<input type="password" id="ipass" name="password" autocomplete="current-password" value="${esc((() => { try { return localStorage.getItem(PASS) || ""; } catch (e) { return ""; } })())}" required></label>
@@ -129,7 +124,7 @@ export function openImport() {
 /* ---------- the AI analyst (Premium) ---------- */
 const SAMPLE_Q = () => [t("Which position is my biggest risk?"), t("Am I too concentrated in one area?"), t("What should I watch this week?")];
 export function openAsk() {
-  const tier = tierName(D.me), prem = tier === "premium";
+  const tier = tierName(D.me), prem = tier === "premium" || tier === "demo";
   openSheet({ title: t("Ask your analyst"), body: `<div class="seg" id="ak" style="margin-bottom:.8rem"><button data-k="ask" aria-pressed="true">${esc(t("Ask"))}</button><button data-k="brief" aria-pressed="false">${esc(t("Daily briefing"))}</button><button data-k="stress" aria-pressed="false">${esc(t("Stress test"))}</button></div><div id="akv"></div>`, onMount(el) {
     const v = el.querySelector("#akv");
     const lock = () => `<div class="ailock">${icon("lock")} ${esc(isDemo() ? t("Sign in and upgrade to Premium to ask questions about your own portfolio.") : t("The AI analyst is part of the Premium plan. It reads your own holdings and answers in your language."))} <a href="#/me" data-close>${esc(t("See plans"))}</a></div>`;
