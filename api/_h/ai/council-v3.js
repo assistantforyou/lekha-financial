@@ -228,6 +228,7 @@ module.exports = async (req, res) => {
     await cacheSet(key, out).catch(() => {});
     return res.status(200).json(out);
   } catch (e) {
+    console.error("council-v3 failed:", e && e.status, String((e && e.message) || e).slice(0, 160));
     if (e && e.status === 503) return res.status(503).json({ error: "The research council is not configured on this site yet.", code: "not_configured" });
     return res.status(502).json({ error: "The council could not answer right now. Try again in a moment.", code: "upstream" });
   }

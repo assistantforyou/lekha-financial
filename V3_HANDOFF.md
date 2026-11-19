@@ -56,3 +56,10 @@ open http://localhost:3456/v3?demo=1#/portfolio/overview
 ## Merge-readiness check (PR #2)
 - GitHub checks: all passed; branch merges cleanly into `main`. Vercel preview: Ready, `/v3` loads.
 - Live Premium Council: **BLOCKED**. `ZAI_API_KEY` exists locally, but there is no Premium test account (no Premium email/password configured); none was created. To unblock: sign in on the Vercel preview (or local `/v3`) with a Premium account, open Deep Analysis → LLM Council, run one short question, and confirm five perspectives + CEO render with `meta.llmRequests: 1`.
+
+## Live Premium Council test (local, 2026-11-19) — FAIL, one request made
+- Setup: the owner's verified account was given local-only admin (= Premium) via the dev-server start command; override removed afterwards (`.claude/launch.json` reverted, server stopped). Production, Supabase, Stripe untouched.
+- Result: one `POST /api/ai/council-v3` (scope NVDA) → HTTP 502 `upstream` after ~21 s; frontend correctly showed the error and five "Unavailable" cards. Auth + Premium gate + single request: PASS. Model response: FAIL.
+- Likely cause (unconfirmed, the error was not logged): output truncated at `COUNCIL_V3_MAX_TOKENS` default 2400 → invalid/empty JSON. Error logging added (`console.error("council-v3 failed: …")`).
+- Next: raise the default to ~4000 (or set env `COUNCIL_V3_MAX_TOKENS`), then run ONE more live request and read the log line.
+- Manual cleanup: unconfirmed Supabase auth user `pt-admin-test@example.com` (created by a local signup attempt) — delete in Supabase → Authentication → Users.
