@@ -3,6 +3,7 @@ const ROUTES = {
   "ask": () => require("./_h/ai/ask"),
   "briefing": () => require("./_h/ai/briefing"),
   "simulate": () => require("./_h/ai/simulate"),
+  "council": () => require("./_h/ai/council"),
 };
 const h = require("./_router").group("ai", ROUTES);
 module.exports = h;

@@ -1,0 +1,378 @@
+0|1 mois
+1|1 an
+2|Taux à 10 ans
+3|1M
+4|1A
+5|3 mois
+6|3M
+7|5 ans d’historique des prix
+8|5A
+9|6 mois
+10|6M
+11|Un score de 0 à 100 qui indique à quel point les investisseurs sont nerveux ou cupides. Bas signifie peur, haut signifie cupidité. Les extrêmes précèdent souvent un retournement, mais pas toujours.
+12|Une journée calme. Votre portefeuille a à peine bougé.
+13|Analyste IA : questions, point quotidien, test de résistance
+14|Explication par IA de chaque investisseur dans les perspectives
+15|Compte
+16|Nom du compte
+17|Ajouter
+18|Ajouter une position
+19|Ajoutez des positions pour voir ce qui pourrait se passer ensuite.
+20|Ajoutez-les une à une ou importez un relevé de courtier.
+21|Ajoutez votre première position
+22|Renforce {add} (points de pourcentage de votre portefeuille).
+23|Renforce {add} ; allège {trim} (points de pourcentage de votre portefeuille).
+24|Aérospatiale et défense
+25|Tout
+26|Répartition par thème
+27|Suis-je trop concentré sur un seul domaine ?
+28|Une explication rédigée par l’IA pour ce profil fait partie de l’offre Premium.
+29|Notes et objectifs de cours des analystes
+30|Analystes
+31|Demander
+32|Posez une question sur votre portefeuille…
+33|Interrogez votre analyste
+34|Au moins 8 caractères.
+35|Auto
+36|Coût moyen
+37|Moyenne de l’orientation des analystes sur vos positions.
+38|Objectif de cours moyen
+39|L’objectif de cours moyen est
+40|Mauvais cas (1 sur 20)
+41|Mauvais pour les actions
+42|Les banques représentent une part moyenne de votre portefeuille.
+43|Les grandes banques prêtent régulièrement mais les pertes sur prêts augmentent
+44|Certaines dates peuvent beaucoup faire bouger les cours. Avant chacune, nous regardons ce qu’attendent les analystes (notes et objectifs de cours), ce que disent les actualités, de combien le cours a déjà monté et l’humeur du marché.
+45|Événement important à surveiller : {name} ({when}). {lean}.
+46|Plus gros mouvements du jour
+47|La facturation est mensuelle et gérée en toute sécurité par Stripe. Annulez à tout moment depuis Gérer la facturation.
+48|La facturation n’est pas disponible pour le moment.
+49|Acheter
+50|Nombre d’avis acheter, conserver et vendre, et objectifs de cours de fournisseurs de données financières. Partagés entre utilisateurs et actualisés chaque jour, car les analystes changent rarement d’avis plus vite.
+51|Achète de la qualité à bon prix et la garde des années.
+52|Achète ce qui monte et vend ce qui faiblit.
+53|Achète ce que les autres ont délaissé.
+54|Annuler
+55|Liquidités
+56|Liquidités détenues
+57|Probabilité de gain
+58|Probabilité de perte
+59|Probabilité de perdre plus de 10 %
+60|Changer de devise
+61|Court après les gagnantes et vend dans la panique après les grosses baisses.
+62|Vérifiez chaque ligne, corrigez ce qui est faux, puis importez.
+63|Consultez votre e-mail pour le lien de confirmation, puis connectez-vous.
+64|Les fabricants de puces prolongent la hausse, la demande des centres de données ne faiblit pas
+65|Les puces sont votre plus gros groupe, donc cela fait monter votre portefeuille le plus.
+66|Choisissez au moins un fichier.
+67|Choisir {plan}
+68|Fermer
+69|À venir
+70|Communication
+71|Connexion…
+72|Consommation discrétionnaire
+73|Les prix à la consommation ont augmenté moins que prévu, ce qui rend une baisse des taux plus probable l’an prochain.
+74|Consommation de base
+75|Impossible de rédiger l’explication pour le moment. Réessayez dans un instant.
+76|Créez d’abord un compte gratuit, puis choisissez une offre.
+77|Créez un compte gratuit pour ajouter vos propres positions. Votre portefeuille d’exemple reste ici d’ici là.
+78|Créez un compte gratuit pour garder votre portefeuille sur tous vos appareils.
+79|Créer un compte
+80|Le brut reste dans une fourchette étroite, les craintes sur l’offre compensant une demande plus lente.
+81|Devise
+82|Réduit le risque quand les taux, l’inflation ou l’humeur semblent fragiles.
+83|Point quotidien
+84|Clôtures quotidiennes d’Alpaca (États-Unis) et de Yahoo Finance (autres marchés), gardées 10 minutes dans votre navigateur pour que les graphiques s’ouvrent aussitôt.
+85|Sombre
+86|Dates qui peuvent faire bouger vos positions. La barre montre vers où penchent analystes et actualités avant la date. Une forte inclinaison haussière peut déjà être dans le cours.
+87|Modèles de valorisation approfondis, rotation sectorielle et tous les outils d’origine.
+88|Les valeurs défensives décrochent alors que les investisseurs préfèrent la croissance
+89|Ne rien faire
+90|Le constructeur de voitures électriques recule, les livraisons manquent les prévisions
+91|Chaque case est un domaine du marché sur le dernier mois. Vert : il a battu le marché, rouge : il est resté derrière. Le grand nombre est sa propre performance.
+92|Résultats {when}
+93|Modifier
+94|Modifier la position
+95|E-mail
+96|Énergie
+97|L’énergie est une petite part de votre portefeuille.
+98|Saisissez un symbole et un nombre d’actions.
+99|Saisissez d’abord votre e-mail.
+100|S&P 500 équipondéré
+101|Événements et ce qui est déjà dans le cours
+102|Tout ce qu’inclut l’offre Gratuite
+103|Tout ce qu’inclut l’offre Payante
+104|Tout fonctionne sur chaque offre. Les offres supérieures ajoutent de la profondeur : plus de positions, plus d’historique et l’analyste IA.
+105|Le rendement attendu est le taux d’intérêt plus le risque de marché, légèrement ajusté par les objectifs de cours des analystes et le ton des actualités. C’est un modèle « et si », pas une prévision ni un conseil.
+106|Fluctuations attendues (VIX)
+107|Expliquer simplement avec l’IA
+108|Hors séance
+109|Données supplémentaires d’analystes et d’estimations
+110|Très grand
+111|Peur extrême
+112|Cupidité extrême
+113|Peur
+114|Peur et cupidité
+115|Décision de taux de la Fed
+116|Taux directeur de la Fed
+117|Finance
+118|Mot de passe oublié ?
+119|Gratuit
+120|Depuis le plus haut sur 1 an
+121|Issu du score de peur et de cupidité.
+122|Historique complet des prix
+123|Gain
+124|Gain ou perte
+125|Bon cas (1 sur 20)
+126|Bon pour les actions
+127|Cupidité
+128|Les titres viennent de flux publics d’actualités financières (CNBC, MarketWatch, BBC, Nasdaq, Seeking Alpha et la Réserve fédérale). Un modèle d’IA choisit les plus pertinents, rédige un court résumé et indique l’effet probable. Le titre et le lien viennent toujours de la source d’origine.
+129|Santé
+130|Des taux d’intérêt plus élevés pèsent en général sur les valeurs de croissance. Une inflation plus forte peut maintenir des taux élevés.
+131|Conserver
+132|Positions
+133|La tech de Hong Kong rebondit sur l’espoir de mesures de soutien
+134|Combien d’analystes disent Acheter, Conserver ou Vendre, et où ils pensent que le cours ira dans l’année.
+135|Comment c’est calculé
+136|Si tout le monde est déjà haussier, une bonne nouvelle peut changer peu de choses : elle est « déjà dans le cours ». Nous décalons le saut simulé de chaque événement vers cette tendance (environ 30 % de sa taille habituelle) et le réduisons si l’action a déjà beaucoup monté. Les dates « estimées » suivent le calendrier habituel et peuvent bouger de quelques jours.
+137|Si cet e-mail a un compte, un lien de réinitialisation est en route.
+138|Si le marché chutait soudainement
+139|Importer
+140|Importer un relevé
+141|Code d’import
+142|Importer la sélection
+143|Dans 1 mauvais futur sur 20, il perd {p5} % ou plus, et la pire baisse en chemin est généralement de {dd} %.
+144|Au milieu des futurs simulés, il termine {x} points au-dessus de l’inaction.
+145|Au milieu des futurs simulés, il termine {x} points en dessous de l’inaction.
+146|Industrie
+147|Inflation (annuelle)
+148|Inflation, taux d’intérêt, humeur
+149|Garde environ {pct} % en liquidités.
+150|Garde vos positions telles quelles.
+151|Langue
+152|Grand
+153|Les grandes valeurs d’internet montent après des signaux de nouvelles mesures de soutien.
+154|Les grandes banques battent les prévisions de bénéfices mais provisionnent davantage pour les créances douteuses.
+155|Dernière mise à jour des actualités
+156|Dernière mise à jour des prix
+157|Derniers titres
+158|Les principales valeurs de puces progressent pour la troisième séance de suite grâce aux fortes commandes de serveurs d’IA.
+159|Clair
+160|Fourchette probable (50 % centraux)
+161|En direct
+162|Prix en direct, actualités et avis d’analystes
+163|Chargement des avis d’analystes…
+164|Chargement des événements…
+165|Chargement…
+166|Plus bas, plus haut et cours du jour. La barre est la fourchette que les analystes attendent.
+167|Des taux plus bas aident généralement les valeurs de croissance et tout le marché.
+168|Personnalisez
+169|Gérer la facturation
+170|Marché
+171|Desk marchés
+172|Marché fermé
+173|Humeur du marché
+174|Les marchés
+175|Matériaux
+176|Moi
+177|Moyen
+178|Résultat médian
+179|Mitigé
+180|Humeur, fluctuations attendues, taux d’intérêt et inflation : la toile de fond qui fait bouger la plupart des actions ensemble.
+181|Plus d’actualités
+182|Nasdaq 100
+183|Neutre
+184|Actualités
+185|Actualités et médias
+186|Neuf investisseurs, un portefeuille
+187|Pas encore de données d’analystes pour cette action.
+188|Pas encore de données d’analystes pour vos positions.
+189|Aucun événement daté trouvé pour l’instant.
+190|Aucune position trouvée dans ces fichiers.
+191|Pas encore de positions
+192|Pas d’historique de prix pour cette action.
+193|Aucun titre récent.
+194|Aucun article sur vos positions pour le moment.
+195|Aucune ligne valide sélectionnée.
+196|Maintenant
+197|Données officielles américaines de la Réserve fédérale (FRED) et indice de peur et de cupidité de CNN.
+198|Le pétrole se stabilise, les opérateurs pesant les perspectives d’offre
+199|Un instant…
+200|Seulement mes positions
+201|Seul l’objectif de cours moyen est disponible pour cette action.
+202|Seulement ceci : (1) les résumés d’actualités et les étiquettes bon ou mauvais, (2) la traduction de ces résumés, (3) la lecture des relevés de courtier que vous envoyez et, en Premium, (4) le chat avec l’analyste, le point quotidien, le test de résistance et les explications rédigées des perspectives. Les prix, graphiques, notes et tous les chiffres de simulation sont des données et des calculs ordinaires, pas de l’IA.
+203|Ouvrir le terminal classique
+204|Facultatif. Dans la devise ci-dessous.
+205|Titre d’origine
+206|Autre
+207|Perspectives
+208|Payante
+209|Mot de passe
+210|Dernier mois
+211|Les paiements ne sont pas disponibles pour le moment.
+212|Paie cher des entreprises à forte croissance et accepte les secousses.
+213|Choisissez un ou plusieurs relevés de courtier (PDF, capture d’écran ou CSV). Un modèle d’IA les lit, puis vous vérifiez chaque ligne avant d’enregistrer quoi que ce soit. Rien n’est stocké sur nos serveurs.
+214|Des réponses claires sur ce qui est en temps réel, ce qui est en cache et ce qui est de l’IA.
+215|Offre
+216|Limite de l’offre
+217|Offres
+218|Valeur du portefeuille dans le temps
+219|Préfère les actions calmes et garde un coussin de liquidités.
+220|Premium
+221|Historique des prix
+222|Historique des prix et graphiques
+223|Chargement des prix…
+224|Prix actualisés {t}
+225|Les analystes professionnels notent chaque action Acheter, Conserver ou Vendre et publient un objectif de cours. Ceci les combine sur vos positions, pondérés par ce que vous détenez de chacune.
+226|Flux publics d’actualités financières : CNBC, MarketWatch, BBC Business, Nasdaq, Seeking Alpha et la Réserve fédérale, plus les titres Yahoo Finance de chaque action que vous détenez. La liste est reconstruite à la première visite après 90 minutes.
+227|Les livraisons trimestrielles sont inférieures aux attentes des analystes et l’action a reculé.
+228|Fourchette
+229|Fourchette des résultats simulés
+230|Les espoirs de baisse des taux montent après une inflation plus faible
+231|Répartition des notes et potentiel jusqu’à l’objectif de cours de cette action.
+232|Lire les relevés
+233|Lire l’article complet
+234|Lecture du fichier {i} sur {n}… cela peut prendre jusqu’à une minute.
+235|Immobilier
+236|Transactions en temps réel de la Bourse IEX via Alpaca pour les actions américaines ; Yahoo Finance pour les actions de Hong Kong et de Thaïlande. Votre écran demande de nouveaux prix environ toutes les 5 secondes quand le marché américain est ouvert, et plus lentement quand il est fermé.
+237|Supprimer
+238|Supprimer la position
+239|Supprimer {tk} de votre portefeuille ? Cette action est irréversible.
+240|Supprimée
+241|Lancer plus de futurs
+242|Lancement de {n} futurs simulés…
+243|S&P 500
+244|Enregistrer
+245|Enregistré
+246|Voir les perspectives
+247|Voir les offres
+248|Vendre
+249|Semi-conducteurs
+250|Part du portefeuille
+251|Actions
+252|Afficher l’argent en
+253|Montre comment vos positions d’aujourd’hui auraient performé, pas vos véritables transactions passées.
+254|Se connecter
+255|Connectez-vous et passez à Premium pour poser des questions sur votre propre portefeuille.
+256|Se déconnecter
+257|Connecté. Chargement de votre portefeuille…
+258|Depuis janvier
+259|Taille
+260|Dimensionne chaque position selon son risque et vise des fluctuations régulières.
+261|Petit
+262|Une erreur s’est produite. Réessayez.
+263|Source : {s}
+264|Les valeurs de base et de santé ont pris du retard sur le marché pendant que la tech menait.
+265|Point de départ : {mood}. Fluctuations de marché supposées : {vol} % par an.
+266|Relevés
+267|Prix des actions
+268|Les actions sont fermes, les rendements obligataires se détendent et les investisseurs penchent vers le risque.
+269|Test de résistance
+270|Fourchette d’objectif de cours {lo} à {hi}
+271|Les objectifs de cours sont des opinions, pas des promesses.
+272|Technologie
+273|Taille du texte
+274|Merci. Votre offre sera mise à jour dans un instant.
+275|L’analyste IA fait partie de l’offre Premium. Il lit vos propres positions et répond dans votre langue.
+276|L’IA peut se tromper. Ouvrez l’article d’origine avant d’agir.
+277|Le Capitalisateur
+278|Le Contrariant
+279|Le Trader Émotif
+280|Le Chasseur de Croissance
+281|Le Stratège Macro
+282|Le Surfeur de Momentum
+283|Le Rentier Régulier
+284|Le Quant Systématique
+285|La barre montre la fourchette large (90 % des futurs y tombent). Le trait épais est le résultat médian. La ligne fine marque l’équilibre.
+286|La vue d’ensemble
+287|Le cas baissier
+288|Les actualités sont collectées auprès de flux publics d’actualités financières, classées et résumées par un modèle d’IA. Touchez l’article pour voir pourquoi il compte pour vous.
+289|Les perspectives de neuf investisseurs
+290|La simulation n’a pas pu s’exécuter. Ajoutez des positions et réessayez.
+291|L’action a bougé de {x} le mois dernier. Une forte hausse peut signifier que les bonnes nouvelles sont déjà dans le cours.
+292|Le cas haussier
+293|Thème
+294|C’est votre position la plus en perte, donc elle compte pour votre total.
+295|Symbole
+296|Aujourd’hui
+297|Ton des titres récents sur cette action.
+298|À la une
+299|Coût total que vous avez payé
+300|Valeur totale
+301|Allège {trim} (points de pourcentage de votre portefeuille).
+302|Saisissez un symbole et le nombre d’actions détenues, ou importez un relevé de courtier.
+303|Pire baisse habituelle
+304|Rapport sur l’inflation américaine
+305|Rapport sur l’emploi américain
+306|Positions illimitées
+307|Jusqu’à 20 positions
+308|Actualisé {t}
+309|Actualisation…
+310|Utilisez CASH pour les liquidités. Hong Kong : 0700.HK, Thaïlande : PTT.BK
+311|Utilisé dans la simulation : le saut de l’événement est décalé vers cette tendance.
+312|Services publics
+313|Le VIX est la fluctuation que le marché attend pour le mois prochain. Plus il est haut, plus c’est nerveux.
+314|Valeur
+315|Nous simulons {n} façons différentes dont l’année prochaine pourrait se dérouler. Chacune a un mouvement de marché aléatoire chaque jour, des jours de choc supplémentaires autour des événements ci-dessus et du bruit sur chacune de vos actions, d’après les hauts et les bas passés de chacune. Les neuf profils vivent les mêmes futurs, donc les différences viennent de leurs règles, pas de la chance.
+316|Bon retour. Connectez-vous pour voir votre propre portefeuille.
+317|Ce que pensent les analystes
+318|Ce qui pourrait mal tourner
+319|Et si neuf types d’investisseurs gèraient exactement vos positions ? Chacun suit ses propres règles sur quoi garder, alléger et éviter. Touchez-en un pour voir sa fourchette de résultats et les raisons.
+320|Ce qui fait bouger les marchés
+321|Qu’est-ce que c’est ?
+322|Que dois-je surveiller cette semaine ?
+323|Ce qui utilise l’IA
+324|Ce qui changerait ce tableau
+325|D’où viennent les données
+326|Où est votre argent
+327|Si les histoires de marché d’aujourd’hui sont bonnes ou mauvaises pour les actions.
+328|Quels domaines mènent
+329|Quelle est ma position la plus risquée ?
+330|Pourquoi c’est important
+331|Pourquoi ce résultat
+332|Fourchette large (90 %)
+333|Rédaction…
+334|E-mail ou mot de passe incorrect, ou e-mail pas encore confirmé.
+335|Code d’import incorrect.
+336|Vous
+337|Vous avez déjà un abonnement. Utilisez Gérer la facturation pour changer d’offre.
+338|Vous regardez un portefeuille d’exemple. Créez un compte gratuit pour ajouter vos propres positions et les garder sur tous vos appareils.
+339|Vous, tel quel
+340|Votre position de Hong Kong bouge souvent avec les actualités de politique chinoise.
+341|Vos meilleures et pires performances depuis la clôture d’hier. Touchez pour ouvrir.
+342|Vos positions exactement comme aujourd’hui.
+343|Vos positions regroupées par thème. Une seule couleur occupant presque toute la barre signifie que vos résultats dépendent fortement de ce domaine.
+344|Votre offre
+345|Votre offre permet jusqu’à {n} positions. Supprimez-en ou passez à une offre supérieure.
+346|Vos positions plus sûres sont petites, donc elles amortissent peu les jours de baisse.
+347|par rapport aux cours d’aujourd’hui.
+348|baissier
+349|haussier
+350|n’a pas pu être lu
+351|p. ex. Technologie
+352|date estimée
+353|penche baissier
+354|penche haussier
+355|mitigé
+356|score d’humeur {s}
+357|humeur inconnue
+358|non disponible
+359|pas encore chargé
+360|sur cette période
+361|par mois
+362|aujourd’hui
+363|demain
+364|variation typique ±{x} %
+365|contre le S&P 500
+366|contre le marché
+367|{a} a le plus aidé ({x}). {b} vous a le plus freiné ({y}).
+368|{a} a le plus aidé aujourd’hui ({x}).
+369|{b} vous a le plus freiné aujourd’hui ({y}).
+370|{n} analystes
+371|{n} analystes : {b} % acheter, {h} % conserver, {s} % vendre
+372|{n} futurs × {d} jours de Bourse × 9 profils, exécutés en {s} secondes sur cet appareil.
+373|{n} positions · {v}
+374|{n} lignes importées
+375|{tk} génère environ {pct} % du gain attendu.
+376|Résultats de {tk}
+377|{tk} est derrière environ {pct} % des hauts et des bas.

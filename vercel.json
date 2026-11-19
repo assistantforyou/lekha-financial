@@ -26,6 +26,10 @@
   ],
   "rewrites": [
     {
+      "source": "/v2",
+      "destination": "/v2/index.html"
+    },
+    {
       "source": "/api/free/:r*",
       "destination": "/api/free?__r=:r*"
     },

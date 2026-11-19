@@ -6,6 +6,8 @@ const ROUTES = {
   "extras": () => require("./_h/free/extras"),
   "health": () => require("./_h/free/health"),
   "status": () => require("./_h/free/status"),
+  "quotes": () => require("./_h/free/quotes"),
+  "street": () => require("./_h/free/street"),
 };
 const h = require("./_router").group("free", ROUTES);
 module.exports = h;

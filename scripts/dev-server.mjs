@@ -9,7 +9,7 @@ import { createRequire } from "node:module";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(import.meta.url);
 const PORT = Number(process.argv[2]) || 3456;
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json", ".ico": "image/x-icon" };
 
 // same rewrites as vercel.json: /api/<group>/<rest> -> api/<group>.js?__r=<rest>
 const REWRITE = /^\/api\/(free|av|billing|cron|ai)\/(.+)$/;
@@ -50,7 +50,9 @@ http.createServer(async (req, res) => {
     try { await mod(req, res); } catch (e) { console.error(e); if (!res.headersSent) { res.statusCode = 500; res.end("error"); } }
     return;
   }
-  const f = join(ROOT, "public", u.pathname === "/" ? "index.html" : u.pathname);
+  let rel = u.pathname === "/" ? "index.html" : u.pathname;
+  if (/^\/v\d+\/?$/.test(rel)) rel = rel.replace(/\/?$/, "/index.html"); // same as the /v2 rewrite in vercel.json
+  const f = join(ROOT, "public", rel);
   if (!f.startsWith(join(ROOT, "public")) || !existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); return res.end("not found"); }
   res.writeHead(200, { "Content-Type": TYPES[extname(f)] || "application/octet-stream" });
   res.end(readFileSync(f));

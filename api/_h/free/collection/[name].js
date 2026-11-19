@@ -40,7 +40,8 @@ module.exports = async (req, res) => {
       return res.status(200).json(doc ? [doc] : []);
     }
     if (name === "news") {
-      const docs = await newsDocs();
+      const lang = String((req.query && req.query.lang) || "en").slice(0, 8);
+      const docs = await newsDocs(lang);
       const list = Array.isArray(docs) ? docs : [];
       // never let the CDN hold an empty answer: only successful briefings are cacheable
       if (list.length) res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");

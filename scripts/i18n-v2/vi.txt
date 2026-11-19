@@ -1,0 +1,378 @@
+0|1 tháng
+1|1 năm
+2|Lãi suất 10 năm
+3|1T
+4|1N
+5|3 tháng
+6|3T
+7|Lịch sử giá 5 năm
+8|5N
+9|6 tháng
+10|6T
+11|Điểm từ 0 đến 100 cho biết nhà đầu tư đang lo lắng hay tham lam đến đâu. Thấp là sợ hãi, cao là tham lam. Mức cực đoan thường xuất hiện trước điểm đảo chiều, nhưng không phải lúc nào cũng vậy.
+12|Một ngày yên ả. Danh mục của bạn hầu như không biến động.
+13|Chuyên viên phân tích AI: hỏi đáp, bản tin hằng ngày, kiểm tra chịu áp lực
+14|Giải thích bằng AI cho từng nhà đầu tư trong dự báo
+15|Tài khoản
+16|Tên tài khoản
+17|Thêm
+18|Thêm khoản nắm giữ
+19|Thêm khoản nắm giữ để xem điều gì có thể xảy ra tiếp theo.
+20|Thêm từng khoản hoặc nhập sao kê từ công ty môi giới.
+21|Thêm khoản nắm giữ đầu tiên
+22|Tăng tỷ trọng {add} (điểm phần trăm của danh mục).
+23|Tăng tỷ trọng {add}; giảm {trim} (điểm phần trăm của danh mục).
+24|Hàng không vũ trụ và quốc phòng
+25|Tất cả
+26|Phân bổ theo chủ đề
+27|Tôi có đang tập trung quá nhiều vào một lĩnh vực không?
+28|Phần giải thích do AI viết cho kiểu nhà đầu tư này nằm trong gói Premium.
+29|Xếp hạng và giá mục tiêu của chuyên viên phân tích
+30|Chuyên viên phân tích
+31|Hỏi
+32|Hỏi về danh mục của bạn…
+33|Hỏi chuyên viên phân tích của bạn
+34|Ít nhất 8 ký tự.
+35|Tự động
+36|Giá vốn trung bình
+37|Trung bình mức nghiêng của chuyên viên phân tích với các khoản bạn nắm giữ.
+38|Giá mục tiêu trung bình
+39|Giá mục tiêu trung bình là
+40|Trường hợp xấu (1 trên 20)
+41|Xấu cho cổ phiếu
+42|Ngân hàng chiếm một phần cỡ trung bình trong danh mục của bạn.
+43|Các ngân hàng lớn cho vay ổn định nhưng nợ xấu tăng
+44|Một số ngày có thể làm giá biến động mạnh. Trước mỗi ngày, chúng tôi xem chuyên viên phân tích kỳ vọng gì (xếp hạng và giá mục tiêu), tin tức nói gì, giá đã tăng bao nhiêu và tâm lý thị trường.
+45|Sự kiện lớn cần theo dõi: {name} ({when}). {lean}.
+46|Biến động lớn nhất hôm nay
+47|Thanh toán theo tháng và được Stripe xử lý an toàn. Hủy bất cứ lúc nào trong Quản lý thanh toán.
+48|Hiện chưa dùng được thanh toán.
+49|Mua
+50|Số lượng khuyến nghị mua, giữ, bán và giá mục tiêu từ các nhà cung cấp dữ liệu tài chính. Dùng chung giữa người dùng và cập nhật mỗi ngày, vì chuyên viên phân tích hiếm khi đổi quan điểm nhanh hơn thế.
+51|Mua công ty chất lượng với giá rẻ và giữ nhiều năm.
+52|Mua cái đang tăng và bán cái đang yếu đi.
+53|Mua thứ mà người khác đã bán tháo.
+54|Hủy
+55|Tiền mặt
+56|Tiền mặt nắm giữ
+57|Xác suất có lãi
+58|Xác suất thua lỗ
+59|Xác suất lỗ hơn 10%
+60|Đổi tiền tệ
+61|Đuổi theo cổ phiếu thắng và bán tháo hoảng loạn sau những đợt giảm lớn.
+62|Kiểm tra từng dòng, sửa chỗ sai rồi nhập.
+63|Kiểm tra email để lấy liên kết xác nhận, rồi đăng nhập.
+64|Cổ phiếu chip kéo dài đà tăng khi nhu cầu trung tâm dữ liệu tiếp tục tăng
+65|Chip là nhóm lớn nhất của bạn nên điều này nâng danh mục của bạn nhiều nhất.
+66|Hãy chọn ít nhất một tệp.
+67|Chọn {plan}
+68|Đóng
+69|Sắp tới
+70|Truyền thông
+71|Đang kết nối…
+72|Tiêu dùng không thiết yếu
+73|Giá tiêu dùng tăng ít hơn dự kiến, khiến khả năng hạ lãi suất năm tới cao hơn.
+74|Tiêu dùng thiết yếu
+75|Hiện chưa viết được phần giải thích. Hãy thử lại sau giây lát.
+76|Hãy tạo tài khoản miễn phí trước, rồi chọn gói.
+77|Tạo tài khoản miễn phí để thêm các khoản nắm giữ của riêng bạn. Danh mục mẫu vẫn ở đây cho đến lúc đó.
+78|Tạo tài khoản miễn phí để giữ danh mục của bạn trên mọi thiết bị.
+79|Tạo tài khoản
+80|Dầu thô đi ngang trong biên độ hẹp khi lo ngại nguồn cung cân bằng với nhu cầu chậm lại.
+81|Tiền tệ
+82|Giảm rủi ro khi lãi suất, lạm phát hoặc tâm lý có vẻ bất ổn.
+83|Bản tin hằng ngày
+84|Giá đóng cửa hằng ngày từ Alpaca (Mỹ) và Yahoo Finance (thị trường khác), lưu trong trình duyệt của bạn 10 phút để biểu đồ mở ngay.
+85|Tối
+86|Những ngày có thể làm biến động các khoản bạn nắm giữ. Thanh cho thấy chuyên viên phân tích và tin tức nghiêng về hướng nào trước ngày đó. Nghiêng mạnh về tăng có thể đã phản ánh trong giá.
+87|Mô hình định giá chuyên sâu, luân chuyển nhóm ngành và toàn bộ công cụ gốc.
+88|Cổ phiếu phòng thủ tụt lại khi nhà đầu tư ưa chuộng tăng trưởng
+89|Không làm gì
+90|Hãng xe điện giảm vì giao hàng không đạt dự báo
+91|Mỗi ô là một mảng của thị trường trong tháng qua. Xanh nghĩa là thắng thị trường chung, đỏ nghĩa là thua. Số lớn là mức sinh lời của chính nó.
+92|Báo cáo lợi nhuận {when}
+93|Sửa
+94|Sửa khoản nắm giữ
+95|Email
+96|Năng lượng
+97|Năng lượng chỉ là phần nhỏ trong danh mục của bạn.
+98|Nhập mã cổ phiếu và số cổ phiếu.
+99|Hãy nhập email trước.
+100|S&P 500 tỷ trọng bằng nhau
+101|Sự kiện và những gì đã nằm trong giá
+102|Mọi thứ trong gói Miễn phí
+103|Mọi thứ trong gói Trả phí
+104|Mọi thứ đều dùng được ở mọi gói. Gói cao hơn thêm chiều sâu: nhiều khoản nắm giữ hơn, lịch sử dài hơn và chuyên viên phân tích AI.
+105|Lợi nhuận kỳ vọng là lãi suất cộng rủi ro thị trường, điều chỉnh nhẹ theo giá mục tiêu của chuyên viên phân tích và sắc thái tin tức. Đây là mô hình giả định, không phải dự báo hay lời khuyên.
+106|Biến động kỳ vọng (VIX)
+107|Giải thích bằng lời dễ hiểu với AI
+108|Ngoài giờ
+109|Dữ liệu phân tích và ước tính bổ sung
+110|Rất lớn
+111|Sợ hãi cực độ
+112|Tham lam cực độ
+113|Sợ hãi
+114|Sợ hãi và tham lam
+115|Quyết định lãi suất của Fed
+116|Lãi suất chính sách của Fed
+117|Tài chính
+118|Quên mật khẩu?
+119|Miễn phí
+120|So với đỉnh 1 năm
+121|Từ điểm sợ hãi và tham lam.
+122|Toàn bộ lịch sử giá
+123|Lãi
+124|Lãi hoặc lỗ
+125|Trường hợp tốt (1 trên 20)
+126|Tốt cho cổ phiếu
+127|Tham lam
+128|Tiêu đề lấy từ các nguồn tin tài chính công khai (CNBC, MarketWatch, BBC, Nasdaq, Seeking Alpha và Cục Dự trữ Liên bang). Mô hình AI chọn tin liên quan nhất, viết tóm tắt ngắn và gắn nhãn tác động có thể xảy ra. Tiêu đề và liên kết luôn đến từ nguồn gốc.
+129|Y tế
+130|Lãi suất cao hơn thường gây áp lực lên cổ phiếu tăng trưởng. Lạm phát cao hơn có thể giữ lãi suất ở mức cao.
+131|Giữ
+132|Khoản nắm giữ
+133|Cổ phiếu công nghệ Hồng Kông hồi phục nhờ kỳ vọng kích thích
+134|Bao nhiêu chuyên viên phân tích nói Mua, Giữ hoặc Bán, và họ cho rằng giá sẽ đi về đâu trong năm tới.
+135|Cách tính
+136|Nếu ai cũng đã lạc quan, tin tốt có thể ít tác dụng: nó đã "nằm trong giá". Chúng tôi dịch cú nhảy mô phỏng của mỗi sự kiện về phía nghiêng đó (khoảng 30% kích thước thông thường) và thu nhỏ khi cổ phiếu đã tăng nhiều. Những ngày ghi "ước tính" theo lịch thông thường và có thể lệch vài ngày.
+137|Nếu email đó có tài khoản, liên kết đặt lại đang được gửi đi.
+138|Nếu thị trường đột ngột giảm
+139|Nhập
+140|Nhập sao kê
+141|Mã nhập
+142|Nhập các mục đã chọn
+143|Trong 1 trên 20 tương lai xấu, mức lỗ là {p5}% hoặc hơn, và mức sụt sâu nhất trên đường đi thường là {dd}%.
+144|Ở mức giữa của các tương lai mô phỏng, kết quả cao hơn việc không làm gì {x} điểm.
+145|Ở mức giữa của các tương lai mô phỏng, kết quả thấp hơn việc không làm gì {x} điểm.
+146|Công nghiệp
+147|Lạm phát (hằng năm)
+148|Lạm phát, lãi suất, tâm lý
+149|Giữ khoảng {pct}% tiền mặt.
+150|Giữ nguyên các vị thế của bạn.
+151|Ngôn ngữ
+152|Lớn
+153|Các cổ phiếu internet lớn tăng sau khi có gợi ý về biện pháp hỗ trợ mới.
+154|Các ngân hàng cho vay lớn vượt dự báo lợi nhuận, dù trích lập nhiều hơn cho nợ xấu.
+155|Lần cập nhật tin tức gần nhất
+156|Lần cập nhật giá gần nhất
+157|Tiêu đề mới nhất
+158|Các cổ phiếu chip hàng đầu tăng phiên thứ ba liên tiếp nhờ đơn đặt hàng máy chủ AI mạnh.
+159|Sáng
+160|Khoảng có khả năng (50% ở giữa)
+161|Trực tiếp
+162|Giá trực tiếp, tin tức và quan điểm chuyên viên phân tích
+163|Đang tải quan điểm chuyên viên phân tích…
+164|Đang tải sự kiện…
+165|Đang tải…
+166|Thấp nhất, cao nhất và giá hôm nay. Thanh là khoảng mà chuyên viên phân tích kỳ vọng.
+167|Lãi suất thấp hơn thường giúp cổ phiếu tăng trưởng và cả thị trường.
+168|Tùy chỉnh theo bạn
+169|Quản lý thanh toán
+170|Thị trường
+171|Bàn tin thị trường
+172|Thị trường đóng cửa
+173|Tâm lý thị trường
+174|Thị trường chung
+175|Vật liệu
+176|Tôi
+177|Vừa
+178|Kết quả ở giữa
+179|Trái chiều
+180|Tâm lý, biến động kỳ vọng, lãi suất và lạm phát: bối cảnh khiến hầu hết cổ phiếu cùng biến động.
+181|Thêm tin tức
+182|Nasdaq 100
+183|Trung lập
+184|Tin tức
+185|Tin tức và truyền thông
+186|Chín nhà đầu tư, một danh mục
+187|Chưa có dữ liệu chuyên viên phân tích cho cổ phiếu này.
+188|Chưa có dữ liệu chuyên viên phân tích cho các khoản bạn nắm giữ.
+189|Chưa tìm thấy sự kiện có ngày.
+190|Không tìm thấy khoản nắm giữ nào trong các tệp này.
+191|Chưa có khoản nắm giữ nào
+192|Không có lịch sử giá cho cổ phiếu này.
+193|Không có tiêu đề gần đây.
+194|Hiện chưa có bài nào về các khoản bạn nắm giữ.
+195|Chưa chọn dòng hợp lệ nào.
+196|Hiện tại
+197|Dữ liệu chính thức của Mỹ từ Cục Dự trữ Liên bang (FRED) và chỉ số sợ hãi và tham lam của CNN.
+198|Giá dầu ổn định khi giới đầu cơ cân nhắc triển vọng nguồn cung
+199|Chờ một chút…
+200|Chỉ khoản của tôi
+201|Chỉ có giá mục tiêu trung bình cho cổ phiếu này.
+202|Chỉ những phần này: (1) tóm tắt tin tức và nhãn tốt hay xấu, (2) bản dịch các bản tóm tắt đó, (3) đọc sao kê môi giới bạn tải lên, và ở gói Premium là (4) trò chuyện với chuyên viên phân tích, bản tin hằng ngày, kiểm tra chịu áp lực và các giải thích bằng văn bản trong dự báo. Giá, biểu đồ, xếp hạng và mọi con số mô phỏng đều là dữ liệu và toán thông thường, không phải AI.
+203|Mở bản terminal cổ điển
+204|Tùy chọn. Bằng loại tiền bên dưới.
+205|Tiêu đề gốc
+206|Khác
+207|Dự báo
+208|Trả phí
+209|Mật khẩu
+210|Tháng qua
+211|Hiện chưa thanh toán được.
+212|Trả giá cao cho công ty tăng trưởng nhanh và chấp nhận biến động.
+213|Chọn một hoặc nhiều sao kê môi giới (PDF, ảnh chụp màn hình hoặc CSV). Một mô hình AI đọc chúng, rồi bạn kiểm tra từng dòng trước khi lưu. Không có gì được lưu trên máy chủ của chúng tôi.
+214|Câu trả lời thẳng thắn về cái gì là thời gian thực, cái gì được lưu đệm và cái gì là AI.
+215|Gói
+216|Giới hạn gói
+217|Các gói
+218|Giá trị danh mục theo thời gian
+219|Thích cổ phiếu ít biến động và giữ một lớp đệm tiền mặt.
+220|Premium
+221|Lịch sử giá
+222|Lịch sử giá và biểu đồ
+223|Đang tải giá…
+224|Giá cập nhật {t}
+225|Chuyên viên phân tích chuyên nghiệp xếp hạng mỗi cổ phiếu Mua, Giữ hoặc Bán và công bố giá mục tiêu. Mục này gộp họ lại trên các khoản bạn nắm giữ, theo tỷ trọng bạn sở hữu mỗi loại.
+226|Nguồn tin tài chính công khai: CNBC, MarketWatch, BBC Business, Nasdaq, Seeking Alpha và Cục Dự trữ Liên bang, cùng tiêu đề Yahoo Finance cho từng cổ phiếu bạn sở hữu. Danh sách được tạo lại ở lần truy cập đầu tiên sau 90 phút.
+227|Số xe giao hàng quý thấp hơn kỳ vọng của chuyên viên phân tích và cổ phiếu giảm.
+228|Khoảng
+229|Khoảng kết quả mô phỏng
+230|Kỳ vọng cắt giảm lãi suất tăng sau số liệu lạm phát hạ nhiệt
+231|Cơ cấu xếp hạng và dư địa tăng tới giá mục tiêu của cổ phiếu này.
+232|Đọc sao kê
+233|Đọc toàn bộ bài viết
+234|Đang đọc tệp {i} trên {n}… có thể mất đến một phút.
+235|Bất động sản
+236|Giao dịch thời gian thực từ sàn IEX qua Alpaca cho cổ phiếu Mỹ; Yahoo Finance cho cổ phiếu Hồng Kông và Thái Lan. Màn hình của bạn xin giá mới khoảng 5 giây một lần khi thị trường Mỹ mở, và chậm hơn khi đóng cửa.
+237|Xóa
+238|Xóa khoản nắm giữ
+239|Xóa {tk} khỏi danh mục của bạn? Không thể hoàn tác.
+240|Đã xóa
+241|Chạy thêm tương lai
+242|Đang chạy {n} tương lai mô phỏng…
+243|S&P 500
+244|Lưu
+245|Đã lưu
+246|Xem dự báo
+247|Xem các gói
+248|Bán
+249|Bán dẫn
+250|Tỷ trọng trong danh mục
+251|Cổ phiếu
+252|Hiển thị tiền bằng
+253|Cho thấy các khoản nắm giữ hôm nay sẽ hoạt động ra sao trong quá khứ, không phải các giao dịch thật của bạn.
+254|Đăng nhập
+255|Đăng nhập và nâng cấp lên Premium để hỏi về danh mục của riêng bạn.
+256|Đăng xuất
+257|Đã đăng nhập. Đang tải danh mục của bạn…
+258|Từ tháng Một
+259|Quy mô
+260|Định cỡ mỗi vị thế theo rủi ro và hướng tới biến động ổn định.
+261|Nhỏ
+262|Đã xảy ra lỗi. Hãy thử lại.
+263|Nguồn: {s}
+264|Nhóm thiết yếu và y tế tụt sau thị trường trong khi công nghệ dẫn dắt.
+265|Điểm xuất phát: {mood}. Biến động thị trường giả định: {vol}% một năm.
+266|Sao kê
+267|Giá cổ phiếu
+268|Cổ phiếu vững, lợi suất trái phiếu giảm và nhà đầu tư nghiêng về chấp nhận rủi ro.
+269|Kiểm tra chịu áp lực
+270|Khoảng giá mục tiêu {lo} đến {hi}
+271|Giá mục tiêu là ý kiến, không phải lời hứa.
+272|Công nghệ
+273|Cỡ chữ
+274|Cảm ơn bạn. Gói của bạn sẽ cập nhật trong giây lát.
+275|Chuyên viên phân tích AI nằm trong gói Premium. Nó đọc các khoản bạn nắm giữ và trả lời bằng ngôn ngữ của bạn.
+276|AI có thể sai. Hãy mở bài gốc trước khi hành động.
+277|Nhà tích lũy dài hạn
+278|Nhà đầu tư ngược dòng
+279|Nhà giao dịch cảm xúc
+280|Thợ săn tăng trưởng
+281|Nhà chiến lược vĩ mô
+282|Người cưỡi đà
+283|Người thu nhập ổn định
+284|Nhà định lượng hệ thống
+285|Thanh cho thấy khoảng rộng (90% các tương lai nằm trong đó). Vạch dày là kết quả ở giữa. Đường mảnh đánh dấu hòa vốn.
+286|Bức tranh lớn
+287|Kịch bản xấu
+288|Tin tức được thu thập từ các nguồn tin tài chính công khai, do mô hình AI xếp hạng và tóm tắt. Chạm vào bài để xem vì sao nó quan trọng với bạn.
+289|Dự báo của chín nhà đầu tư
+290|Không chạy được mô phỏng. Hãy thêm vài khoản nắm giữ rồi thử lại.
+291|Cổ phiếu đã biến động {x} trong tháng qua. Đà tăng mạnh có thể có nghĩa tin tốt đã nằm trong giá.
+292|Kịch bản tốt
+293|Chủ đề
+294|Đây là vị thế lỗ sâu nhất của bạn nên ảnh hưởng đến tổng của bạn.
+295|Mã cổ phiếu
+296|Hôm nay
+297|Sắc thái của các tiêu đề gần đây về cổ phiếu này.
+298|Tin nổi bật
+299|Tổng chi phí bạn đã trả
+300|Tổng giá trị
+301|Giảm tỷ trọng {trim} (điểm phần trăm của danh mục).
+302|Nhập mã cổ phiếu và số cổ phiếu bạn sở hữu, hoặc nhập sao kê từ công ty môi giới.
+303|Mức sụt sâu nhất thường gặp
+304|Báo cáo lạm phát Mỹ
+305|Báo cáo việc làm Mỹ
+306|Không giới hạn khoản nắm giữ
+307|Tối đa 20 khoản nắm giữ
+308|Cập nhật {t}
+309|Đang cập nhật…
+310|Dùng CASH cho tiền mặt. Hồng Kông: 0700.HK, Thái Lan: PTT.BK
+311|Dùng trong mô phỏng: cú nhảy của sự kiện được dịch về phía nghiêng này.
+312|Tiện ích công cộng
+313|VIX là biến động mà thị trường kỳ vọng trong tháng tới. Càng cao càng lo lắng.
+314|Giá trị
+315|Chúng tôi mô phỏng {n} cách khác nhau mà năm tới có thể diễn ra. Mỗi cách có một biến động thị trường ngẫu nhiên mỗi ngày, những ngày chấn động thêm quanh các sự kiện ở trên, và nhiễu ở từng cổ phiếu của bạn, dựa trên những lên xuống trong quá khứ của chính nó. Chín nhà đầu tư trải qua cùng các tương lai, nên khác biệt đến từ quy tắc của họ, không phải may rủi.
+316|Chào mừng bạn trở lại. Đăng nhập để xem danh mục của riêng bạn.
+317|Chuyên viên phân tích nghĩ gì
+318|Điều gì có thể sai
+319|Nếu chín kiểu nhà đầu tư khác nhau quản lý đúng các khoản bạn nắm giữ thì sao? Mỗi người theo quy tắc riêng về giữ, giảm và tránh gì. Chạm vào một người để xem khoảng kết quả và lý do.
+320|Điều gì đang làm thị trường biến động
+321|Đây là gì?
+322|Tuần này tôi nên theo dõi gì?
+323|Cái gì dùng AI
+324|Điều gì sẽ thay đổi bức tranh này
+325|Dữ liệu đến từ đâu
+326|Tiền của bạn đang ở đâu
+327|Những câu chuyện thị trường hôm nay tốt hay xấu cho cổ phiếu.
+328|Lĩnh vực nào đang dẫn đầu
+329|Vị thế nào rủi ro nhất của tôi?
+330|Vì sao quan trọng
+331|Vì sao có kết quả này
+332|Khoảng rộng (90%)
+333|Đang viết…
+334|Sai email hoặc mật khẩu, hoặc email chưa được xác nhận.
+335|Sai mã nhập.
+336|Bạn
+337|Bạn đã có gói đăng ký. Dùng Quản lý thanh toán để đổi gói.
+338|Bạn đang xem danh mục mẫu. Tạo tài khoản miễn phí để thêm các khoản nắm giữ của riêng bạn và giữ trên mọi thiết bị.
+339|Bạn, giữ nguyên
+340|Khoản nắm giữ Hồng Kông của bạn thường biến động theo tin chính sách Trung Quốc.
+341|Những khoản tốt nhất và tệ nhất của bạn kể từ giá đóng cửa hôm qua. Chạm để mở.
+342|Các khoản bạn nắm giữ đúng như hôm nay.
+343|Các khoản nắm giữ nhóm theo chủ đề. Nếu một màu chiếm gần hết thanh, kết quả của bạn phụ thuộc nhiều vào mảng đó.
+344|Gói của bạn
+345|Gói của bạn chứa tối đa {n} khoản nắm giữ. Hãy xóa bớt hoặc nâng cấp để có thêm.
+346|Các khoản an toàn hơn của bạn nhỏ nên ít đệm đỡ trong ngày giảm.
+347|so với giá hôm nay.
+348|giảm giá
+349|tăng giá
+350|không đọc được
+351|ví dụ Công nghệ
+352|ngày ước tính
+353|nghiêng về giảm
+354|nghiêng về tăng
+355|trái chiều
+356|điểm tâm lý {s}
+357|chưa rõ tâm lý
+358|không có
+359|chưa tải
+360|trong giai đoạn này
+361|mỗi tháng
+362|hôm nay
+363|ngày mai
+364|biến động thường gặp ±{x}%
+365|so với S&P 500
+366|so với thị trường
+367|{a} giúp nhiều nhất ({x}). {b} kéo bạn xuống nhiều nhất ({y}).
+368|{a} giúp nhiều nhất hôm nay ({x}).
+369|{b} kéo bạn xuống nhiều nhất hôm nay ({y}).
+370|{n} chuyên viên phân tích
+371|{n} chuyên viên phân tích: {b}% mua, {h}% giữ, {s}% bán
+372|{n} tương lai × {d} ngày giao dịch × 9 nhà đầu tư, chạy trong {s} giây trên thiết bị này.
+373|{n} khoản nắm giữ · {v}
+374|Đã nhập {n} dòng
+375|{tk} đóng góp khoảng {pct}% khoản lãi kỳ vọng.
+376|Báo cáo lợi nhuận {tk}
+377|{tk} đứng sau khoảng {pct}% các biến động lên xuống.

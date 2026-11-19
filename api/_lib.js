@@ -62,6 +62,19 @@ async function av(params) {
   return j;
 }
 
+// Same budget and spacing as av(), for the endpoints that answer in CSV (EARNINGS_CALENDAR).
+async function avCsv(params) {
+  if (!(await spend())) throw new Error("daily_budget_exhausted");
+  const wait = lastCallAt + 1200 - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastCallAt = Date.now();
+  const qs = new URLSearchParams({ ...params, apikey: process.env.AV_API_KEY });
+  const r = await fetch(`https://www.alphavantage.co/query?${qs}`);
+  const t = await r.text();
+  if (!r.ok || /^\s*\{/.test(t)) throw new Error("alpha_vantage_refused");
+  return t;
+}
+
 // Serve fresh cache; refresh when stale; fall back to stale data if the refresh fails or the budget is gone.
 async function cached(key, ttlMs, build) {
   const hit = await cacheGet(key);
@@ -77,4 +90,4 @@ async function cached(key, ttlMs, build) {
   return hit ? hit.payload : null;
 }
 
-module.exports = { sb, av, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };
+module.exports = { sb, av, avCsv, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };

@@ -26,11 +26,12 @@ module.exports = async (req, res) => {
       const c = await stripe("POST", "customers", { email: u.email, metadata: { user_id: u.id } });
       customer = c.id; await updateProfile(u.id, { stripe_customer_id: customer });
     }
+    const ret = req.body && req.body.ret === "/v2" ? "/v2" : "/";
     const origin = `https://${req.headers["x-forwarded-host"] || req.headers.host}`;
     const s = await stripe("POST", "checkout/sessions", {
       mode: "subscription", customer, client_reference_id: u.id,
       line_items: { 0: { price: priceId, quantity: 1 } },
-      success_url: origin + "/?billing=success", cancel_url: origin + "/?billing=cancel",
+      success_url: origin + ret + "?billing=success", cancel_url: origin + ret + "?billing=cancel",
       allow_promotion_codes: "true", subscription_data: { metadata: { user_id: u.id, plan } },
     });
     return res.status(200).json({ url: s.url });
