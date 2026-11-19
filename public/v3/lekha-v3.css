@@ -67,7 +67,8 @@ body{background:var(--bg);color:var(--fg);margin:0}
   .v3bar{gap:8px;padding:8px 12px}
   .v3bar .brand img{height:22px}
   .v3bar .status{margin-left:0;width:100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
-  .v3bar #st-news,.v3bar #to-v2{display:none}
+  .v3bar #st-news,.v3bar #to-v2,.v3bar #lay-toggle{display:none}
+  .v3bar .status>*{flex:none;white-space:nowrap}
   .v3nav{top:auto;position:relative}
   .v3nav button{padding:12px 10px 10px;font-size:12px}
   .wrap{padding:0 12px 32px}
