@@ -1,7 +1,7 @@
 // SEC EDGAR access (keyless). Only data.sec.gov JSON APIs are used, with a generic descriptive User-Agent (no personal details).
 // SEC allows 10 requests/second; calls are spaced ~120 ms apart per function instance.
 const CIKS = require("./_data/sp500_cik.json");
-const UA = "portfolio-terminal personal-dashboard";
+const UA = process.env.SEC_USER_AGENT || "PortfolioTerminal assistantforyou999@gmail.com";   // SEC requires a declared contact (same value _insiders.js already uses)
 let last = 0;
 
 async function secGet(url, tries = 2) {

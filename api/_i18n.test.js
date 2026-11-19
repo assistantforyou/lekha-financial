@@ -1,11 +1,11 @@
 // Run: node api/_i18n.test.js
-// Language support: the pure text functions of public/pt-i18n.js, the generated dictionaries in public/i18n/,
+// Language support: the pure text functions of public/v2/pt-i18n.js, the generated dictionaries in public/i18n/,
 // and the AI answer-language whitelist (api/_h/ai/_lang.js).
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const I = require("../public/pt-i18n.js");
+const I = require("../public/v2/pt-i18n.js");
 const L = require("./_h/ai/_lang.js");
 
 const CODES = ["th", "zh-Hans", "zh-Hant", "ja", "ko", "es", "hi", "vi", "fr"];

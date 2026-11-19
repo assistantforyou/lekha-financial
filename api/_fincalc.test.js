@@ -1,0 +1,25 @@
+const assert = require("assert"); const c = require("./_fin/calc");
+const near = (a, b, e = 1e-9) => assert.ok(Math.abs(a - b) < e, `${a} !~ ${b}`);
+near(c.cagr(100, 200, 5), 2 ** (1 / 5) - 1); assert.strictEqual(c.cagr(-1, 5, 3), null); assert.strictEqual(c.cagr(100, 0, 3), null);
+near(c.growth(118, 100), 0.18); assert.strictEqual(c.growth(5, 0), null); assert.strictEqual(c.growth(5, -3), null);
+near(c.margin(30, 120), 0.25); assert.strictEqual(c.margin(1, 0), null);
+near(c.roe(20, 110, 90), 0.2); near(c.roe(20, 100), 0.2); assert.strictEqual(c.roe(20, -5, -5), null);
+near(c.roic(100, 0.2, 300, 700, 0), 0.08); assert.strictEqual(c.roic(100, 0.2, 0, 0, 0), null);
+near(c.debtToEquity(50, 100), 0.5); assert.strictEqual(c.debtToEquity(50, -1), null); near(c.currentRatio(300, 150), 2);
+near(c.pe(150, 5), 30); assert.strictEqual(c.pe(150, -1), null); near(c.earningsYield(5, 100), 0.05);
+near(c.fcfYield(40, 1000), 0.04); near(c.enterpriseValue(1000, 200, 150), 1050); near(c.evToEbitda(1050, 105), 10);
+near(c.peg(30, 0.15), 2); assert.strictEqual(c.peg(30, -0.1), null);
+near(c.costOfEquity(0.04, 1.2, 0.05), 0.10); near(c.wacc({ equity: 800, debt: 200, costEquity: 0.1, costDebt: 0.05, taxRate: 0.2 }), 0.8 * 0.1 + 0.2 * 0.05 * 0.8);
+// DCF: flat 0 % growth, terminal 0 %, 10 % discount, FCF 100 => perpetuity value 1000 (10 explicit years + terminal sum to 1000)
+const d = c.dcf({ fcf: 100, growth: 0, terminalGrowth: 0, discount: 0.1, years: 10, netDebt: 100, shares: 10 });
+near(d.enterpriseValue, 1000, 1e-6); near(d.equityValue, 900, 1e-6); near(d.perShare, 90, 1e-6);
+assert.strictEqual(c.dcf({ fcf: 100, growth: 0.05, terminalGrowth: 0.06, discount: 0.05 }), null);
+const r = c.returnsFrom([100, 110, 99]); near(r[0], 0.1); near(r[1], -0.1);
+near(c.volatility([0.01, -0.01, 0.01, -0.01], 252), c.stdev([0.01, -0.01, 0.01, -0.01]) * Math.sqrt(252));
+near(c.beta([0.02, -0.02, 0.04, 0.0], [0.01, -0.01, 0.02, 0.0]), 2); assert.strictEqual(c.beta([1], [1]), null);
+assert.ok(c.sharpe([0.01, 0.02, -0.005, 0.015, 0.0], 0.02) > 0); assert.strictEqual(c.sharpe([0.01, 0.01], 0), null);
+const dd = c.drawdown([100, 120, 90, 110, 80]); near(dd.maxDrawdown, 80 / 120 - 1); assert.strictEqual(dd.peakIndex, 1); assert.strictEqual(dd.troughIndex, 4);
+const al = c.portfolioAllocation([{ symbol: "A", value: 300 }, { symbol: "B", value: 100 }, { symbol: "C", value: 0 }]); near(al.weights[0].weight, 0.75); near(al.concentrationHHI, 0.75 ** 2 + 0.25 ** 2);
+const pr = c.portfolioReturn([{ quantity: 10, price: 12, costBasis: 100, previousClose: 11 }]); near(pr.pnl, 20); near(pr.returnFraction, 0.2); near(pr.dayChange, 10);
+near(c.ttm([{ period: "2025-03-31", x: 1 }, { period: "2025-06-30", x: 2 }, { period: "2025-09-30", x: 3 }, { period: "2025-12-31", x: 4 }, { period: "2024-12-31", x: 99 }], "x"), 10);
+console.log("_fincalc.test.js ok");

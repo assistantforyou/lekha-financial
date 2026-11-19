@@ -1,0 +1,56 @@
+/* Tailwind WITHOUT global preflight: the classic V2/V3 panels rely on browser defaults. A scoped reset covers the React shell only (.shell, minus .cx). */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* LEKHA Teal is the default palette (main's skin). Any of the 100 themes overrides these inline on <html>. */
+:root { --bg:#0B0E11; --panel:#13181D; --panel-2:#191F26; --line:#242C34; --fg:#EDF0F3; --muted:#98A2AD; --accent:#3DCDAA; --accent-soft:#12372F; --up:#3FD18D; --down:#FF6F63; --warn:#F0A33A; --chart:#3DCDAA; --chart-fill:rgba(61,205,170,.12); --s2:#F0A33A; --s3:#A893D9; color-scheme:dark;
+  --f-body:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI","Noto Sans","Noto Sans Thai","Sukhumvit Set","Hiragino Sans",sans-serif; --f-display:Inter,ui-sans-serif,system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; }
+:root[data-theme="light"] { --bg:#F3F1EA; --panel:#FFFFFF; --panel-2:#F7F5EF; --line:#E4E0D6; --fg:#14171C; --muted:#656C76; --accent:#0A7A6A; --accent-soft:#DFF0EC; --up:#0F8050; --down:#C63A2F; --warn:#A96300; --chart:#0A7A6A; --chart-fill:rgba(10,122,106,.1); color-scheme:light; }
+
+/* shadcn tokens derive from the classic tokens, so every theme restyles the shell and the panels together */
+:root { --background:var(--bg); --foreground:var(--fg); --card:var(--panel); --card-foreground:var(--fg); --popover:var(--panel); --popover-foreground:var(--fg); --primary:var(--accent); --primary-foreground:color-mix(in srgb,var(--bg) 92%,black);
+  --secondary:var(--panel-2); --secondary-foreground:var(--fg); --muted-token:var(--panel-2); --muted-foreground:var(--muted); --accent-token:var(--accent-soft); --border:var(--line); --input:color-mix(in srgb,var(--line) 85%,var(--fg)); --ring:var(--accent); --destructive:var(--down); --radius:.75rem; }
+@theme inline {
+  --color-background:var(--background); --color-foreground:var(--foreground); --color-card:var(--card); --color-card-foreground:var(--card-foreground); --color-popover:var(--popover); --color-popover-foreground:var(--popover-foreground);
+  --color-primary:var(--primary); --color-primary-foreground:var(--primary-foreground); --color-secondary:var(--secondary); --color-secondary-foreground:var(--secondary-foreground); --color-muted:var(--panel-2); --color-muted-foreground:var(--muted-foreground);
+  --color-accent:var(--accent-soft); --color-accent-foreground:var(--fg); --color-border:var(--border); --color-input:var(--input); --color-ring:var(--ring); --color-destructive:var(--destructive);
+  --font-sans:var(--f-body); --font-mono:var(--f-mono); --radius-md:calc(var(--radius) - 2px); --radius-lg:var(--radius); --radius-xl:calc(var(--radius) + 4px);
+}
+html { font-size:calc(16px * var(--zoom,1)); }
+body { margin:0; background:var(--bg); color:var(--fg); font-family:var(--f-body); -webkit-font-smoothing:antialiased; }
+[hidden] { display:none !important; }
+
+/* scoped reset: shell only, never inside classic panels (.cx) */
+@layer base {
+  @scope (.shell) to (.cx) {
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; border:0 solid var(--border); }
+    button, input, select, textarea { font:inherit; color:inherit; background:transparent; }
+    button { cursor:pointer; } a { color:inherit; text-decoration:none; } h1,h2,h3,h4 { font-size:inherit; font-weight:inherit; }
+    ul, ol { list-style:none; } img, svg { display:block; } table { border-collapse:collapse; } :focus-visible { outline:2px solid var(--ring); outline-offset:2px; }
+  }
+}
+.num { font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
+.up-t { color:var(--up); } .down-t { color:var(--down); }
+.sidebar-scroll { scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+@media (prefers-reduced-motion:reduce){ *{animation-duration:.01ms!important;transition-duration:.01ms!important} }
+
+/* ---- classic panels inside the shell: same tokens, shadcn-style surfaces ---- */
+.cx { font-family:var(--f-body); font-size:14px; line-height:1.5; color:var(--fg); }
+.cx .panel { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 1px 0 color-mix(in srgb,#000 12%,transparent); }
+.cx .btn, .cx .seg, .cx .pill, .cx .seg button { border-radius:8px; font-family:var(--f-body); }
+.cx .seg button { font-size:12px; } .cx .pill { font-family:var(--f-mono); }
+.cx .btn { background:var(--panel-2); } .cx .btn:hover { border-color:var(--accent); }
+.cx .btn.pri { background:var(--accent); color:color-mix(in srgb,var(--bg) 92%,black); border-color:var(--accent); }
+.cx input, .cx select, .cx textarea { border-radius:8px; }
+.cx .kpis { border-radius:14px; } .cx .kpi .val { font-family:var(--f-mono); }
+.cx table { border-radius:10px; }
+.cx .v3sum { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.cx .v3sc { border:1px solid var(--line); border-radius:12px; padding:12px 14px; background:var(--panel-2); font-size:13.5px; line-height:1.55; }
+.cx .v3sc h3 { margin:0 0 6px; font:600 11px/1 var(--f-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--accent); } .cx .v3sc p { margin:0 0 4px; }
+@media (max-width:1000px){ .cx .v3sum{grid-template-columns:repeat(2,minmax(0,1fr))} } @media (max-width:560px){ .cx .v3sum{grid-template-columns:1fr} }
+.cx #summary .sm-line { display:none; }
+.cx > #tab-sim, .cx > #tab-an-deep, .cx > #tab-an-council { display:block; }
+/* the engine's own floating bits that attach to <body> (account prompt, theme popover) */
+#theme-btn, #theme-pop, #theme-backdrop { display:none !important; }
+#demo-prompt { position:fixed; z-index:45; left:50%; bottom:16px; transform:translateX(-50%); max-width:min(560px,92vw); display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:12px 14px; border-radius:12px; border:1px solid var(--line); background:var(--panel); color:var(--fg); box-shadow:0 14px 40px rgba(0,0,0,.4); font-size:13px; }

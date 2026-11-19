@@ -1,6 +1,7 @@
-// POST /api/auth/signup|login|refresh|logout|password|recover|prefs, GET /api/auth/me
+// POST /api/auth/signup|login|refresh|logout|password|email|delete|recover|prefs, GET /api/auth/me
 // Session tokens are returned to the browser (stored in localStorage there); passwords are never stored or logged here.
 const { gotrue, admin, userFrom, profile, updateProfile, publicProfile, bearer } = require("../_auth");
+const { sb } = require("../_lib");
 const { rateHit } = require("../_lib");
 const { clientId } = require("../_history");
 
@@ -85,6 +86,28 @@ module.exports = async (req, res) => {
     if (password.length < 8 || password.length > 72) return res.status(400).json({ error: "Passwords are 8 to 72 characters." });
     const r = await gotrue("user", { method: "PUT", headers: { Authorization: `Bearer ${tok}` }, body: JSON.stringify({ password }) });
     return r.ok ? res.status(200).json({ ok: true }) : res.status(400).json({ error: "Could not change the password." });
+  }
+  // change the sign-in email: GoTrue sends a confirmation link to the new address; nothing changes until it is clicked
+  if (action === "email") {
+    const tok = bearer(req), email = String(b.email || "").trim().toLowerCase();
+    if (!tok) return res.status(401).json({ error: "Sign in first." });
+    if (!EMAIL.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
+    const r = await gotrue("user", { method: "PUT", headers: { Authorization: `Bearer ${tok}` }, body: JSON.stringify({ email }) });
+    return r.ok ? res.status(200).json({ ok: true, message: "Check the new address for a confirmation link. Your sign-in email changes when you confirm it." }) : res.status(400).json({ error: "Could not start the email change." });
+  }
+  // permanently delete the account and its stored state. Re-checks the password, requires the typed word DELETE, and refuses while a paid plan is active.
+  if (action === "delete") {
+    const u = await userFrom(req); if (!u) return res.status(401).json({ error: "Sign in first." });
+    if (String(b.confirm || "") !== "DELETE") return res.status(400).json({ error: "Type DELETE to confirm." });
+    const password = String(b.password || ""); if (password.length < 8 || password.length > 72) return res.status(400).json({ error: "Enter your password to confirm." });
+    const chk = await gotrue("token?grant_type=password", { method: "POST", body: JSON.stringify({ email: u.email, password }) });
+    if (!chk.ok) return res.status(400).json({ error: "That password is not correct." });
+    const p = await profile(u);
+    if ((p.plan === "paid" || p.plan === "premium") && p.sub_status && !/^(canceled|cancelled|incomplete_expired)$/.test(p.sub_status)) return res.status(409).json({ error: "Cancel your subscription first (Plans & billing, Manage subscription), then delete the account.", code: "active_subscription" });
+    await sb(`pt_user_state?user_id=eq.${u.id}`, { method: "DELETE" }).catch(() => {});
+    await sb(`pt_profiles?user_id=eq.${u.id}`, { method: "DELETE" }).catch(() => {});
+    const d = await admin(`admin/users/${u.id}`, { method: "DELETE" });
+    return d.ok ? res.status(200).json({ ok: true }) : res.status(502).json({ error: "The account could not be deleted. Nothing else was changed; try again or contact support." });
   }
   if (action === "prefs") {
     const u = await userFrom(req);

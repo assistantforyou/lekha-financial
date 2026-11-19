@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:login",
+  "buildCommand": "npm run build:app",
   "outputDirectory": "public",
   "functions": {
     "api/**/*.js": {
@@ -52,6 +52,10 @@
     {
       "source": "/api/cron/:r*",
       "destination": "/api/cron?__r=:r*"
+    },
+    {
+      "source": "/api/data/:r*",
+      "destination": "/api/data?__r=:r*"
     }
   ]
 }
