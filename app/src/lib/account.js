@@ -6,7 +6,7 @@ export const signup = async (email, password) => { const j = await post("/api/au
 export const recover = (email) => post("/api/auth/recover", { email })
 export const logout = async () => { await post("/api/auth/logout", {}, true).catch(() => {}); window.PT_AUTH.setSession(null); try { window.PT_SYNC && PT_SYNC.reset() } catch (e) {} }
 export const changePassword = (password) => post("/api/auth/password", { password }, true)
-export const changeEmail = (email) => post("/api/auth/email", { email }, true)
+export const changeEmail = (email, password) => post("/api/auth/email", { email, password }, true)
 export const deleteAccount = (password, confirm) => post("/api/auth/delete", { password, confirm }, true)
 export const checkout = (plan) => post("/api/billing/checkout", { plan }, true)
 export const portal = () => post("/api/billing/portal", {}, true)

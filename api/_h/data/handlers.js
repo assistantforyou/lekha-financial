@@ -26,7 +26,7 @@ const GET = {
   profile: (q) => svc.getCompanyProfile(q.symbol), statements: (q) => svc.getFinancialStatements(q.symbol, { type: q.type }), facts: (q) => svc.getCompanyFacts(q.symbol),
   filings: (q) => svc.getSecFilings(q.symbol, { forms: list(q.forms), limit: num(q.limit, 40) }), news: (q) => svc.getNews({ symbol: q.symbol || null, category: q.category || null, query: q.q || null, limit: num(q.limit, 25) }),
   earnings: (q) => svc.getEarnings(q.symbol), estimates: (q) => svc.getEstimates(q.symbol), peers: (q) => svc.getPeers(q.symbol), ratios: (q) => svc.getRatios(q.symbol),
-  valuation: (q) => svc.getValuation(q.symbol, { growth: q.growth != null ? num(q.growth) : undefined, discount: q.discount != null ? num(q.discount) : undefined, terminalGrowth: q.terminalGrowth != null ? num(q.terminalGrowth) : undefined, years: q.years ? num(q.years) : undefined }),
+  valuation: (q) => svc.getValuation(q.symbol, { growth: q.growth != null ? num(q.growth) : undefined, discount: q.discount != null ? num(q.discount) : undefined, terminalGrowth: q.terminalGrowth != null ? num(q.terminalGrowth) : undefined, years: q.years ? Math.max(1, Math.min(40, Math.floor(num(q.years, 10)))) : undefined }),
   macro: (q) => (q.id ? svc.getMacroSeries(q.id, { years: num(q.years, 10) }) : svc.getMacroDashboard()), fx: (q) => svc.getFX(q.base || "USD"),
 };
 const NOSTORE = new Set(["quote"]);
@@ -47,7 +47,11 @@ function make(route) {
     if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
     const b = req.body && typeof req.body === "object" ? req.body : {}, fn = String(b.fn || "");
     if (!Object.prototype.hasOwnProperty.call(calc, fn) || typeof calc[fn] !== "function" || fn === "result") return res.status(400).json({ error: "Unknown calculation.", available: Object.keys(calc).filter((k) => typeof calc[k] === "function" && k !== "result") });
-    const args = Array.isArray(b.args) ? b.args : [];
+    if (limited(req, 30)) return res.status(429).json({ error: "Too many requests. Slow down." });
+    // bounded inputs only: at most 8 arguments, each a number, null, a numeric array (<= 5000 items) or a flat object of <= 20 numeric fields
+    const args = Array.isArray(b.args) ? b.args : [], numOk = (v) => v == null || (typeof v === "number" && Number.isFinite(v));
+    const argOk = (a) => numOk(a) || (Array.isArray(a) && a.length <= 5000 && a.every((x) => numOk(x) || (x && typeof x === "object" && !Array.isArray(x) && Object.keys(x).length <= 20 && Object.values(x).every((y) => numOk(y) || typeof y === "string")))) || (a && typeof a === "object" && !Array.isArray(a) && Object.keys(a).length <= 20 && Object.values(a).every(numOk));
+    if (args.length > 8 || !args.every(argOk)) return res.status(400).json({ error: "Invalid inputs." });
     try { const value = calc[fn](...args); res.setHeader("Cache-Control", "no-store"); return res.status(200).json({ fn, value, kind: "calculated", note: "Deterministic server-side calculation. Rates are fractions." }); } catch (e) { return res.status(400).json({ error: "Invalid inputs." }); }
   };
   if (route === "agent") return require("./agent-route");

@@ -9,6 +9,15 @@ const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 const session = (j) => ({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at || Math.floor(Date.now() / 1000) + (j.expires_in || 3600), email: j.user && j.user.email });
 const msg = (j, fallback) => String((j && (j.msg || j.error_description || j.message || j.error)) || fallback).slice(0, 200);
 
+// password re-check for sensitive actions: rate limited per user as well as per client, then verified against GoTrue
+async function reauth(u, password, res) {
+  if (!(await rateHit(`rl/auth-user/${u.id}/${Math.floor(Date.now() / 6e5)}`, 8))) { res.status(429).json({ error: "Too many attempts. Wait a few minutes." }); return false; }
+  if (password.length < 8 || password.length > 72) { res.status(400).json({ error: "Enter your current password to confirm." }); return false; }
+  const chk = await gotrue("token?grant_type=password", { method: "POST", body: JSON.stringify({ email: u.email, password }) });
+  if (!chk.ok) { res.status(400).json({ error: "That password is not correct." }); return false; }
+  return true;
+}
+
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const action = String((req.query && req.query.action) || "");
@@ -32,7 +41,7 @@ module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
 
   // brute-force guard: 20 auth attempts per client per 10 minutes
-  if (["setup", "signup", "login", "recover"].includes(action) && !(await rateHit(`rl/auth/${clientId(req)}/${Math.floor(Date.now() / 6e5)}`, 20))) return res.status(429).json({ error: "Too many attempts. Wait a few minutes." });
+  if (["setup", "signup", "login", "recover", "password", "email", "delete"].includes(action) && !(await rateHit(`rl/auth/${clientId(req)}/${Math.floor(Date.now() / 6e5)}`, 20))) return res.status(429).json({ error: "Too many attempts. Wait a few minutes." });
 
   if (action === "setup") {
     const email = String(b.email || "").trim().toLowerCase(), password = String(b.password || "");
@@ -89,19 +98,18 @@ module.exports = async (req, res) => {
   }
   // change the sign-in email: GoTrue sends a confirmation link to the new address; nothing changes until it is clicked
   if (action === "email") {
-    const tok = bearer(req), email = String(b.email || "").trim().toLowerCase();
-    if (!tok) return res.status(401).json({ error: "Sign in first." });
+    const u = await userFrom(req), email = String(b.email || "").trim().toLowerCase();
+    if (!u) return res.status(401).json({ error: "Sign in first." });
     if (!EMAIL.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
-    const r = await gotrue("user", { method: "PUT", headers: { Authorization: `Bearer ${tok}` }, body: JSON.stringify({ email }) });
+    if (!(await reauth(u, String(b.password || ""), res))) return;
+    const r = await gotrue("user", { method: "PUT", headers: { Authorization: `Bearer ${bearer(req)}` }, body: JSON.stringify({ email }) });
     return r.ok ? res.status(200).json({ ok: true, message: "Check the new address for a confirmation link. Your sign-in email changes when you confirm it." }) : res.status(400).json({ error: "Could not start the email change." });
   }
   // permanently delete the account and its stored state. Re-checks the password, requires the typed word DELETE, and refuses while a paid plan is active.
   if (action === "delete") {
     const u = await userFrom(req); if (!u) return res.status(401).json({ error: "Sign in first." });
     if (String(b.confirm || "") !== "DELETE") return res.status(400).json({ error: "Type DELETE to confirm." });
-    const password = String(b.password || ""); if (password.length < 8 || password.length > 72) return res.status(400).json({ error: "Enter your password to confirm." });
-    const chk = await gotrue("token?grant_type=password", { method: "POST", body: JSON.stringify({ email: u.email, password }) });
-    if (!chk.ok) return res.status(400).json({ error: "That password is not correct." });
+    if (!(await reauth(u, String(b.password || ""), res))) return;
     const p = await profile(u);
     if ((p.plan === "paid" || p.plan === "premium") && p.sub_status && !/^(canceled|cancelled|incomplete_expired)$/.test(p.sub_status)) return res.status(409).json({ error: "Cancel your subscription first (Plans & billing, Manage subscription), then delete the account.", code: "active_subscription" });
     await sb(`pt_user_state?user_id=eq.${u.id}`, { method: "DELETE" }).catch(() => {});

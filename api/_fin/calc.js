@@ -39,6 +39,7 @@ function wacc({ equity, debt, costEquity, costDebt, taxRate = 0.21 }) {
 // Two-stage free-cash-flow DCF: `years` of growth fading linearly from `growth` to `terminalGrowth`, then a Gordon terminal value.
 function dcf({ fcf, growth: g, years = 10, terminalGrowth = 0.025, discount, netDebt = 0, shares }) {
   if (!ok(fcf, g, years, terminalGrowth, discount) || discount <= terminalGrowth || fcf <= 0 || years < 1) return null;
+  years = Math.min(50, Math.floor(years));   // bounded: the loop below must never run on user-controlled huge counts
   let cf = fcf, pv = 0;
   for (let t = 1; t <= years; t++) { const gt = g + (terminalGrowth - g) * ((t - 1) / Math.max(1, years - 1)); cf *= 1 + gt; pv += cf / (1 + discount) ** t; }
   const tv = (cf * (1 + terminalGrowth)) / (discount - terminalGrowth), pvTv = tv / (1 + discount) ** years, ev = pv + pvTv, equity = ev - (fin(netDebt) ? netDebt : 0);
