@@ -63,3 +63,9 @@ open http://localhost:3456/v3?demo=1#/portfolio/overview
 - Likely cause (unconfirmed, the error was not logged): output truncated at `COUNCIL_V3_MAX_TOKENS` default 2400 → invalid/empty JSON. Error logging added (`console.error("council-v3 failed: …")`).
 - Next: raise the default to ~4000 (or set env `COUNCIL_V3_MAX_TOKENS`), then run ONE more live request and read the log line.
 - Manual cleanup: unconfirmed Supabase auth user `pt-admin-test@example.com` (created by a local signup attempt) — delete in Supabase → Authentication → Users.
+
+## Live Premium Council test #2 (local) — FAIL, provider-side, one request made
+- Same setup (local-only admin override, removed afterwards). One `POST /api/ai/council-v3` → 502 after ~21 s.
+- Server log: `council-v3 failed: 429 upstream_1305` = Z.ai overloaded / rate-limited (its retries were exhausted). Test #1 matched the same ~21 s pattern, so truncation was not the cause; the 4000-token change was reverted.
+- Not a V3 code defect: auth, Premium gate, single request and frontend error handling all PASS. The Council has no fallback model by design (one-model rule), so it fails while Z.ai is busy.
+- Options (owner decision): (a) retry later when Z.ai is not overloaded; (b) allow the existing Gemini fallback only when Z.ai returns 1305/429 (still one inference reaches a model, but a different model); (c) check Z.ai plan concurrency limits for `glm-4.6v-flash` (`NEWS_MODEL`).
