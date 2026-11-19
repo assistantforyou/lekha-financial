@@ -162,6 +162,29 @@ export function Layout({ item }) {
     <Card><CardContent className="pt-5">{state === "loading" && <DataState s={{ status: "loading" }} />}<div ref={host} className="cx" />{state === "none" && <p className="text-sm text-muted-foreground">The layout editor is not available right now.</p>}</CardContent></Card></div>)
 }
 
+/* ---------------- Knowledge base (pgvector) ---------------- */
+function KnowledgeBase({ signed }) {
+  const [st, set] = useState({ status: "loading" }), [busy, setBusy] = useState(null)
+  const load = async () => { try { const j = await api("/api/rag", { auth: true, method: "POST", body: { action: "status" } }); set({ status: "ok", data: j }) } catch (e) { set({ status: "error", error: errMsg(e) }) } }
+  useEffect(() => { if (signed) load(); else set({ status: "anon" }) }, [signed])
+  const run = async (action, body = {}) => { setBusy(action); try {
+    const j = await api("/api/rag", { auth: true, method: "POST", body: { action, ...body } })
+    if (j && j.demo) toast("Sign in to build a knowledge base"); else toast.success(action === "filings" ? `Indexed ${j.chunks || 0} filing passages` : `Knowledge base rebuilt: ${j.chunks || 0} passages`)
+    await load()
+  } catch (e) { toast.error(errMsg(e)) } finally { setBusy(null) } }
+  const topTickers = () => { try { const d = JSON.parse(localStorage.getItem((window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.") + "db.holdings/all") || "{}"); return (d.items || []).filter((h) => h.tk && h.tk !== "CASH").slice(0, 3).map((h) => h.tk) } catch (e) { return [] } }
+  const x = st.data
+  return (<Card><CardHeader><CardTitle>Knowledge base for the AI analyst</CardTitle><CardDescription>Your holdings, valuation settings and saved snapshots are embedded (Gemini, 768 dims) in pgvector so the research agent can retrieve them. Numbers still come from the live data tools; this stores narrative context only.</CardDescription></CardHeader>
+    <CardContent className="space-y-3 text-sm">
+      {!signed ? <p className="text-muted-foreground">Sign in to build a knowledge base from your own account.</p> : st.status === "error" ? <p className="down-t">{st.error}</p> : !x ? <p className="text-muted-foreground">Checking…</p> : <>
+        <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{x.chunks || 0} passages</Badge>{Object.entries(x.byKind || {}).map(([k, n]) => <Badge key={k} variant="outline">{k} {n}</Badge>)}{x.lastSync && <span className="text-[12px] text-muted-foreground">updated {dateTime(x.lastSync)}</span>}{!x.embeddings && <Badge variant="warn">embeddings not configured</Badge>}</div>
+        {x.tickers && x.tickers.length > 0 && <p className="text-[12px] text-muted-foreground">Filings indexed for: {x.tickers.join(", ")}</p>}
+        <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("sync", { force: true })}><RefreshCw />{busy === "sync" ? "Rebuilding…" : "Rebuild from my account"}</Button>
+          <Button size="sm" variant="outline" disabled={!!busy} onClick={() => run("filings", { tickers: topTickers() })}>{busy === "filings" ? "Reading filings…" : "Index latest filings for my top 3 holdings"}</Button></div>
+      </>}
+    </CardContent></Card>)
+}
+
 /* ---------------- Data, import, sync, sources ---------------- */
 export function DataPage({ item, navigate }) {
   const [, force] = useState(0), file = useRef(null), sync = window.PT_SYNC ? PT_SYNC.status : null, keys = window.PT_SYNC ? PT_SYNC.keys() : [], stamps = window.PT_SYNC ? PT_SYNC.stamps() : {}, signed = !!(useSession() || {}).access_token && !isDemo()
@@ -175,5 +198,6 @@ export function DataPage({ item, navigate }) {
         {signed ? <><div className="flex items-center gap-2">Status: {sync && sync.error ? <Badge variant="down">{sync.error}</Badge> : sync && sync.pending ? <Badge variant="warn">saving {sync.pending}</Badge> : <Badge variant="up">up to date</Badge>}</div>
           <ul className="max-h-40 overflow-auto rounded-md border border-border text-[12px]">{keys.map((k) => <li key={k} className="flex justify-between gap-2 border-b border-border/60 px-2 py-1 last:border-0"><span className="font-mono">{k}</span><span className="text-muted-foreground">{stamps[k] ? dateTime(stamps[k]) : "not synced yet"}</span></li>)}{!keys.length && <li className="px-2 py-2 text-muted-foreground">No documents yet.</li>}</ul>
           <Button size="sm" variant="outline" onClick={async () => { const r = await PT_SYNC.flush(); toast(r && r.ok ? "Synced" : "Nothing to sync"); force((x) => x + 1) }}><RefreshCw />Sync now</Button></> : <p className="text-muted-foreground">Not signed in.</p>}</CardContent></Card>
+      <KnowledgeBase signed={signed} />
     </div></div>)
 }

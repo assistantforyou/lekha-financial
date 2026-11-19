@@ -113,6 +113,7 @@ module.exports = async (req, res) => {
     const p = await profile(u);
     if ((p.plan === "paid" || p.plan === "premium") && p.sub_status && !/^(canceled|cancelled|incomplete_expired)$/.test(p.sub_status)) return res.status(409).json({ error: "Cancel your subscription first (Plans & billing, Manage subscription), then delete the account.", code: "active_subscription" });
     await sb(`pt_user_state?user_id=eq.${u.id}`, { method: "DELETE" }).catch(() => {});
+    await sb(`pt_rag_docs?owner=eq.${u.id}`, { method: "DELETE" }).catch(() => {});
     await sb(`pt_profiles?user_id=eq.${u.id}`, { method: "DELETE" }).catch(() => {});
     const d = await admin(`admin/users/${u.id}`, { method: "DELETE" });
     return d.ok ? res.status(200).json({ ok: true }) : res.status(502).json({ error: "The account could not be deleted. Nothing else was changed; try again or contact support." });

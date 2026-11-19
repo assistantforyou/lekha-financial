@@ -122,7 +122,15 @@ async function convene() {
     const r = await PT_AUTH.fetch("/api/ai/council-v3", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, scope, evidence: evidence(), lang }) });
     const j = await r.json().catch(() => null);
     if (!r.ok || !j || !j.ceo) throw new Error((j && j.error) || "The council could not answer right now.");
-    st.report = { ...j, question: q, scope }; st.phase = "done"; store.add({ ...st.report, savedAt: new Date().toISOString() }); reveal(); reports();
+    st.report = { ...j, question: q, scope }; st.phase = "done"; store.add({ ...st.report, savedAt: new Date().toISOString() });
+    /* the saved report also becomes retrieval material for the research agent (owner-scoped) */
+    try {
+      const c = st.report.ceo || {}, P = st.report.perspectives || {};
+      const text = [`QUESTION: ${q}`, `VERDICT: ${c.verdict || ""}`, `EXECUTIVE: ${c.executive || ""}`, `THESIS: ${c.thesis || ""}`, `VALUATION: ${c.valuation || ""}`, `BULL: ${c.bullCase || ""}`, `BEAR: ${c.bearCase || ""}`, `PORTFOLIO: ${c.portfolio || ""}`, `FINAL: ${c.final || ""}`]
+        .concat(Object.keys(P).map((k) => `${k.toUpperCase()}: ${(P[k] && P[k].headline) || ""} — ${((P[k] && P[k].points) || []).join("; ")}`)).join("\n");
+      if (window.PT_AUTH && PT_AUTH.session && PT_AUTH.session()) PT_AUTH.fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ingest", kind: "report", ref: "council:" + (st.report.savedAt || Date.now()), title: "Council report · " + q.slice(0, 80), text: text.slice(0, 18000), scope }) }).catch(() => {});
+    } catch (e) {}
+    reveal(); reports();
   } catch (e) { st.phase = "error"; st.err = e.message; board(); }
   finally { const g = host.querySelector("#cn-go"); if (g) g.disabled = false; }
 }
