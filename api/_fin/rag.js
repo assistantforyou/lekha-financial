@@ -55,15 +55,21 @@ function docText(key, data) {
 async function embed(texts, taskType = "RETRIEVAL_DOCUMENT") {
   if (!haveKey()) throw Object.assign(new Error("embeddings_not_configured"), { status: 503 });
   const out = [];
-  for (let i = 0; i < texts.length; i += 20) {
-    const batch = texts.slice(i, i + 20);
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL()}:batchEmbedContents`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
-      body: JSON.stringify({ requests: batch.map((text) => ({ model: `models/${EMBED_MODEL()}`, content: { parts: [{ text }] }, taskType, outputDimensionality: DIMS })) }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.embeddings) throw Object.assign(new Error("embed_failed_" + r.status), { status: 502 });
+  for (let i = 0; i < texts.length; i += 10) {
+    const batch = texts.slice(i, i + 10);
+    let j = null, last = 0;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL()}:batchEmbedContents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
+        body: JSON.stringify({ requests: batch.map((text) => ({ model: `models/${EMBED_MODEL()}`, content: { parts: [{ text }] }, taskType, outputDimensionality: DIMS })) }),
+      });
+      last = r.status; j = await r.json().catch(() => ({}));
+      if (r.ok && j.embeddings) break;
+      if (r.status !== 429) break;
+      await new Promise((res) => setTimeout(res, 1800 * (attempt + 1)));   /* free-tier rate limit: back off */
+    }
+    if (!j || !j.embeddings) throw Object.assign(new Error("embed_failed_" + (last || 0)), { status: last === 429 ? 429 : 502 });
     j.embeddings.forEach((e) => out.push(e.values));
   }
   return out;
@@ -76,16 +82,20 @@ async function upsert(owner, docs) {
   if (!owner) throw Object.assign(new Error("no_owner"), { status: 400 });
   const list = (docs || []).filter((d) => d && d.content && d.content.trim().length > 80).slice(0, MAX_CHUNKS_PER_DOC);
   if (!list.length) return { ok: true, chunks: 0 };
-  const vectors = await embed(list.map((d) => (d.title ? d.title + "\n" : "") + d.content));
+  /* If embeddings are rate-limited, store the text anyway: full-text search still finds it and the
+     next rebuild fills the vectors in. Never lose the document because the embedding quota is short. */
+  let vectors = null, degraded = false;
+  try { vectors = await embed(list.map((d) => (d.title ? d.title + "\n" : "") + d.content)); }
+  catch (e) { if (e.status === 429 || e.status === 503) degraded = true; else throw e; }
   const rows = list.map((d, i) => ({
     owner, kind: d.kind, ref: d.ref, title: d.title || null, content: d.content,
     ticker: d.ticker ? String(d.ticker).toUpperCase() : null,
     doc_type: d.doc_type || d.kind, as_of: d.as_of || null, source_url: d.source_url || null,
-    embedding: vec(vectors[i]), meta: { dims: DIMS, model: EMBED_MODEL() }, updated_at: new Date().toISOString(),
+    embedding: vectors ? vec(vectors[i]) : null, meta: { dims: DIMS, model: EMBED_MODEL() }, updated_at: new Date().toISOString(),
   }));
   const r = await sb("pt_rag_docs?on_conflict=owner,ref", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows) });
   if (!r.ok) throw Object.assign(new Error("rag_write_failed_" + r.status), { status: 502 });
-  return { ok: true, chunks: rows.length };
+  return { ok: true, chunks: rows.length, ...(degraded ? { degraded: "embeddings rate-limited; stored for full-text search" } : {}) };
 }
 
 async function buildAccountDocs(owner) {
@@ -140,29 +150,61 @@ async function fetchFilingText(url) {
   return htmlToText(html).slice(0, 900_000);
 }
 
-async function ingestFilings(owner, symbol, { forms = ["10-K", "10-Q"], perForm = 1 } = {}) {
+async function ingestFilings(owner, symbol, { forms = ["10-K", "10-Q", "20-F", "40-F", "6-K", "8-K"], perForm = 1 } = {}) {
   const sec = require("./providers/sec");
   const sym = String(symbol || "").toUpperCase();
   const list = await sec.filings(sym, { forms, limit: 20 });
   const pick = forms.flatMap((f) => list.filter((x) => x.form === f).slice(0, perForm));
-  let chunks = 0, docs = [];
+  let chunks = 0, docs = [], seq = 0;
   for (const f of pick) {
     try {
       const text = await fetchFilingText(f.url);
       const head = `${sym} ${f.form} filed ${f.filingDate} (accession ${f.accession})`;
       for (const s of sections(text)) {
         const body = (s.title ? s.title + "\n" : "") + s.body;
-        chunkText(body).slice(0, 24).forEach((c, i) => docs.push({
-          kind: "filing", ref: `${sym}:${f.accession}:${i}`, title: `${head}${s.title ? " · " + s.title : ""}`, content: c,
-          ticker: sym, doc_type: "filing", as_of: f.filingDate, source_url: f.url,
+        chunkText(body).slice(0, 10).forEach((c) => docs.push({
+          kind: "filing", ref: `${sym}:${f.accession}:${seq++}`, title: `${head}${s.title ? " · " + s.title : ""}`, content: c,
+          ticker: sym, doc_type: /^(8-K|6-K)$/.test(f.form) ? "release" : "filing", as_of: f.filingDate, source_url: f.url,
         }));
       }
     } catch (e) { /* one unreadable filing must not fail the batch */ }
   }
-  docs = docs.slice(0, 120);
+  docs = docs.slice(0, 60);
   let written = 0;
   for (let i = 0; i < docs.length; i += 40) { const r = await upsert(owner, docs.slice(i, i + 40)); written += r.chunks; chunks += r.chunks; }
   return { ok: true, symbol: sym, filings: pick.map((f) => f.form + " " + f.filingDate), chunks: written };
+}
+
+// Archive headlines the agent (or the news page) already retrieved. Deduped by URL, so repeated
+// runs build a searchable history instead of duplicates. Short items are dropped.
+const NEWS_TTL_MS = 180 * 864e5;
+async function archiveNews(owner, items, { ticker = null } = {}) {
+  try {
+    if (!owner || !Array.isArray(items) || !items.length) return { ok: true, chunks: 0 };
+    const docs = [];
+    for (const it of items.slice(0, 12)) {
+      const title = String(it.title || it.headline || "").trim();
+      const summary = String(it.summary || it.description || it.snippet || "").trim();
+      const url = String(it.url || it.link || "").trim();
+      if (title.length < 12) continue;
+      const text = [title, summary, it.source ? "Source: " + it.source : "", it.at || it.publishedAt || it.date ? "Published: " + (it.at || it.publishedAt || it.date) : ""].filter(Boolean).join("\n");
+      if (text.length < 100) continue;
+      const ref = "news:" + (url ? Buffer.from(url).toString("base64").slice(0, 60) : Buffer.from(title).toString("base64").slice(0, 60));
+      docs.push({ kind: "news", ref, title: title.slice(0, 160), content: text.slice(0, 1600), ticker: (it.ticker || it.symbol || ticker || "").toUpperCase() || null, doc_type: "news", as_of: (it.at || it.publishedAt || it.date || "").slice(0, 10) || null, source_url: url || null });
+    }
+    if (!docs.length) return { ok: true, chunks: 0 };
+    return await upsert(owner, docs);
+  } catch (e) { return { ok: false, chunks: 0 }; }
+}
+
+// Demo holdings live in the browser, so the demo client posts its snapshot here and it is stored
+// under the demo owner (a per-client id). Nothing personal, nothing shared with other visitors.
+async function ingestHoldings(owner, doc) {
+  const text = docText("holdings/all", doc);
+  if (!text) return { ok: true, chunks: 0 };
+  const docs = chunkText(text, 1800, 180).map((c, i) => ({ kind: "holdings", ref: `holdings/all#${i}`, title: "My portfolio", content: c, doc_type: "holdings" }));
+  await sb(`pt_rag_docs?owner=eq.${enc(owner)}&kind=eq.holdings`, { method: "DELETE" });
+  return upsert(owner, docs);
 }
 
 async function deleteOwner(owner) {
@@ -171,6 +213,10 @@ async function deleteOwner(owner) {
 }
 
 // Hybrid retrieval: vector + full-text fused in Postgres (see pt_rag_match in rag.sql).
+async function pruneNews(owner, keepDays = 180) {
+  try { const cut = new Date(Date.now() - keepDays * 864e5).toISOString().slice(0, 10); await sb(`pt_rag_docs?owner=eq.${enc(owner)}&kind=eq.news&as_of=lt.${cut}`, { method: "DELETE" }); } catch (e) {}
+}
+
 async function retrieve(owner, question, k = 5, { ticker = null, kind = null } = {}) {
   if (!owner || !haveKey()) return [];
   try {
@@ -182,4 +228,4 @@ async function retrieve(owner, question, k = 5, { ticker = null, kind = null } =
   } catch (e) { return []; }
 }
 
-module.exports = { sync, retrieve, upsert, buildAccountDocs, ingestFilings, ingestText: (owner, doc) => upsert(owner, [doc]), deleteOwner, docText, chunkText, embed, lastSync, haveKey, EMBED_MODEL, DIMS };
+module.exports = { sync, retrieve, upsert, buildAccountDocs, ingestFilings, archiveNews, ingestHoldings, pruneNews, ingestText: (owner, doc) => upsert(owner, [doc]), deleteOwner, docText, chunkText, embed, lastSync, haveKey, EMBED_MODEL, DIMS };

@@ -7,6 +7,7 @@
 const svc = require("./service");
 const C = require("./calc");
 const obs = require("./obs");
+const rag = require("./rag");
 
 const SECTOR_ETF = { "Information Technology": "XLK", Financials: "XLF", Energy: "XLE", "Health Care": "XLV", "Consumer Discretionary": "XLY", "Consumer Staples": "XLP", Industrials: "XLI", Utilities: "XLU", Materials: "XLB", "Communication Services": "XLC", "Real Estate": "XLRE" };
 const SP = Object.fromEntries(require("../_data/sp500.json").stocks);
@@ -140,6 +141,18 @@ async function run({ question, symbol = null, llm = null, lang = null, langHint 
   }
   for (const r of results) if (r && r.ok) evidence.push({ id: "E" + ++n, tool: r.tool, args: r.args, label: r.out.label, source: r.out.source, asOf: r.out.asOf || null, kind: r.out.kind, url: r.out.url || null, lines: r.out.lines });
   const failed = results.filter((r) => r && !r.ok).map((r) => ({ tool: r.tool, args: r.args, error: r.error }));
+  /* passively archive the headlines we just retrieved, so news becomes searchable over time */
+  if (owner) {
+    const news = [];
+    for (const r of results) {
+      if (!r || !r.ok || r.tool !== "get_news") continue;
+      for (const line of r.out.lines || []) {
+        const m = /^(\S+)\s+\[([^\]]+)\]\s+(.*?)(?:\s+<(https?:\/\/[^>]+)>)?$/.exec(line);
+        if (m) news.push({ at: m[1], source: m[2], title: m[3], url: m[4] || null, ticker: r.args && r.args.symbol });
+      }
+    }
+    if (news.length) await Promise.race([rag.archiveNews(owner, news).catch(() => null), new Promise((res) => setTimeout(res, 2500))]);
+  }
   const byId = Object.fromEntries(evidence.map((e) => [e.id, e]));
   let answer = null, by = "evidence-only", llmError = null;
   if (evidence.length && llm) {

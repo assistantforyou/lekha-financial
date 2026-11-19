@@ -5,6 +5,7 @@
 //   ingest  -> store one document the client already has (saved council report, imported statement summary)
 // Embeddings are owner-scoped; demo visitors have no server-side documents.
 const { requireTier } = require("./_auth");
+const { clientId } = require("./_history");
 const { rateHit } = require("./_lib");
 const { sb } = require("./_lib");
 const rag = require("./_fin/rag");
@@ -16,8 +17,15 @@ module.exports = async (req, res) => {
   const p = await requireTier(req, res, ["demo", "free", "paid", "premium"]); if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   const b = req.body && typeof req.body === "object" ? req.body : {}, action = String(b.action || "status");
-  if (p.demo) return res.status(200).json({ ok: false, demo: true, note: "Sign in to build a knowledge base from your own holdings.", chunks: 0 });
-  const owner = p.user_id;
+  /* demo visitors get their own knowledge base from the browser snapshot, keyed per client */
+  const owner = p.demo ? "demo:" + clientId(req) : p.user_id;
+  res.setHeader("X-KB-Owner", p.demo ? "demo" : "account");
+
+  if (action === "holdings") {
+    if (!(await rateHit(`rag/holdings/${owner}/${Math.floor(Date.now() / 6e5)}`, 6).catch(() => true))) return res.status(429).json({ error: "Too many updates." });
+    try { return res.status(200).json({ ok: true, ...(await rag.ingestHoldings(owner, b.doc && typeof b.doc === "object" ? b.doc : {})) }); }
+    catch (e) { return res.status(e.status === 503 ? 503 : 502).json({ error: "Your holdings could not be indexed: " + (e.code || e.status || e.message) }); }
+  }
 
   if (action === "status") {
     const r = await sb(`pt_rag_docs?owner=eq.${encodeURIComponent(owner)}&select=kind,ticker,updated_at&order=updated_at.desc&limit=1000`);
@@ -30,17 +38,17 @@ module.exports = async (req, res) => {
 
   if (action === "sync") {
     if (!(await rateHit(`rag/sync/${owner}/${Math.floor(Date.now() / 6e5)}`, 10).catch(() => true))) return res.status(429).json({ error: "Too many rebuilds. Try again in a few minutes." });
-    try { return res.status(200).json(await rag.sync(owner, { force: !!b.force })); }
+    try { const out = await rag.sync(owner, { force: !!b.force }); rag.pruneNews(owner).catch(() => {}); return res.status(200).json(out); }
     catch (e) { return res.status(e.status === 503 ? 503 : 502).json({ error: "The knowledge base could not be rebuilt: " + (e.code || e.status || e.message) }); }
   }
 
   if (action === "filings") {
-    if (!(await rateHit(`rag/filings/${owner}/${Math.floor(Date.now() / 36e5)}`, 6).catch(() => true))) return res.status(429).json({ error: "Too many filing imports this hour." });
+    if (!(await rateHit(`rag/filings/${owner}/${Math.floor(Date.now() / 36e5)}`, p.demo ? 2 : 6).catch(() => true))) return res.status(429).json({ error: "Too many filing imports this hour." });
     try {
       const tickers = b.ticker ? [String(b.ticker).toUpperCase()] : (Array.isArray(b.tickers) ? b.tickers : []).slice(0, 3).map((t) => String(t).toUpperCase());
       if (!tickers.length) return res.status(400).json({ error: "Name at least one ticker." });
       const out = [];
-      for (const t of tickers) { try { out.push(await rag.ingestFilings(owner, t, { forms: Array.isArray(b.forms) && b.forms.length ? b.forms : ["10-K", "10-Q"], perForm: 1 })); } catch (e) { out.push({ symbol: t, ok: false, error: String(e.code || e.status || e.message) }); } }
+      for (const t of tickers) { try { out.push(await rag.ingestFilings(owner, t, { forms: Array.isArray(b.forms) && b.forms.length ? b.forms : ["10-K", "10-Q", "20-F", "40-F", "6-K", "8-K"], perForm: 1 })); } catch (e) { out.push({ symbol: t, ok: false, error: String(e.code || e.status || e.message) }); } }
       return res.status(200).json({ ok: true, results: out, chunks: out.reduce((a, x) => a + (x.chunks || 0), 0) });
     } catch (e) { return res.status(502).json({ error: "Filings could not be indexed: " + (e.code || e.status || e.message) }); }
   }
