@@ -4,6 +4,7 @@ import { D, positions, totals, portfolioSeries } from "/core/data.js";
 import { buildEvents } from "/core/council.js";
 import { LineChart } from "/core/charts.js";
 import { esc, sum } from "/core/util.js";
+import { isDemo } from "/core/store.js";
 import { icon, cardHead, money, moneySigned, pct, tone, price } from "../ui.js";
 import { RANGES, rangeLabel, segHtml, bindSeg, lastN, leanBar, leanLabel, leanTone, eventName, dateChip, inDays, impactPill } from "./shared.js";
 import { openAdd, openImport } from "../sheets.js";
@@ -68,6 +69,7 @@ export default {
     const inv = rows.filter((r) => !r.cash && r.valueUsd), gain = [...inv].sort((a, b) => b.dayPct - a.dayPct).slice(0, 3), lose = [...inv].sort((a, b) => a.dayPct - b.dayPct).slice(0, 3).filter((r) => r.dayPct < 0 && !gain.includes(r));
     const mv = (r) => `<button class="mv" data-go="#/holdings/${esc(r.tk)}"><b>${esc(r.tk)}</b><span class="${tone(r.dayPct)}" data-live="day" data-tk="${esc(r.tk)}">${esc(pct(r.dayPct))}</span></button>`;
     return `<div class="page">
+      ${isDemo() ? `<div class="card flat row demo-banner"><span class="pill up">${esc(t("Demo account"))}</span><span class="small muted sp">${esc(t("A sample portfolio on live market data. None of it is your real money."))}</span><a class="btn sm" href="#/me">${esc(t("Create account"))}</a></div>` : ""}
       <div class="grid">
         <div class="card hero full">
           <div class="row"><span class="muted small">${esc(t("Total value"))}</span></div>

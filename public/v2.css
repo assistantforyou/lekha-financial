@@ -1,4 +1,4 @@
-/* Portfolio Terminal v2: phone-first, fluid. Everything scales with the viewport (clamp() type and spacing, auto-fit grids,
+/* Lekha Financials: phone-first, fluid. Everything scales with the viewport (clamp() type and spacing, auto-fit grids,
    container-sized charts). Colours are tokens, so light, dark and any future theme restyle the whole app. */
 :root{--bg:#f3f1ea;--card:#fff;--card2:#f7f5ef;--ink:#14171c;--muted:#656c76;--line:#e4e0d6;--accent:#0a7a6a;--accent-ink:#fff;--accent-soft:#dff0ec;--up:#0f8050;--down:#c63a2f;--warn:#a96300;--chart:#0a7a6a;--chart2:#7a8795;--chart3:#c28a1c;--shadow:0 1px 2px rgba(20,24,29,.05),0 10px 28px -14px rgba(20,24,29,.18);--r:18px;--z:1;color-scheme:light}
 :root[data-theme="dark"]{--bg:#0b0e11;--card:#13181d;--card2:#191f26;--ink:#edf0f3;--muted:#98a2ad;--line:#242c34;--accent:#3dcdaa;--accent-ink:#06231d;--accent-soft:#12372f;--up:#3fd18d;--down:#ff6f63;--warn:#f0a33a;--chart:#3dcdaa;--chart2:#8795a5;--chart3:#e3a93c;--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -14px rgba(0,0,0,.6);color-scheme:dark}
@@ -19,22 +19,35 @@ svg{display:block}
 #rail{display:none}
 #main{width:100%;max-width:1240px;margin:0 auto;padding:0 clamp(14px,3.2vw,32px) calc(5.6rem + env(safe-area-inset-bottom))}
 #top{position:sticky;top:0;z-index:15;display:flex;align-items:center;gap:.6rem;padding:calc(.55rem + env(safe-area-inset-top)) 0 .55rem;background:linear-gradient(var(--bg) 78%,transparent)}
-.brand{font-weight:750;letter-spacing:-.01em;font-size:1.05rem;display:flex;align-items:center;gap:.5rem;margin-right:auto}
+.brand{font-weight:750;letter-spacing:-.01em;font-size:1.05rem;display:flex;align-items:center;gap:.5rem;margin-right:auto;min-width:0}
+.brand>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand i{width:1.55rem;height:1.55rem;border-radius:.5rem;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
 .brand i svg{width:1rem;height:1rem}
 .live,.iconbtn,.btn{white-space:nowrap}
-.askbtn{display:none}
+.iconbtn{flex:none}
+.btn.askbtn{display:none}
 .live{display:inline-flex;align-items:center;gap:.4rem;font-size:.74rem;color:var(--muted);padding:.28rem .6rem;border:1px solid var(--line);border-radius:99px;background:var(--card)}
 .live b{width:.5rem;height:.5rem;border-radius:50%;background:var(--muted)}
 .live.on b{background:var(--up);animation:pulse 1.8s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--up) 55%,transparent)}100%{box-shadow:0 0 0 .55rem transparent}}
 .iconbtn{display:inline-grid;place-items:center;min-width:2.5rem;height:2.5rem;border-radius:99px;border:1px solid var(--line);background:var(--card);padding:0 .65rem;font-size:.8rem;font-weight:650;gap:.35rem;grid-auto-flow:column}
-#tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(6,1fr);background:color-mix(in srgb,var(--card) 90%,transparent);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-top:1px solid var(--line);padding:.3rem .4rem calc(.3rem + env(safe-area-inset-bottom))}
-.tab{display:flex;flex-direction:column;align-items:center;gap:.15rem;padding:.35rem 0;border-radius:12px;color:var(--muted);font-size:.68rem;font-weight:600;min-height:3rem;justify-content:center}
+#tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:color-mix(in srgb,var(--card) 90%,transparent);backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);border-top:1px solid var(--line);padding:.3rem .4rem calc(.3rem + env(safe-area-inset-bottom))}
+.tab{display:flex;flex-direction:column;align-items:center;gap:.15rem;padding:.35rem 0;border-radius:12px;color:var(--muted);font-size:.68rem;font-weight:600;min-height:3rem;justify-content:center;min-width:0;overflow:hidden}
+.tab span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .tab[aria-current="page"]{color:var(--accent)}
 .tab[aria-current="page"] .ico{stroke-width:2.2}
 .fab{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:calc(4.9rem + env(safe-area-inset-bottom));z-index:19;height:3.2rem;min-width:3.2rem;border-radius:99px;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;gap:.5rem;padding:0 1rem;font-weight:700;box-shadow:0 10px 26px -8px color-mix(in srgb,var(--accent) 70%,#000)}
 .fab span{display:none}
+@media(max-width:430px){
+  #top{gap:.4rem}
+  .brand{font-size:.98rem;gap:.4rem}
+  .brand-sub{display:none}
+  .brand i{width:1.4rem;height:1.4rem}
+  .live{padding:.22rem .45rem;font-size:.68rem;gap:.3rem}
+  .iconbtn{min-width:2.3rem;height:2.3rem;padding:0 .5rem;font-size:.74rem}
+  #tabs{padding-left:.2rem;padding-right:.2rem}
+  .tab{font-size:.63rem}
+}
 @media(min-width:760px){
   #app{grid-template-columns:5.2rem minmax(0,1fr)}
   #tabs{display:none}
@@ -223,5 +236,5 @@ h3{font-size:.9rem;font-weight:650}
 .table{width:100%;border-collapse:collapse;font-size:.82rem}.table td,.table th{padding:.35rem .3rem;text-align:left;border-top:1px solid var(--line)}.table input,.table select{width:100%;min-width:4rem;padding:.35rem;border:1px solid var(--line);border-radius:8px;background:var(--card2);font-size:.85rem}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-@media(max-width:560px){.brand span{display:none}.seg button{padding:.38rem .62rem}#top{gap:.45rem}.iconbtn{padding:0 .55rem}}
-@media(min-width:760px){#top .brand{visibility:hidden}.fab{display:none}.askbtn{display:inline-flex}}
+@media(max-width:560px){.brand-sub{display:none}.seg button{padding:.38rem .62rem}#top{gap:.45rem}.iconbtn{padding:0 .55rem}}
+@media(min-width:760px){#top .brand{visibility:hidden}.fab{display:none}.btn.askbtn{display:inline-flex}}

@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Portfolio Terminal</title>
+<title>Lekha Financials</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <script>/* embed mode (?embed=1): the whole classic terminal, minus its own header, inside the v2 / v3 shells */
 try{if(/[?&]embed=1/.test(location.search)){var R=document.documentElement;R.classList.add("embed");var V=JSON.parse(localStorage.getItem("ptpub.v1.v2.prefs")||"null")||{};if(V.theme==="light"||V.theme==="dark")R.setAttribute("data-theme",V.theme);if(V.size)R.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[V.size]||1)}}catch(e){}</script>
@@ -282,7 +282,7 @@ td{font-size:13.5px}
 
 <div class="wrap">
   <header class="bar">
-    <div class="brand">Portfolio Terminal <span class="tick" id="brand-tier">FREE</span></div>
+    <div class="brand">Lekha Financials <span class="tick" id="brand-tier">FREE</span></div>
     <div class="seg tabs" role="group" aria-label="View"><button id="tb-ov" aria-pressed="true">Overview</button><button id="tb-val" aria-pressed="false">Intrinsic value</button><button id="tb-set" aria-pressed="false">Settings</button></div>
     <div class="status">
       <span class="pill" id="st-prices">Prices: loading</span>
@@ -522,7 +522,7 @@ td{font-size:13.5px}
 <script src="/pt-state.js"></script>
 <script>
 /* ===================== TIERED DATA ADAPTER =====================
-   This build runs one Portfolio Terminal for every tier (demo / free / paid / premium).
+   This build runs one terminal for every tier (demo / free / paid / premium).
    - window.PT_DEMO_MODE (set by pt-datasource.js before this script): when true,
      every market panel is fed by the deterministic local simulation in pt-demo.js
      and user docs live in the "ptpub.v1.demo." namespace. No /api calls happen.

@@ -1,4 +1,4 @@
-/* Portfolio Terminal v3 "Desk": every panel on one screen (holdings table, chart + analysts, news / events / market, Council strip).
+/* Lekha Financials v3 "Desk": every panel on one screen (holdings table, chart + analysts, news / events / market, Council strip).
    Same core, accounts, billing and dialogs as v2; a different way to look at the same portfolio. */
 import { t, detectLang, setLang, getLang, fmtDate, fmtAgo } from "/core/i18n.js";
 import { D, init, onData, loadNews, loadHistory, loadStreet, positions, totals, portfolioSeries } from "/core/data.js";
@@ -26,7 +26,7 @@ function applyLook() {
 }
 /* ---------- bar, tape, mobile tabs ---------- */
 function bar() {
-  $("#bar").innerHTML = `<span class="brand">${icon("trend")} <span>Portfolio Terminal</span></span><input id="cmd" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${esc(t("Jump to a ticker…"))}" aria-label="${esc(t("Jump to a ticker…"))}"><div class="seg" id="modes"><button data-m="desk" aria-pressed="${mode === "desk"}">${esc(t("Today"))}</button><button data-m="analysis" aria-pressed="${mode === "analysis"}">${esc(t("Analysis"))}</button></div><span class="sp"></span><span class="live" id="livepill"><b></b><span>…</span></span><button class="btn sm" id="ask">${icon("spark")} ${esc(t("Ask"))}</button><button class="iconbtn" id="cur">${curr() === "THB" ? "THB ฿" : "USD $"}</button>${signedIn() ? `<button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>` : `<button class="btn primary sm" id="signin">${esc(t("Sign in"))}</button><button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>`}`;
+  $("#bar").innerHTML = `<span class="brand">${icon("trend")} <span>Lekha Financials</span></span><input id="cmd" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${esc(t("Jump to a ticker…"))}" aria-label="${esc(t("Jump to a ticker…"))}"><div class="seg" id="modes"><button data-m="desk" aria-pressed="${mode === "desk"}">${esc(t("Today"))}</button><button data-m="analysis" aria-pressed="${mode === "analysis"}">${esc(t("Analysis"))}</button></div><span class="sp"></span><span class="live" id="livepill"><b></b><span>…</span></span><button class="btn sm" id="ask">${icon("spark")} ${esc(t("Ask"))}</button><button class="iconbtn" id="cur">${curr() === "THB" ? "THB ฿" : "USD $"}</button>${signedIn() ? `<button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>` : `<button class="btn primary sm" id="signin">${esc(t("Sign in"))}</button><button class="iconbtn" id="acct" aria-label="${esc(t("Account"))}">${icon("me")}</button>`}`;
   $("#modes").onclick = (e) => { const b = e.target.closest("button[data-m]"); if (b) setMode(b.dataset.m); };
   $("#ask").onclick = openAsk; $("#acct").onclick = account;
   $("#cur").onclick = () => { prefs.set({ cur: curr() === "THB" ? "USD" : "THB" }); bar(); renderAll(); };

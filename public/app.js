@@ -1,14 +1,14 @@
-/* Portfolio Terminal v2: shell, router and live painter. Screens live in views/, shared logic in /core. */
+/* Lekha Financials: shell, router and live painter. Screens live in views/, shared logic in /core. */
 import { t, detectLang, setLang, getLang, fmtAgo } from "/core/i18n.js";
 import { D, init, onData, loadNews, loadHistory, loadStreet, positions, totals } from "/core/data.js";
 import * as live from "/core/live.js";
-import { prefs, isDemo, signedIn, tierName } from "/core/store.js";
+import { prefs } from "/core/store.js";
 import { esc } from "/core/util.js";
 import { icon, bindInfo, money, moneySigned, pct, price, tone, curr, openSheet } from "./ui.js";
 import today from "./views/today.js"; import holdings from "./views/holdings.js"; import market from "./views/market.js"; import risk from "./views/risk.js"; import outlook from "./views/outlook.js"; import me from "./views/me.js"; import analysis from "./views/analysis.js";
-import { openAuth, openAsk } from "./sheets.js";
+import { openAsk } from "./sheets.js";
 
-const VIEWS = { today, holdings, market, risk, outlook, analysis, me }, ORDER = ["today", "holdings", "market", "risk", "outlook", "analysis", "me"];
+const VIEWS = { today, holdings, market, risk, outlook, analysis, me }, ORDER = ["today", "holdings", "market", "risk", "outlook", "analysis"];
 const LABEL = () => ({ today: t("Today"), holdings: t("Holdings"), market: t("Market"), risk: t("Risk"), outlook: t("Outlook"), analysis: t("Analysis"), me: t("Me") });
 const $ = (s) => document.querySelector(s);
 let route = { id: "today", param: null }, raf = 0;
@@ -21,13 +21,11 @@ function applyLook() {
 }
 function shell() {
   const L = LABEL(), nav = (cls) => ORDER.map((id) => `<a class="${cls}" href="#/${id}" data-tab="${id}" ${route.id === id ? 'aria-current="page"' : ""}>${icon(id)}<span>${esc(L[id])}</span></a>`).join("");
-  $("#rail").innerHTML = `<div class="brand"><i>${icon("trend")}</i><b>Portfolio Terminal</b></div>${nav("rtab")}`;
+  $("#rail").innerHTML = `<div class="brand"><i>${icon("trend")}</i><b>Lekha Financials</b></div>${nav("rtab")}`;
   $("#tabs").innerHTML = nav("tab");
-  const signed = signedIn();
-  $("#top").innerHTML = `<div class="brand"><i>${icon("trend")}</i><span>Portfolio Terminal</span></div><span class="live" id="livepill"><b></b><span>${esc(t("Connecting…"))}</span></span><button class="btn sm askbtn" id="askbtn">${icon("spark")} ${esc(t("Ask"))}</button><button class="iconbtn" id="curbtn" aria-label="${esc(t("Change currency"))}">${curr() === "THB" ? "THB ฿" : "USD $"}</button>${signed ? `<a class="iconbtn" href="#/me" aria-label="${esc(t("Account"))}">${icon("me")}</a>` : `<button class="btn primary sm" id="signin">${esc(t("Sign in"))}</button>`}`;
+  $("#top").innerHTML = `<div class="brand"><i>${icon("trend")}</i><span>Lekha<span class="brand-sub"> Financials</span></span></div><span class="live" id="livepill"><b></b><span>${esc(t("Connecting…"))}</span></span><button class="btn sm askbtn" id="askbtn">${icon("spark")} ${esc(t("Ask"))}</button><button class="iconbtn" id="curbtn" aria-label="${esc(t("Change currency"))}">${curr() === "THB" ? "THB ฿" : "USD $"}</button><a class="iconbtn" href="#/me" aria-label="${esc(t("Account and demo"))}">${icon("me")}</a>`;
   $("#fab-root").innerHTML = `<button class="fab" id="fab" aria-label="${esc(t("Ask your analyst"))}">${icon("spark")}<span>${esc(t("Ask"))}</span></button>`;
   $("#curbtn").onclick = () => { prefs.set({ cur: curr() === "THB" ? "USD" : "THB" }); shell(); paintAll(); view(); };
-  const si = $("#signin"); if (si) si.onclick = () => openAuth("login");
   $("#fab").onclick = openAsk; $("#askbtn").onclick = openAsk; pill();
 }
 function pill() {
