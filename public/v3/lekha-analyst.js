@@ -169,6 +169,22 @@
     return DEMO.p;
   }
 
+  /* Compact, exact context the expert model receives: every figure is the same one the panels show. */
+  function demoContextText(c) {
+    if (!c) return "No portfolio data is loaded.";
+    var rows = c.rows.slice().sort(function (a, b) { return b.weight - a.weight; });
+    var lines = rows.map(function (r) {
+      return r.tk + ": weight " + (r.weight * 100).toFixed(2) + "%, value " + money(r.val) + ", " + r.qty + " units, cost basis " + money(r.cost) +
+        ", unrealized P&L " + pct1(r.pnlPct) + ", today " + pct1(r.day) + ", 1w " + pct1(r.w1) + ", 1m " + pct1(r.m1) + ", " + pct1(r.from52) + " from its 52-week high, theme " + r.theme + ", beta " + (r.beta != null ? r.beta.toFixed(2) : "n/a") + ".";
+    }).join("\n");
+    return "DEMO PORTFOLIO (fictional holdings, prices as of " + ((window.PT_LIVE_ASOF) || "2026-08-18") + ").\n" +
+      "Total " + money(c.total) + "; cash " + money(c.cash) + " (" + (c.cashPct * 100).toFixed(1) + "%); today " + pct1(c.dayPct) + " (" + money(c.dayPnl) + "); unrealized P&L " + money(c.pnl) + " (" + pct1(c.pnlPct) + ") on " + money(c.cost) + " cost.\n" +
+      "RISK: annualised volatility " + (c.vol * 100).toFixed(1) + "%, effective beta " + c.beta.toFixed(2) + ", top-3 weight " + (c.top3 * 100).toFixed(1) + "%, Herfindahl " + c.hhi.toFixed(3) + ", " + c.up + " up / " + c.down + " down today.\n" +
+      "THEMES: " + c.themes.map(function (t) { return t.theme + " " + (t.weight * 100).toFixed(0) + "%"; }).join(", ") + ".\n" +
+      "POSITIONS:\n" + lines + "\n" +
+      "This is the demo's simulated book. Anything not stated above (other companies, news, macro, history, industry structure) is not in the terminal's data for this user — answer those as a financial expert from general knowledge and say when you are doing so.";
+  }
+
   /* Is this question about the portfolio at all? The analyst answers from this book — prices,
      weights, P&L, risk, valuation, exposure — and says so plainly when a question is outside it
      instead of dumping the portfolio summary as if it were an answer. */
@@ -180,13 +196,11 @@
     return false;
   }
   function demoScopeAnswer() {
+    var c = DEMO.ctx;
     return {
-      answer: "That is outside what this analyst can answer. It only sees the numbers in your portfolio — positions, weights, P&L, cost basis, risk, exposure and valuation — and it cannot verify or comment on claims about named people, private lives, lawsuits or news it has not been given. Ask it about the book and it will answer with the actual figures.",
-      points: [
-        { title: "Try instead", detail: "\"Which position is my biggest risk?\" · \"What is my sector exposure?\" · \"How is the portfolio doing today?\" · \"Which holdings are furthest below cost?\"" },
-        { title: "Why it stops here", detail: "Answering a question like that from this data would be a guess dressed as analysis, and the demo has no news or filing evidence for it." }
-      ],
-      tickers: []
+      answer: "The live analyst is unreachable from here, so this answer is limited to the terminal's own figures: the book is worth " + (c ? money(c.total) : "–") + " with " + (c ? (c.cashPct * 100).toFixed(1) + "% in cash" : "cash unavailable") + ", " + (c ? pct1(c.dayPct) + " today and " + pct1(c.pnlPct) + " versus cost" : "") + ". Ask about positions, risk, exposure or valuation and the computed answer below is exact; for anything else, retry when the model is reachable.",
+      points: c ? [{ title: "Largest position", detail: c.rows[0].tk + " " + (c.rows[0].weight * 100).toFixed(1) + "% of value" }, { title: "Largest theme", detail: c.themes[0].theme + " " + (c.themes[0].weight * 100).toFixed(0) + "%" }] : [],
+      tickers: c ? c.rows.slice(0, 3).map(function (r) { return r.tk; }) : []
     };
   }
 
@@ -428,11 +442,22 @@
     };
     function ask(q) {
       if (demo) {
-        out.innerHTML = '<div class="empty">Reading your portfolio…</div>';
+        out.innerHTML = '<div class="empty">Thinking…</div>';
+        if (document.getElementById("ai-msg")) document.getElementById("ai-msg").hidden = true;
         demoCtx().then(function (c) {
-          var a = c && demoAnswer(q);
-          out.innerHTML = a ? answerHtml(a) : '<div class="empty">The demo portfolio is still loading. Try again in a moment.</div>';
-        });
+          var body = JSON.stringify({ question: q, mode: "expert", context: demoContextText(c), lang: uiLang() });
+          return fetch("/api/data/agent", { method: "POST", headers: { "Content-Type": "application/json" }, body: body })
+            .then(function (r) { return jget(r).then(function (j) { return { s: r.status, j: j }; }); })
+            .then(function (x) {
+              if (x.s === 200 && x.j && x.j.answer) { out.innerHTML = answerHtml({ answer: x.j.answer }); return; }
+              if (x.s === 429) { say((x.j && x.j.error) || "Daily question limit reached. It resets tomorrow."); out.innerHTML = ""; return; }
+              if (x.s === 503) { say("The AI service is not configured on this deployment."); out.innerHTML = ""; return; }
+              /* network or provider failure: fall back to the locally computed summary of the book */
+              var a = c && demoAnswer(q);
+              say("The live model is unreachable right now, so this answer comes from the terminal's own figures.");
+              out.innerHTML = a ? answerHtml(a) : "";
+            });
+        }).catch(function () { out.innerHTML = ""; say("Network error talking to the analyst."); });
         return;
       }
       out.innerHTML = '<div class="empty">Thinking…</div>';

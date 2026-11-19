@@ -176,4 +176,36 @@ async function run({ question, symbol = null, llm = null, lang = null, langHint 
     disclaimer: "Analysis from the cited sources, not investment advice. Facts and calculations trace to the evidence list; interpretation and speculation are the model's own." };
 }
 
-module.exports = { run, TOOLS, toolList, heuristicPlan, checkNumbers, numbersIn, resolveSymbols };
+
+/* ---------------- expert mode: a financial analyst, not a retrieval form ----------------
+   Used by the portfolio analyst chat. The caller supplies the site's own figures (holdings,
+   weights, P&L, risk, valuation, market context) as CONTEXT; the model may also use general
+   financial knowledge to explain, compare and answer. It must never invent a number about the
+   user's book, but it must not refuse a question for being "outside the portfolio" either. */
+const EXPERT_SYSTEM = [
+  "You are a senior financial analyst embedded in a portfolio terminal, talking to the owner of the portfolio. You are an expert: markets, equities, credit, macro, valuation, risk, accounting, tax structures, history of cycles, company and industry analysis.",
+  "CONTEXT below is the terminal's own data for this user: holdings, weights, cost basis, P&L, risk statistics, exposure, valuation and any market data supplied. Treat its numbers as authoritative and quote them exactly. Never invent a user-specific figure that CONTEXT does not contain.",
+  "You may use general financial knowledge freely: explain, compare, give base rates, historical analogues, industry structure, how a mechanism works, what usually drives an outcome. Do not pretend general knowledge is this user's data: mark it as general when it matters.",
+  "Answer the question that was asked, directly and completely, the way a good analyst would in conversation. Do not refuse because a question is not strictly about the portfolio — answer it as an expert and, where useful, connect it back to the book. Never substitute a portfolio summary for an answer.",
+  "One hard limit, because it is the law and the truth: do not state, repeat or speculate about private facts or unverified allegations about real people (affairs, crimes, health, disputes). If asked, say in ONE short sentence that there is no public, verifiable record of it, then immediately give the useful part — what is publicly known about the company, the person's public role, and what it means for the holdings. No lecturing, no moralising, no second refusal.",
+  "Be concise and specific: 2-6 sentences, or a short list when comparing. No boilerplate disclaimers; one short line only if you give an actionable opinion.",
+  "Never open with 'I don't have information', 'I can't', 'I am unable', 'As an AI' or a statement about your limits. Open with the substance: what is true, what the data shows, or what usually happens. If part of a question is unverifiable, mention it in one clause inside the answer, not as the opening.",
+].join("\n");
+
+async function expert({ question, context = "", llm = null, langHint = "" }) {
+  const q = String(question || "").slice(0, 800).trim();
+  if (q.length < 2) throw Object.assign(new Error("empty_question"), { status: 400 });
+  if (!llm) throw Object.assign(new Error("llm_not_configured"), { status: 503 });
+  const user = `CONTEXT (${new Date().toISOString().slice(0, 10)}):\n${String(context || "").slice(0, 12000) || "No portfolio data supplied."}\n\nQUESTION:\n${q}`;
+  const j = await llm.json({ system: EXPERT_SYSTEM + langHint, user, schema: { type: "OBJECT", properties: { answer: { type: "STRING" } }, required: ["answer"] }, job: "agent-expert", timeoutMs: 25000, maxTokens: 1200 });
+  let answer = String((j && j.answer) || "").slice(0, 6000).trim();
+  /* models still open with a limits sentence despite the instructions: drop that boilerplate opener
+     and keep the substance, so the reply starts with an answer instead of a disclaimer. */
+  const stripped = answer.replace(/^(?:as an ai[^.!?]*[.!?]\s*|i (?:do not|don't) have (?:access to |information (?:about|on) )?[^.!?]*[.!?]\s*|i (?:cannot|can't|am unable to|am not able to) [^.!?]*[.!?]\s*)+/i, "").trim();
+  if (stripped.length > 40) answer = stripped.replace(/^(?:however|that said|but|still|nonetheless|nevertheless)[,:]?\s+/i, "");
+  answer = answer.charAt(0).toUpperCase() + answer.slice(1);
+  if (!answer) throw Object.assign(new Error("empty_answer"), { status: 502 });
+  return { answer, answeredBy: "model", at: new Date().toISOString() };
+}
+
+module.exports = { run, expert, TOOLS, toolList, heuristicPlan, checkNumbers, numbersIn, resolveSymbols };

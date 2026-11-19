@@ -21,6 +21,13 @@ module.exports = async (req, res) => {
   /* signed-in users get their own knowledge base; demo visitors get one built from their browser
      snapshot, keyed to this client so nothing is shared between visitors */
   const owner = p.demo ? "demo:" + clientId(req) : p.user_id;
+  /* analyst chat: expert mode, no tool plan, caller-supplied context (see agent.expert) */
+  if (b.mode === "expert") {
+    const limitX = p.demo ? 40 : p.plan === "premium" ? 80 : 30;
+    if (!(await rateHit(`ai/expert/${owner}/${Math.floor(Date.now() / DAY)}`, limitX).catch(() => true))) return res.status(429).json({ error: `Daily question limit reached (${limitX}/day).`, code: "ai_limit" });
+    try { return res.status(200).json(await agent.expert({ question, context: String(b.context || "").slice(0, 14000), llm, langHint: langOf(b.lang) && langOf(b.lang) !== "en" ? "\n" + withLang("", langOf(b.lang)).trim() : "" })); }
+    catch (e) { return res.status(e.status === 400 ? 400 : e.status === 503 ? 503 : 502).json({ error: e.message === "llm_not_configured" ? "AI is not configured on this deployment." : "The analyst could not answer right now.", code: e.message }); }
+  }
   try { const out = await agent.run({ question, symbol: b.symbol || null, llm, lang, owner, langHint: lang && lang !== "en" ? "\n" + withLang("", lang).trim() : "" }); return res.status(200).json(out); }
   catch (e) { return res.status(e.status === 400 ? 400 : 502).json({ error: e.status === 400 ? "Ask a question first." : "The research agent could not complete this request.", code: e.message }); }
 };
