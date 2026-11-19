@@ -131,7 +131,44 @@ function fanSvg(sum, hz, startV, events) {
     <line x1="${L}" x2="${Wd - R}" y1="${Y(startV)}" y2="${Y(startV)}" class="now"/>
     <path d="${line("p90")}" class="bull"/><path d="${line("p10")}" class="bear"/><path d="${line("p50")}" class="med"/>
     ${lab("p90", "Bull P90")}${lab("p50", "Base P50")}${lab("p10", "Bear P10")}
-    <text x="${L}" y="${H - 8}" class="ax">Today</text><text x="${Wd - R}" y="${H - 8}" text-anchor="end" class="ax">+${days} trading days</text></svg>`;
+    <text x="${L}" y="${H - 8}" class="ax">Today</text><text x="${Wd - R}" y="${H - 8}" text-anchor="end" class="ax">+${days} trading days</text>
+    <g class="hov" aria-hidden="true"><line class="hov-cross" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/><circle class="hov-dot" r="3.5" cx="0" cy="0" visibility="hidden"/><circle class="hov-dot" r="3" cx="0" cy="0" opacity=".55" visibility="hidden"/><rect class="hov-hit" x="${L}" y="${T}" width="${Wd - L - R}" height="${H - T - B}"/></g></svg>`;
+}
+
+/* Hover on the fan chart: crosshair + readout of the percentile band and any catalyst on that day. */
+function attachFanHover(svg, res, hz, startV, events) {
+  const days = res.horizons[hz].days, rows = res.fan.filter((r) => r.day <= days); if (!svg || rows.length < 2) return;
+  const Wd = 900, H = 300, L = 70, R = 70, T = 16, B = 30, v = (r) => startV * (1 + r);
+  const lo = Math.min(...rows.map((r) => v(r.p5))), hi = Math.max(...rows.map((r) => v(r.p95))), pad = (hi - lo) * 0.06;
+  const y0 = lo - pad, y1 = hi + pad, X = (d) => L + (d / days) * (Wd - L - R), Y = (val) => T + (1 - (val - y0) / (y1 - y0)) * (H - T - B);
+  const chart = svg.closest(".chart"), cross = svg.querySelector(".hov-cross"), dot = svg.querySelectorAll(".hov-dot");
+  if (!chart || !cross) return;
+  const tip = document.createElement("div"); tip.className = "sim-tip"; tip.hidden = true; chart.appendChild(tip);
+  const day2date = (d) => { const t = new Date(); t.setDate(t.getDate() + Math.round((d * 7) / 5)); return t.toISOString().slice(0, 10); };
+  const pctIn = (x) => (x >= 0 ? "+" : "") + (x * 100).toFixed(1) + "%";
+  const move = (e) => {
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const m = svg.getScreenCTM(); if (!m) return; const p = pt.matrixTransform(m.inverse());
+    if (p.x < L || p.x > Wd - R) { tip.hidden = true; cross.setAttribute("visibility", "hidden"); dot.forEach((n) => n.setAttribute("visibility", "hidden")); return; }
+    const day = Math.round(((p.x - L) / (Wd - L - R)) * days), row = rows.reduce((a, b) => (Math.abs(b.day - day) < Math.abs(a.day - day) ? b : a), rows[0]);
+    const val = v(row.p50), cx = X(row.day), cy = Y(val);
+    cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.setAttribute("visibility", "visible");
+    dot[0].setAttribute("cx", cx); dot[0].setAttribute("cy", cy); dot[0].setAttribute("visibility", "visible");
+    const near = (events || []).filter((ev) => Math.abs(ev.day - row.day) <= 1).slice(0, 3);
+    const b90 = v(row.p95) - v(row.p5), b50 = v(row.p75) - v(row.p25);
+    tip.innerHTML = `<div class="tt-d">Day ${row.day} · ${day2date(row.day)}</div>` +
+      `<div class="tt-r"><span>Median</span><b>${esc(money(val))} <em>${pctIn(row.p50)}</em></b></div>` +
+      `<div class="tt-r"><span>P25–P75</span><span>${esc(money(v(row.p25)))} – ${esc(money(v(row.p75)))}</span></div>` +
+      `<div class="tt-r"><span>P5–P95</span><span>${esc(money(v(row.p5)))} – ${esc(money(v(row.p95)))}</span></div>` +
+      `<div class="tt-r"><span>Band width</span><span>${esc(money(b50))} / ${esc(money(b90))}</span></div>` +
+      (near.length ? near.map((ev) => `<div class="tt-e"><b>${esc(ev.label)}</b><em>${esc(ev.date)} · ${ev.status === "scheduled" ? "scheduled (official calendar)" : "estimated earnings date"}</em></div>`).join("") : "");
+    tip.hidden = false;
+    const box = chart.getBoundingClientRect(), s = box.width / Wd;
+    let left = cx * s + 14; if (left + 230 > box.width) left = Math.max(4, cx * s - 224);
+    tip.style.left = left.toFixed(0) + "px"; tip.style.top = Math.max(4, cy * s - 8).toFixed(0) + "px";
+  };
+  svg.addEventListener("pointermove", move);
+  svg.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); dot.forEach((n) => n.setAttribute("visibility", "hidden")); });
 }
 function histSvg(agg, hIdx, o) {
   const off = hIdx * RB, lo = Math.log(1 + o.p5 * 1.4 - 0.02 * (o.p5 < 0)), hi = Math.log(1 + o.p95 * 1.2 + 0.02), N = 48, bk = new Array(N).fill(0);
@@ -173,6 +210,7 @@ function paint() {
     <li><b>Statistics:</b> streamed into fixed-width histograms (≈0.2% return resolution) so a million paths never sit in memory; percentiles interpolate within a bin; mean, CVaR and probabilities are exact over the completed paths.</li>
     <li>A simulation describes a range of outcomes under these assumptions. It is not a prediction or investment advice.</li></ul>
     <div class="row"><button class="btn" id="sim-json" type="button">Export JSON</button><button class="btn" id="sim-svg" type="button">Export chart SVG</button></div></details>`;
+  try { attachFanHover(out.querySelector(".sim-fan"), s, st.hz, sv, st.input.events); } catch (e) { console.warn("[sim] hover failed", e && e.message); }
   out.querySelector("#sim-json").onclick = () => dl("lekha-simulation.json", "application/json", JSON.stringify({ ...simSummary(), horizons: s.horizons, fan: s.fan, events: st.input.events, assumptions: st.meta }, null, 2));
   out.querySelector("#sim-svg").onclick = () => { const svg = out.querySelector(".sim-fan"); if (svg) dl("lekha-projection.svg", "image/svg+xml", svg.outerHTML.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"')); };
 }

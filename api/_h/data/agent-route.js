@@ -18,6 +18,7 @@ module.exports = async (req, res) => {
   if (!(await rateHit(`ai/agent/${who}/${Math.floor(Date.now() / DAY)}`, limit).catch(() => true))) return res.status(429).json({ error: `Daily research limit reached (${limit}/day).`, code: "ai_limit" });
   const lang = langOf(b.lang), hasLlm = !!(process.env.ZAI_API_KEY || process.env.GEMINI_API_KEY);
   const llm = hasLlm ? { json: (o) => generateJson(o) } : null;
-  try { const out = await agent.run({ question, symbol: b.symbol || null, llm, lang, langHint: lang && lang !== "en" ? "\n" + withLang("", lang).trim() : "" }); return res.status(200).json(out); }
+  const owner = p.demo ? null : p.user_id;
+  try { const out = await agent.run({ question, symbol: b.symbol || null, llm, lang, owner, langHint: lang && lang !== "en" ? "\n" + withLang("", lang).trim() : "" }); return res.status(200).json(out); }
   catch (e) { return res.status(e.status === 400 ? 400 : 502).json({ error: e.status === 400 ? "Ask a question first." : "The research agent could not complete this request.", code: e.message }); }
 };

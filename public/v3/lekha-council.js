@@ -76,7 +76,7 @@ function card(L, p, status, isDemo) {
   const [k, n, name, role, q, ic] = L, s = { idle: "Standing by", queued: "Queued", working: "Analysing", done: p ? p.stance : "", failed: "Unavailable" }[status];
   return `<div class="cn-card ${status} ${p && status === "done" ? "st-" + esc(p.stance) : ""}" data-l="${k}" role="button" tabindex="0" aria-expanded="false">
     <div class="cn-top">${icon(ic)}<span class="cn-n">JUDGE ${n}</span><span class="cn-st">${esc(s)}</span></div><b class="cn-name">${name}</b><span class="cn-role">${role}</span>
-    ${p && status === "done" ? `<p class="cn-head">${esc(p.headline)}</p><div class="cn-more"><h4>${esc(q)}</h4><ul>${(p.points || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>(p.risks || []).length ? `<h4>Risks to this view</h4><ul>${p.risks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div><span class="cn-x">Details</span>` : `<p class="cn-q">${esc(q)}</p>`}</div>`;
+    ${p && status === "done" ? `<p class="cn-head">${esc(p.headline)}</p><div class="cn-more"><h4>${esc(q)}</h4><ul>${(p.points || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>${(p.risks || []).length ? `<h4>Risks to this view</h4><ul>${p.risks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div><span class="cn-x">Details</span>` : `<p class="cn-q">${esc(q)}</p>`}</div>`;
 }
 function links(shown = 0) {
   const xs = [10, 30, 50, 70, 90];
@@ -132,7 +132,7 @@ function reports() {
   const el = document.getElementById("lekha-reports"); if (!el) return;
   const saved = store.get(), samples = (demo && demo.scenarios) || [];
   el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">Live reports are kept in this browser (last 20). Samples show what a report looks like.</span></div>
-    ${saved.length ? `<ul class="cn-list">${saved.map((r, i) => `<li><button class="btn" data-rep="${i}">${esc(r.ceo && r.ceo.verdict)} · ${esc(r.question)}</button><span class="note">${esc((r.savedAt || "").slice(0, 10))}</span></li>`).join("")}</ul>` : `<p class="note">No live Council reports yet${isLive() ? "." : " — live reports are a Premium feature."}</p>`}
+    ${saved.length ? `<ul class="cn-list">${saved.map((r, i) => `<li><button class="btn" data-rep="${i}">${esc(r.ceo && r.ceo.verdict)} · ${esc(r.question)}</button><span class="note">${esc((r.savedAt || "").slice(0, 10))}</span></li>`).join("")}</ul>` : `<p class="note">No live Council reports yet${isLive() || window.PT_DEMO_MODE ? "." : " — live reports are a Premium feature."}</p>`}
     <h3>Sample reports</h3><ul class="cn-list">${samples.map((s) => `<li><button class="btn" data-sample="${esc(s.id)}">${esc(s.ceo.verdict)} · ${esc(s.question)}</button></li>`).join("")}</ul></section>`;
   el.querySelectorAll("[data-rep]").forEach((b) => (b.onclick = () => { clearTimers(); st.report = saved[+b.dataset.rep]; st.q = st.report.question; st.phase = "done"; st.shown = LENSES.length + 1; window.LEKHA_SHELL.go("analysis/council"); frame(); }));
   el.querySelectorAll("[data-sample]").forEach((b) => (b.onclick = () => { window.LEKHA_SHELL.go("analysis/council"); playDemo(b.dataset.sample); }));
