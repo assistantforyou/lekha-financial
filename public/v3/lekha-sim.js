@@ -90,7 +90,7 @@ function shell() {
 function seg() {
   host.querySelectorAll("#sim-hz button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.h === st.hz));
   host.querySelectorAll("#sim-n button").forEach((b) => { b.setAttribute("aria-pressed", +b.dataset.n === st.paths); b.disabled = !!st.job; });
-  host.querySelector("#sim-tags").innerHTML = (demo() ? `<span class="v3-demo-label">SAMPLE PORTFOLIO · REAL COMPUTATION</span>` : "") + `<span class="pill">Model ${esc(MODEL_VERSION)}</span>`;
+  host.querySelector("#sim-tags").innerHTML =  `<span class="pill">Model ${esc(MODEL_VERSION)}</span>`;
 }
 function start() {
   if (st.job) return;

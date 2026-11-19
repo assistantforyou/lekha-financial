@@ -58,7 +58,7 @@ let acct = between(v2, `<script>\n(function(){\n  var a=document.getElementById(
 acct = `(function(){\n  var a=document.getElementById("acct");` + acct;
 acct = patch(acct, `document.addEventListener("pt:state-hydrated",paint);`, `window.addEventListener("pt:state-hydrated",paint);`, "acct hydrated");
 acct = patch(acct, `document.addEventListener("pt:state-synced",paint);`, `window.addEventListener("pt:state-synced",paint);`, "acct synced");
-acct = patch(acct, `tick.textContent="DEMO — SIMULATED DATA"`, `tick.textContent="DEMO"`, "short demo tick");
+acct = patch(acct, `tick.textContent="DEMO"`, `tick.textContent="DEMO"`, "short demo tick");
 writeFileSync(P("v3", "lekha-account.js"), HDR("public/v2/index.html (account painter)") + acct);
 
 /* ---------- pt-ui → lekha-ui ---------- */

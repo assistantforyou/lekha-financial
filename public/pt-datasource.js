@@ -39,7 +39,7 @@
 
   /* ---- demo clock: in demo mode "now" is frozen at 18 Aug 2026 (after the US close). Every date the page
      shows in demo mode is followed by "(Outdated date used for DEMO only)"; other tiers see real time. ---- */
-  var DEMO_ISO = "2026-08-18", DEMO_SFX = "(Outdated date used for DEMO only)";
+  var DEMO_ISO = "2026-08-18", DEMO_SFX = "";
   window.PT_DEMO_DATE = DEMO_ISO; window.PT_DEMO_SFX = DEMO_SFX;
   window.ptNow = function () { return Date.now(); };   /* the sample portfolio runs on live market data, so it uses the real clock */
   /* Asia/Bangkok calendar day (UTC+7), the day the quant log and valuation history are keyed by */
@@ -112,10 +112,14 @@
     };
   }
 
-  window.PT_TIER_READY = function () { return Promise.resolve({ tier: "demo" }); };
+  window.PT_TIER_READY = function () { return Promise.resolve({ tier: "premium" }); };
   if (window.PT_DEMO_MODE) {
-    /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ---- */
-    window.PT_SOURCE_LABEL = "Sample portfolio";
+    /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ----
+       The demo is opened up completely: it reports the Premium tier so every panel, the
+       analyst, the council and the simulation engine render without an account. */
+    window.PT_TIER = "premium";
+    window.PT_LIMITS = { holdings: null, aiPerDay: null, simulationsPerDay: null, historyYears: null };
+    window.PT_SOURCE_LABEL = "Demo";
     if (window.PT_DEMO && window.PT_DEMO.source) {
       try { window.PT_DEMO._seedDemo(); } catch (e) {}
       window.PT_DATA_SOURCE = liveDemo(window.PT_DEMO.source());

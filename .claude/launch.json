@@ -1,6 +1,23 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "pt-dev", "runtimeExecutable": "bash", "runtimeArgs": ["-c", "set -a; source ~/.config/portfolio-terminal/keys.env; set +a; AV_API_KEY=$ALPHAVANTAGE_API_KEY ADMIN_EMAILS=${ADMIN_EMAILS:-pt-admin-test@example.com} node scripts/dev-server.mjs 3456"], "port": 3456 }
+    {
+      "name": "pt-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a; source ~/.config/portfolio-terminal/keys.env; set +a; AV_API_KEY=$ALPHAVANTAGE_API_KEY ADMIN_EMAILS=${ADMIN_EMAILS:-pt-admin-test@example.com} node scripts/dev-server.mjs 3456"
+      ],
+      "port": 3456
+    },
+    {
+      "name": "pt-restore",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a; source ~/.config/portfolio-terminal/keys.env; set +a; AV_API_KEY=$ALPHAVANTAGE_API_KEY node scripts/dev-server.mjs 3477"
+      ],
+      "port": 3477
+    }
   ]
 }

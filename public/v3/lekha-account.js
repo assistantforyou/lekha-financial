@@ -16,10 +16,10 @@
       if(demo){
         var cta=document.getElementById("demo-cta");
         if(s&&s.access_token){
-          banner.querySelector("span").textContent="Demo mode is showing a simulated portfolio. Your real account data is untouched.";
+          banner.querySelector("span").textContent="";
           if(cta){cta.textContent="Exit demo";cta.onclick=function(){location.href=location.pathname;};}
         }else if(cta){
-          cta.textContent="Create a free account for real data";
+          cta.textContent="Create a free account to save your own holdings";
           cta.onclick=function(){var b=document.getElementById("tb-set");if(b)b.click();};
         }
       }

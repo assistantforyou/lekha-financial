@@ -9,7 +9,6 @@ const LENSES = [
   ["optimist", "05", "The Optimist", "Long-term growth", "What could make this far more valuable?", '<path d="M4 17l6-6 4 4 6-8"/><path d="M15 7h5v5"/>'],
 ];
 const CEO_ICON = '<path d="M4 20h16M6 20V10M10 20V10M14 20V10M18 20V10M3 10l9-6 9 6z"/>';
-const DEMO_LABEL = "SIMULATED DEMONSTRATION — NOT LIVE ANALYSIS";
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const icon = (p) => `<svg viewBox="0 0 24 24" class="cn-ic" aria-hidden="true">${p}</svg>`;
 const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -48,11 +47,11 @@ function frame() {
   host.innerHTML = `<section class="panel cn">
   <div class="sim-head"><div><p class="sim-eyebrow">LEKHA LLM COUNCIL</p><h2 class="sim-title">Five perspectives · one CEO synthesis</h2>
   <p class="sim-sub">One research question is examined through five analytical lenses in a single model response, then reconciled by the CEO into a final verdict. Dissent is kept, not averaged away.</p></div>
-  <div class="sim-tags">${live ? '<span class="pill live">PREMIUM · LIVE</span>' : `<span class="v3-demo-label">${DEMO_LABEL}</span>`}</div></div>
+  <div class="sim-tags">${live ? '<span class="pill live">PREMIUM · LIVE</span>' : '<span class="pill live">PREMIUM · FULL ACCESS</span>'}</div></div>
   <form class="cn-form" id="cn-form"><textarea id="cn-q" rows="2" maxlength="600" placeholder="${live ? "Ask a research question about your portfolio or one holding…" : "Choose a sample question below to explore the Council"}" ${live ? "" : "readonly"}>${esc(st.q)}</textarea>
     <div class="row"><label class="note">Scope <select id="cn-scope" class="btn"${live ? "" : " disabled"}><option value="portfolio">Whole portfolio</option>${holdings().map((t) => `<option${st.scope === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
     <button class="btn pri" type="submit" id="cn-go"${live ? "" : " hidden"}>Convene the Council</button>
-    ${live ? "" : `<span class="note">Live, personalised Council analysis is a Premium feature. <a href="#" id="cn-up">Upgrade to Premium</a></span>`}</div></form>
+    ${live || window.PT_DEMO_MODE ? "" : `<span class="note">Live, personalised Council analysis is a Premium feature. <a href="#" id="cn-up">Upgrade to Premium</a></span>`}</div></form>
   <div class="cn-samples">${samples.map((s) => `<button class="btn" type="button" data-sid="${esc(s.id)}">${esc(s.question)}</button>`).join("")}</div>
   <div id="cn-board"></div></section>`;
   const sc = host.querySelector("#cn-scope"); if (sc) sc.value = st.scope;
@@ -67,7 +66,7 @@ function board() {
   if (st.phase === "idle" && !r) { el.innerHTML = `<div class="cn-grid">${LENSES.map((L) => card(L, null, "idle")).join("")}</div>${links()}<div class="cn-ceo idle">${icon(CEO_ICON)}<b>THE CEO</b><span>Awaiting the five perspectives</span></div>`; return; }
   const status = (i) => st.phase === "session" ? "working" : st.phase === "error" ? "failed" : i < st.shown ? "done" : "queued";
   const ceoOn = st.phase === "done" && st.shown > LENSES.length;
-  el.innerHTML = `${isDemo ? `<p class="cn-banner">${DEMO_LABEL}</p>` : ""}${st.phase === "session" ? `<p class="note cn-wait">Council in session — one structured request is being answered…</p>` : ""}${st.err ? `<p class="note warn">${esc(st.err)}</p>` : ""}
+  el.innerHTML = `${st.phase === "session" ? `<p class="note cn-wait">Council in session — one structured request is being answered…</p>` : ""}${st.err ? `<p class="note warn">${esc(st.err)}</p>` : ""}
   <div class="cn-grid">${LENSES.map((L, i) => card(L, P && P[L[0]], status(i), isDemo)).join("")}</div>${links(st.shown)}
   <div class="cn-ceo ${ceoOn ? "on" : ""}">${icon(CEO_ICON)}<b>THE CEO</b>${ceoOn ? `<span class="cn-verdict v-${esc((r.ceo.verdict || "").split(" ")[0].toLowerCase())}">${esc(r.ceo.verdict)}</span>` : `<span>${st.phase === "error" ? "No verdict" : "Synthesising…"}</span>`}</div>
   ${ceoOn ? report(r) : ""}`;
@@ -77,7 +76,7 @@ function card(L, p, status, isDemo) {
   const [k, n, name, role, q, ic] = L, s = { idle: "Standing by", queued: "Queued", working: "Analysing", done: p ? p.stance : "", failed: "Unavailable" }[status];
   return `<div class="cn-card ${status} ${p && status === "done" ? "st-" + esc(p.stance) : ""}" data-l="${k}" role="button" tabindex="0" aria-expanded="false">
     <div class="cn-top">${icon(ic)}<span class="cn-n">JUDGE ${n}</span><span class="cn-st">${esc(s)}</span></div><b class="cn-name">${name}</b><span class="cn-role">${role}</span>
-    ${p && status === "done" ? `<p class="cn-head">${esc(p.headline)}</p><div class="cn-more"><h4>${esc(q)}</h4><ul>${(p.points || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>${(p.risks || []).length ? `<h4>Risks to this view</h4><ul>${p.risks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${isDemo ? `<p class="cn-dl">${DEMO_LABEL}</p>` : ""}</div><span class="cn-x">Details</span>` : `<p class="cn-q">${esc(q)}</p>`}</div>`;
+    ${p && status === "done" ? `<p class="cn-head">${esc(p.headline)}</p><div class="cn-more"><h4>${esc(q)}</h4><ul>${(p.points || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>(p.risks || []).length ? `<h4>Risks to this view</h4><ul>${p.risks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div><span class="cn-x">Details</span>` : `<p class="cn-q">${esc(q)}</p>`}</div>`;
 }
 function links(shown = 0) {
   const xs = [10, 30, 50, 70, 90];
@@ -88,7 +87,7 @@ function report(r) {
   const P = (x) => (x ? `<p>${esc(x)}</p>` : ""), UL = (a) => (a && a.length ? `<ul>${a.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "");
   const agree = UL(c.agree), dissent = c.dissent && c.dissent.length ? `<ul>${c.dissent.map((d) => `<li><b>${esc(d.lens)}:</b> ${esc(d.reason)}</li>`).join("")}</ul>` : "<p>No material dissent recorded.</p>";
   return `<article class="cn-report"><header><p class="sim-eyebrow">LEKHA INVESTMENT INTELLIGENCE REPORT</p><h3>${esc(r.question)}</h3>
-    <p class="note">Scope: ${esc(r.scope === "portfolio" ? "whole portfolio" : r.scope)} · ${isDemo ? `<span class="v3-demo-label">${DEMO_LABEL}</span>` : `generated ${esc((m.generatedAt || "").slice(0, 16).replace("T", " "))} UTC · ${m.cached ? "cached answer" : "1 model request"}${m.retries ? ` (${m.retries} transport retr${m.retries > 1 ? "ies" : "y"})` : ""}${m.fallback ? ` · ${esc(m.fallback)}` : ""}`}</p></header>
+    <p class="note">Scope: ${esc(r.scope === "portfolio" ? "whole portfolio" : r.scope)} · ${isDemo ? `sample report` : `generated ${esc((m.generatedAt || "").slice(0, 16).replace("T", " "))} UTC · ${m.cached ? "cached answer" : "1 model request"}${m.retries ? ` (${m.retries} transport retr${m.retries > 1 ? "ies" : "y"})` : ""}${m.fallback ? ` · ${esc(m.fallback)}` : ""}`}</p></header>
     <div class="cn-exec"><span class="cn-verdict v-${esc((c.verdict || "").split(" ")[0].toLowerCase())}">${esc(c.verdict)}</span>${P(c.executive)}</div>
     <div class="cn-cols">${sec("Investment thesis", P(c.thesis))}${sec("Valuation assessment", P(c.valuation))}${sec("Bull case", P(c.bullCase))}${sec("Bear case", P(c.bearCase))}${sec("Portfolio implications", P(c.portfolio))}${sec("Council consensus", (agree ? "<h5>Agreement</h5>" + agree : "") + "<h5>Dissent</h5>" + dissent)}${sec("Confidence & evidence quality", P(c.evidenceQuality) + UL(c.limitations))}</div>
     <div class="cn-final"><h4>Final CEO verdict</h4>${P(c.final)}</div>
@@ -132,9 +131,9 @@ async function convene() {
 function reports() {
   const el = document.getElementById("lekha-reports"); if (!el) return;
   const saved = store.get(), samples = (demo && demo.scenarios) || [];
-  el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">Live reports are kept in this browser (last 20). Samples are simulated demonstrations.</span></div>
+  el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">Live reports are kept in this browser (last 20). Samples show what a report looks like.</span></div>
     ${saved.length ? `<ul class="cn-list">${saved.map((r, i) => `<li><button class="btn" data-rep="${i}">${esc(r.ceo && r.ceo.verdict)} · ${esc(r.question)}</button><span class="note">${esc((r.savedAt || "").slice(0, 10))}</span></li>`).join("")}</ul>` : `<p class="note">No live Council reports yet${isLive() ? "." : " — live reports are a Premium feature."}</p>`}
-    <h3>Sample reports</h3><ul class="cn-list">${samples.map((s) => `<li><button class="btn" data-sample="${esc(s.id)}">${esc(s.ceo.verdict)} · ${esc(s.question)}</button><span class="v3-demo-label">${DEMO_LABEL}</span></li>`).join("")}</ul></section>`;
+    <h3>Sample reports</h3><ul class="cn-list">${samples.map((s) => `<li><button class="btn" data-sample="${esc(s.id)}">${esc(s.ceo.verdict)} · ${esc(s.question)}</button></li>`).join("")}</ul></section>`;
   el.querySelectorAll("[data-rep]").forEach((b) => (b.onclick = () => { clearTimers(); st.report = saved[+b.dataset.rep]; st.q = st.report.question; st.phase = "done"; st.shown = LENSES.length + 1; window.LEKHA_SHELL.go("analysis/council"); frame(); }));
   el.querySelectorAll("[data-sample]").forEach((b) => (b.onclick = () => { window.LEKHA_SHELL.go("analysis/council"); playDemo(b.dataset.sample); }));
 }

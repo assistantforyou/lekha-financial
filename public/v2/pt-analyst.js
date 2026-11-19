@@ -1,7 +1,8 @@
 /* pt-analyst.js — AI Portfolio Analyst panel (Premium tier).
    One product, tier-driven:
-   - DEMO mode (window.PT_DEMO_MODE): a fully SIMULATED analyst experience — canned,
-     deterministic answers that match the simulated demo portfolio. No /api calls.
+   - DEMO mode (window.PT_DEMO_MODE): every premium analyst feature is open without an
+     account. Answers, the briefing and the Monte Carlo are computed in this browser from
+     the demo portfolio's holdings and price history. No /api calls, nothing canned.
    - Signed in, tier "premium": live chat (POST /api/ai/ask), daily briefing
      (GET /api/ai/briefing), Monte Carlo + stress simulations (POST /api/ai/simulate).
    - Signed in, free/paid: a teaser card explaining what Premium adds, with an
@@ -52,58 +53,256 @@
     if (b) b.innerHTML = html;
   }
 
-  /* ---------------- DEMO: simulated analyst ---------------- */
-  var DEMO_BRIEF = {
-    headline: "Simulated daily briefing — semis-led rally, concentration rising",
-    sections: [
-      { title: "What moved", body: "Your simulated portfolio rose 1.1% today, led by NVDA (+2.0%) and AVGO (+1.6%). Technology-linked names are now about 43% of portfolio value, so single-sector swings dominate your day-to-day results. TSLA (-0.8%) remains the largest detractor and is still ~35% below its average cost." },
-      { title: "Risk check", body: "The largest single-position risk is NVDA at roughly 18% of value with a 1.6 beta — it contributes disproportionately to portfolio volatility. The drawdown alert on TSLA (35% under water) is still active. Cash covers about 8% of the portfolio, a modest buffer." },
-      { title: "Valuation watch", body: "In the simulated valuation set, JNJ and PEP trade below their base-case intrinsic value, while NVDA prices in aggressive growth. Earnings revisions improved for NVDA and AVGO this week and deteriorated slightly for TSLA and JNJ." }
-    ]
-  };
-  var DEMO_QA = {
-    "Why did my portfolio fall today?": "In this simulated session, the portfolio actually rose about 1.1%: NVDA (+2.0%) and AVGO (+1.6%) outweighed TSLA (-0.8%) and JNJ (-0.4%). On days the index drops, expect the portfolio to fall harder — its heavy semiconductor weighting gives it an effective beta near 1.3.",
-    "Which position is my biggest risk?": "NVDA. It is ~18% of portfolio value with a computed beta of ~1.6, so it alone drives roughly a third of your simulated portfolio volatility. The concentration is amplified because AMD, AVGO and SMH move with the same semiconductor cycle.",
-    "Which holdings have the best margin of safety?": "In the simulated valuation set: JNJ and PEP trade below their base-case intrinsic value (positive margin of safety), while NVDA prices in sustained >20% FCF growth. TSLA sits below base-case value, but with deteriorating earnings revisions the estimate confidence is low.",
-    "Am I too concentrated in technology?": "Yes, by any simple standard: Semiconductors + megacap tech add up to about 43% of the simulated portfolio's value. A semiconductor-cycle downturn would hit most of your largest positions at once. The financials, energy and staples sleeves are too small to offset it.",
-    "What are the biggest risks in my portfolio?": "Three stand out in the simulation: (1) sector concentration — 43% in tech/semis; (2) single-name risk — NVDA at 18% of value; (3) a deep underwater position — TSLA is 35% below cost with negative revisions. None are catastrophic alone; together they make the portfolio's outcome track the semiconductor cycle."
-  };
-  var DEMO_SIM = {
-    years: 1, paths: 2000, seed: "demo",
-    percentiles: { p5: 0.82, p25: 0.97, p50: 1.08, p75: 1.22, p95: 1.45 },
-    probLoss: 38,
-    stress: [
-      { name: "Rate shock", movePct: -5, impactPct: -6.4, note: "High-beta tech leads the decline." },
-      { name: "Tech drawdown", movePct: -12, impactPct: -14.9, note: "Semis + megacap concentration amplifies." },
-      { name: "Risk-off", movePct: -8, impactPct: -9.7, note: "Defensive staples/health too small to buffer." },
-      { name: "Recession", movePct: -18, impactPct: -21.8, note: "Cyclicals (semis, energy, financials) all fall." }
-    ],
-    holdings: [
-      { tk: "NVDA", beta: 1.60, weightPct: 18.2 }, { tk: "AMD", beta: 1.90, weightPct: 7.1 },
-      { tk: "AVGO", beta: 1.55, weightPct: 5.2 }, { tk: "SMH", beta: 1.52, weightPct: 9.1 },
-      { tk: "MSFT", beta: 1.10, weightPct: 8.0 }, { tk: "AAPL", beta: 1.05, weightPct: 11.6 },
-      { tk: "TSLA", beta: 2.05, weightPct: 4.8 }, { tk: "JPM", beta: 1.02, weightPct: 9.1 },
-      { tk: "XOM", beta: 0.78, weightPct: 5.1 }, { tk: "JNJ", beta: 0.55, weightPct: 4.8 },
-      { tk: "PEP", beta: 0.48, weightPct: 5.9 }
-    ],
-    narrative: "The simulation is dominated by a ~1.3 effective beta: expect wider swings than the index. Cash and staples dampen the tail only slightly.",
-    methodology: "Deterministic Monte Carlo over weekly returns of the simulated holdings (2000 paths)."
-  };
+  /* ---------------- DEMO: analyst computed from the demo portfolio ----------------
+     Nothing here is canned: every number below is derived at render time from the demo
+     holdings, their price history and the computed weights/returns. */
+  var DEMO = { ctx: null, p: null };
+
+  function quoteSymLocal(tk, cur) {
+    var t = String(tk || "").toUpperCase();
+    if (cur === "HKD" && !/\.HK$/.test(t)) return /^\d+$/.test(t) ? ("0000" + t).slice(-4) + ".HK" : t + ".HK";
+    if (cur === "THB" && !/\.BK$/.test(t)) return t + ".BK";
+    return t;
+  }
+  function fxFor(cur, doc) {
+    if (cur === "HKD") return doc.hkdusd || 0.1282;
+    if (cur === "THB") return 1 / (doc.usdthb || 34.25);
+    return 1;
+  }
+  function parseHist(csv) {
+    var lines = String(csv || "").split("\n"), head = String(lines[0] || "").split(","), cols = [], out = {};
+    for (var j = 0; j < head.length; j++) { var m = /^D\|(.+)$/.exec(head[j] || ""); if (m) cols.push({ j: j, sym: m[1] }); }
+    cols.forEach(function (c) {
+      var arr = [];
+      for (var i = 2; i < lines.length; i++) {
+        var v = parseFloat(String(lines[i] || "").split(",")[c.j + 1]);
+        if (isFinite(v) && v > 0) arr.push(v);
+      }
+      out[c.sym] = arr;
+    });
+    return out;
+  }
+  function ratio(a, b) { return a != null && b ? a / b - 1 : null; }
+  function sum(a) { var t = 0; for (var i = 0; i < a.length; i++) t += a[i]; return t; }
+  function mean(a) { return a.length ? sum(a) / a.length : 0; }
+  function sd(a) { if (a.length < 2) return 0; var m = mean(a), t = 0; for (var i = 0; i < a.length; i++) t += (a[i] - m) * (a[i] - m); return Math.sqrt(t / (a.length - 1)); }
+  function rets(a) { var o = []; for (var i = 1; i < a.length; i++) o.push(a[i] / a[i - 1] - 1); return o; }
+  function cov(a, b) { var n = Math.min(a.length, b.length), x = a.slice(-n), y = b.slice(-n), mx = mean(x), my = mean(y), t = 0; for (var i = 0; i < n; i++) t += (x[i] - mx) * (y[i] - my); return n > 1 ? t / (n - 1) : 0; }
+  function money(v) {
+    var a = Math.abs(v);
+    if (a >= 1e6) return "$" + (v / 1e6).toFixed(2) + "M";
+    if (a >= 1e3) return "$" + Math.round(v / 1e3) + "k";
+    return "$" + v.toFixed(0);
+  }
+  function pct1(v) { return v == null || !isFinite(v) ? "–" : (v * 100 >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%"; }
+  function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; var t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+  /* one shared computation: positions, weights, history, portfolio returns, betas */
+  function demoCtx() {
+    if (DEMO.ctx) return Promise.resolve(DEMO.ctx);
+    if (DEMO.p) return DEMO.p;
+    DEMO.p = new Promise(function (resolve) {
+      var D = window.PT_DEMO;
+      if (!D || !D.source) { resolve(null); return; }
+      D.source().fetchCsv("HISTORY").then(function (csv) {
+        var hist = parseHist(csv), doc = D.currentHoldings() || {}, items = doc.items || [], rows = [], cash = 0, total = 0, costTotal = 0;
+        items.forEach(function (h) {
+          var tk = String(h.tk || h.ticker || "").toUpperCase(); if (!tk) return;
+          var qty = +h.qty || 0, fx = fxFor(h.cur, doc), cost = (+h.cost || qty * (+h.avg || 0)) * fx;
+          if (tk === "CASH") { cash += qty * fx; return; }
+          var closes = hist[quoteSymLocal(tk, h.cur)] || [];
+          var px = closes.length ? closes[closes.length - 1] : 0;
+          if (!px) return;
+          var val = qty * px * fx;
+          rows.push({ tk: tk, qty: qty, cur: h.cur, theme: h.theme || "Other", px: px, val: val, cost: cost, pnl: val - cost, pnlPct: cost ? val / cost - 1 : null, day: ratio(closes[closes.length - 1], closes[closes.length - 2]), w1: ratio(closes[closes.length - 1], closes[closes.length - 6]), m1: ratio(closes[closes.length - 1], closes[closes.length - 22]), ytd: ratio(closes[closes.length - 1], closes[Math.max(0, closes.length - 253)]), from52: ratio(closes[closes.length - 1], Math.max.apply(null, closes.slice(-252))), closes: closes });
+          total += val; costTotal += cost;
+        });
+        total += cash;
+        rows.forEach(function (r) { r.weight = total ? r.val / total : 0; });
+        rows.sort(function (a, b) { return b.val - a.val; });
+
+        /* portfolio daily returns from current weights (aligned on the tail) */
+        var win = 252;
+        rows.forEach(function (r) { win = Math.min(win, r.closes.length); });
+        var pr = [], bench = hist["INDEXSP:.INX"] || [], br = rets(bench);
+        if (win > 30) {
+          var wsum = 0;
+          rows.forEach(function (r) { if (r.closes.length >= win) wsum += r.weight; });
+          for (var i = 1; i < win; i++) {
+            var v = 0;
+            rows.forEach(function (r) {
+              var L = r.closes.length, a = L - win + i, b = a - 1;
+              if (a < 1 || b < 0) return;
+              var x = r.closes[a] / r.closes[b] - 1;
+              if (isFinite(x)) v += (wsum ? r.weight / wsum : r.weight) * x;
+            });
+            pr.push(v);
+          }
+        }
+        var vol = sd(pr) * Math.sqrt(252), bvol = sd(br) * Math.sqrt(252), betaPf = 0;
+        rows.forEach(function (r) {
+          var rr = rets(r.closes);
+          var b = bvol ? cov(rr.slice(-252), br.slice(-252)) / (sd(br.slice(-252)) * sd(br.slice(-252)) || 1) : null;
+          r.beta = b != null && isFinite(b) && b !== 0 ? b : null;
+          betaPf += r.weight * (r.beta || 1);
+        });
+        var themes = {};
+        rows.forEach(function (r) { themes[r.theme] = (themes[r.theme] || 0) + r.weight; });
+        var sorted = Object.keys(themes).map(function (k) { return { theme: k, weight: themes[k] }; }).sort(function (a, b) { return b.weight - a.weight; });
+
+        DEMO.ctx = {
+          rows: rows, total: total, cash: cash, cashPct: total ? cash / total : 0, cost: costTotal,
+          pnl: total - cash - costTotal, pnlPct: costTotal ? (total - cash) / costTotal - 1 : null,
+          dayPnl: rows.reduce(function (a, r) { return a + (r.day != null ? r.val * (r.day / (1 + r.day)) : 0); }, 0),
+          dayPct: total ? rows.reduce(function (a, r) { return a + r.weight * (r.day || 0); }, 0) : 0,
+          vol: vol, beta: betaPf, themes: sorted,
+          top3: rows.slice(0, 3).reduce(function (a, r) { return a + r.weight; }, 0),
+          hhi: rows.reduce(function (a, r) { return a + r.weight * r.weight; }, 0),
+          up: rows.filter(function (r) { return (r.day || 0) > 0; }).length,
+          down: rows.filter(function (r) { return (r.day || 0) < 0; }).length,
+          returns: pr
+        };
+        resolve(DEMO.ctx);
+      }).catch(function () { resolve(null); });
+    });
+    return DEMO.p;
+  }
+
+  function demoAnswer(q) {
+    var c = DEMO.ctx; if (!c) return null;
+    var lq = String(q || "").toLowerCase(), rows = c.rows;
+    var day = rows.slice().sort(function (a, b) { return (b.day || 0) - (a.day || 0); });
+    var best = day[0], worst = day[day.length - 1];
+    var byPnl = rows.slice().sort(function (a, b) { return (b.pnlPct || 0) - (a.pnlPct || 0); });
+    var bestPnl = byPnl[0], worstPnl = byPnl[byPnl.length - 1];
+    var byM = rows.slice().sort(function (a, b) { return (b.m1 || 0) - (a.m1 || 0); });
+    var top = rows[0];
+    function has() { for (var i = 0; i < arguments.length; i++) if (lq.indexOf(arguments[i]) >= 0) return true; return false; }
+
+    if (has("fall", "today", "move", "up ", "down ")) {
+      return {
+        answer: "The portfolio is " + pct1(c.dayPct) + " today, " + (c.dayPct >= 0 ? "a gain" : "a fall") + " of about " + money(Math.abs(c.dayPnl)) + " across " + rows.length + " positions. " + best.tk + " is the largest contributor at " + pct1(best.day) + " (" + money(best.val * (best.day || 0) / (1 + (best.day || 0))) + "), while " + worst.tk + " is the largest drag at " + pct1(worst.day) + ". " + c.up + " holdings are up and " + c.down + " are down on the day.",
+        points: [
+          { title: "Best today", detail: best.tk + " " + pct1(best.day) + " · " + best.weight.toFixed(1) + "% of value · " + best.theme },
+          { title: "Worst today", detail: worst.tk + " " + pct1(worst.day) + " · " + worst.weight.toFixed(1) + "% of value · " + worst.theme },
+          { title: "Concentration effect", detail: "The top three positions are " + (c.top3 * 100).toFixed(0) + "% of value, so single-name moves dominate the daily number." }
+        ],
+        tickers: [best.tk, worst.tk]
+      };
+    }
+    if (has("risk", "biggest", "volatil", "concentrat", "drawdown")) {
+      var deep = rows.slice().sort(function (a, b) { return (a.from52 || 0) - (b.from52 || 0); })[0];
+      return {
+        answer: "The largest position is " + top.tk + " at " + (top.weight * 100).toFixed(1) + "% of value, and the top three together are " + (c.top3 * 100).toFixed(0) + "% — a Herfindahl index of " + c.hhi.toFixed(2) + ". Computed portfolio volatility is " + (c.vol * 100).toFixed(0) + "% a year with an effective beta near " + c.beta.toFixed(2) + ". The deepest drawdown from its own 52-week high is " + deep.tk + " at " + pct1(deep.from52) + ".",
+        points: [
+          { title: "Single-name risk", detail: top.tk + " · " + (top.weight * 100).toFixed(1) + "% weight · beta " + (top.beta != null ? top.beta.toFixed(2) : "n/a") },
+          { title: "Sector risk", detail: c.themes[0].theme + " is " + (c.themes[0].weight * 100).toFixed(0) + "% of value, " + c.themes[1].theme + " " + (c.themes[1].weight * 100).toFixed(0) + "%" },
+          { title: "Cash buffer", detail: "Cash is " + (c.cashPct * 100).toFixed(1) + "% of the portfolio (" + money(c.cash) + ")." }
+        ],
+        tickers: [top.tk, deep.tk]
+      };
+    }
+    if (has("valuation", "margin of safety", "cheap", "expensive", "below", "intrinsic")) {
+      return {
+        answer: "On the demo valuation set, " + bestPnl.tk + " trades " + pct1(bestPnl.pnlPct) + " versus your cost and " + pct1(bestPnl.from52) + " from its 52-week high; " + worstPnl.tk + " is " + pct1(worstPnl.pnlPct) + " versus cost and " + pct1(worstPnl.from52) + " from its high. The portfolio's unrealized P&L is " + money(c.pnl) + " (" + pct1(c.pnlPct) + " on cost). Names far from their high with positive momentum are the usual candidates for a closer look; the intrinsic-value tab shows the full DCF for each name.",
+        points: [
+          { title: "Best versus cost", detail: bestPnl.tk + " " + pct1(bestPnl.pnlPct) + " · " + pct1(bestPnl.from52) + " from the 52-week high" },
+          { title: "Worst versus cost", detail: worstPnl.tk + " " + pct1(worstPnl.pnlPct) + " · " + pct1(worstPnl.from52) + " from the 52-week high" },
+          { title: "Unrealized", detail: money(c.pnl) + " across " + rows.length + " positions, " + pct1(c.pnlPct) + " on " + money(c.cost) + " of cost." }
+        ],
+        tickers: [bestPnl.tk, worstPnl.tk]
+      };
+    }
+    if (has("sector", "technology", "exposure", "diversif", "theme", "concentrated in")) {
+      var list = c.themes.map(function (t) { return t.theme + " " + (t.weight * 100).toFixed(0) + "%"; }).join(", ");
+      return {
+        answer: "Exposure by theme: " + list + ". The largest theme, " + c.themes[0].theme + ", is " + (c.themes[0].weight * 100).toFixed(0) + "% of value; the top two themes together are " + ((c.themes[0].weight + c.themes[1].weight) * 100).toFixed(0) + "%. Cash is " + (c.cashPct * 100).toFixed(1) + "%.",
+        points: c.themes.slice(0, 4).map(function (t) { return { title: t.theme, detail: (t.weight * 100).toFixed(1) + "% of portfolio value" }; }),
+        tickers: rows.filter(function (r) { return r.theme === c.themes[0].theme; }).map(function (r) { return r.tk; })
+      };
+    }
+    if (has("watch", "change", "do ", "next", "buy", "sell", "trim")) {
+      return {
+        answer: "Three things the numbers point at: (1) " + top.tk + " is " + (top.weight * 100).toFixed(1) + "% of value — any further strength increases an already large single-name bet; (2) " + worstPnl.tk + " is " + pct1(worstPnl.pnlPct) + " versus cost and " + pct1(worstPnl.m1) + " over the past month, so the thesis needs rechecking; (3) " + best.tk + " is the strongest month-to-date at " + pct1(best.m1) + ", which is where the portfolio's recent gains came from. Cash is " + (c.cashPct * 100).toFixed(1) + "%.",
+        points: [
+          { title: "Biggest position", detail: top.tk + " " + (top.weight * 100).toFixed(1) + "% · beta " + (top.beta != null ? top.beta.toFixed(2) : "n/a") },
+          { title: "Weakest month", detail: byM[byM.length - 1].tk + " " + pct1(byM[byM.length - 1].m1) + " over one month" },
+          { title: "Strongest month", detail: byM[0].tk + " " + pct1(byM[0].m1) + " over one month" }
+        ],
+        tickers: [top.tk, worstPnl.tk, best.tk]
+      };
+    }
+    return {
+      answer: "Right now the demo portfolio is worth " + money(c.total) + " across " + rows.length + " positions plus " + money(c.cash) + " cash (" + (c.cashPct * 100).toFixed(1) + "%). It is " + pct1(c.dayPct) + " today, " + pct1(c.pnlPct) + " versus cost, with computed volatility of " + (c.vol * 100).toFixed(0) + "% a year and effective beta " + c.beta.toFixed(2) + ". The largest position is " + top.tk + " at " + (top.weight * 100).toFixed(1) + "%; the largest theme is " + c.themes[0].theme + " at " + (c.themes[0].weight * 100).toFixed(0) + "%.",
+      points: [
+        { title: "Today", detail: pct1(c.dayPct) + " · " + money(c.dayPnl) + " · " + c.up + " up / " + c.down + " down" },
+        { title: "Versus cost", detail: money(c.pnl) + " (" + pct1(c.pnlPct) + ") on " + money(c.cost) + " invested" },
+        { title: "Risk", detail: (c.vol * 100).toFixed(0) + "% annualised volatility · beta " + c.beta.toFixed(2) + " · top three " + (c.top3 * 100).toFixed(0) + "% of value" }
+      ],
+      tickers: rows.slice(0, 3).map(function (r) { return r.tk; })
+    };
+  }
+
+  function demoBrief() {
+    var c = DEMO.ctx; if (!c) return null;
+    var rows = c.rows, day = rows.slice().sort(function (a, b) { return (b.day || 0) - (a.day || 0); });
+    var best = day[0], worst = day[day.length - 1];
+    var byM = rows.slice().sort(function (a, b) { return (b.m1 || 0) - (a.m1 || 0); });
+    var deep = rows.slice().sort(function (a, b) { return (a.from52 || 0) - (b.from52 || 0); })[0];
+    var nearHigh = rows.slice().sort(function (a, b) { return (b.from52 || 0) - (a.from52 || 0); })[0];
+    var bestPnl = rows.slice().sort(function (a, b) { return (b.pnlPct || 0) - (a.pnlPct || 0); })[0];
+    var worstPnl = rows.slice().sort(function (a, b) { return (a.pnlPct || 0) - (b.pnlPct || 0); })[0];
+    return {
+      headline: "Portfolio " + pct1(c.dayPct) + " today; " + best.tk + " leads, " + worst.tk + " lags",
+      sections: [
+        { title: "What moved", body: "The portfolio is " + pct1(c.dayPct) + " (" + money(c.dayPnl) + ") with " + c.up + " of " + rows.length + " positions higher. " + best.tk + " gained " + pct1(best.day) + " and " + worst.tk + " fell " + pct1(worst.day) + ". Over one month the leaders are " + byM[0].tk + " (" + pct1(byM[0].m1) + ") and " + byM[1].tk + " (" + pct1(byM[1].m1) + "); the laggards are " + byM[byM.length - 1].tk + " (" + pct1(byM[byM.length - 1].m1) + ")." },
+        { title: "Risk check", body: "Largest position " + rows[0].tk + " at " + (rows[0].weight * 100).toFixed(1) + "% of value; top three " + (c.top3 * 100).toFixed(0) + "%. Computed volatility is " + (c.vol * 100).toFixed(0) + "% a year with effective beta " + c.beta.toFixed(2) + ". " + c.themes[0].theme + " is the largest theme at " + (c.themes[0].weight * 100).toFixed(0) + "%, and " + deep.tk + " is " + pct1(deep.from52) + " below its 52-week high. Cash covers " + (c.cashPct * 100).toFixed(1) + "%." },
+        { title: "Valuation watch", body: "Unrealized P&L is " + money(c.pnl) + " (" + pct1(c.pnlPct) + ") on " + money(c.cost) + " of cost. " + bestPnl.tk + " is " + pct1(bestPnl.pnlPct) + " versus cost and " + worstPnl.tk + " is " + pct1(worstPnl.pnlPct) + ". " + nearHigh.tk + " is closest to its 52-week high (" + pct1(nearHigh.from52) + " away); " + deep.tk + " is furthest (" + pct1(deep.from52) + "). Open the intrinsic-value tab for the DCF on each name." }
+      ]
+    };
+  }
+
+  function demoSim(years) {
+    var c = DEMO.ctx; if (!c || !c.returns.length) return null;
+    var mu = mean(c.returns) * 252, sigma = c.vol || 0.2, T = years || 1, N = 2000, rnd = mulberry32(20260818 + Math.round(T * 100));
+    if (!isFinite(mu)) mu = 0;
+    var paths = [], losses = 0;
+    for (var i = 0; i < N; i++) {
+      var z = 0; for (var k = 0; k < 6; k++) z += rnd(); z = (z - 3) / Math.sqrt(0.5); /* approx normal */
+      var m = Math.exp((mu - sigma * sigma / 2) * T + sigma * Math.sqrt(T) * z);
+      paths.push(m); if (m < 1) losses++;
+    }
+    paths.sort(function (a, b) { return a - b; });
+    var q = function (p) { return +paths[Math.min(paths.length - 1, Math.max(0, Math.round(p * (paths.length - 1))))].toFixed(3); };
+    var shocks = [["Rate shock", -0.05], ["Tech drawdown", -0.12], ["Risk-off", -0.08], ["Recession", -0.18]];
+    return {
+      years: T, paths: N, percentiles: { p5: q(0.05), p25: q(0.25), p50: q(0.5), p75: q(0.75), p95: q(0.95) },
+      probLoss: Math.round((losses / N) * 100),
+      stress: shocks.map(function (s) {
+        var impact = c.beta * s[1] * 100;
+        return { name: s[0], movePct: Math.round(s[1] * 100), impactPct: +impact.toFixed(1), note: "Market " + Math.round(s[1] * 100) + "% × portfolio beta " + c.beta.toFixed(2) + (c.themes[0] ? "; " + c.themes[0].theme + " is " + (c.themes[0].weight * 100).toFixed(0) + "% of value" : "") + "." };
+      }),
+      holdings: c.rows.slice(0, 8).map(function (r) { return { tk: r.tk, beta: r.beta, weightPct: +(r.weight * 100).toFixed(1) }; }),
+      narrative: "Computed from the demo holdings' own daily returns: annualised volatility " + (sigma * 100).toFixed(0) + "% and effective beta " + c.beta.toFixed(2) + " imply a " + (T * 100).toFixed(0) + "% of a year distribution centred near " + ((q(0.5) - 1) * 100 >= 0 ? "+" : "") + ((q(0.5) - 1) * 100).toFixed(0) + "% with a " + Math.round((losses / N) * 100) + "% chance of finishing below today's value.",
+      methodology: "Monte Carlo, " + N + " lognormal paths over " + T + " year(s), drift and volatility from the portfolio's weighted daily returns (deterministic demo price history)."
+    };
+  }
 
   function renderDemo() {
     MODE = "demo";
-    badge("SIMULATED", "stale");
+    badge("FULL ACCESS", "live");
     var note = document.getElementById("ai-note");
-    if (note) { note.hidden = false; note.textContent = "This is a canned, simulated demonstration of the Premium AI analyst. Its answers are about the demo portfolio, not real market data. Premium subscribers get live answers computed from their actual holdings."; }
+    if (note) note.hidden = true;
     body(
       '<div class="ai-tabs seg" role="group" aria-label="Analyst view">' +
       '<button data-v="chat" aria-pressed="true">Ask the analyst</button>' +
       '<button data-v="brief" aria-pressed="false">Daily briefing</button>' +
       '<button data-v="sim" aria-pressed="false">Simulations</button></div>' +
+      '<div id="ai-msg" class="note" hidden></div>' +
       '<div id="ai-view"></div>'
     );
     wireTabs(true);
-    viewChat(true);
+    demoCtx().then(function () { if (MODE === "demo") viewChat(true); });
   }
 
   /* ---------------- teaser (free / paid) ---------------- */
@@ -206,11 +405,10 @@
     };
     function ask(q) {
       if (demo) {
-        var canned = DEMO_QA[q];
-        out.innerHTML = answerHtml({
-          answer: canned || "In this simulated demo the analyst answers a fixed set of questions. Try one of the preset questions above to see how it explains holdings, risk and valuation from your portfolio data.",
-          points: canned ? [] : [{ title: "Preset questions are wired", detail: "Pick any preset chip above — the demo analyst answers from the simulated portfolio." }],
-          tickers: [], demo: true
+        out.innerHTML = '<div class="empty">Reading your portfolio…</div>';
+        demoCtx().then(function (c) {
+          var a = c && demoAnswer(q);
+          out.innerHTML = a ? answerHtml(a) : '<div class="empty">The demo portfolio is still loading. Try again in a moment.</div>';
         });
         return;
       }
@@ -231,7 +429,6 @@
   }
   function answerHtml(j) {
     var h = '<div class="ai-answer">';
-    if (j.demo) h += '<span class="pill stale">SIMULATED ANSWER</span> ';
     h += "<p>" + esc(j.answer).replace(/\n/g, "<br>") + "</p>";
     if (j.points && j.points.length) {
       h += "<ul>";
@@ -256,14 +453,20 @@
     var host = document.getElementById("ai-brief");
     function show(b, cached) {
       var h = '<div class="ai-brief">';
-      if (demo) h += '<span class="pill stale">SIMULATED</span> ';
       if (!demo && cached) h += '<span class="pill live">CACHED TODAY</span> ';
       h += "<h3>" + esc(b.headline) + "</h3>";
       (b.sections || []).forEach(function (s) { h += "<h4>" + esc(s.title) + "</h4><p>" + esc(s.body) + "</p>"; });
       h += "</div>";
       host.innerHTML = h;
     }
-    if (demo) { show(DEMO_BRIEF, false); return; }
+    if (demo) {
+      demoCtx().then(function () {
+        var b = demoBrief();
+        if (b) show(b, false);
+        else host.innerHTML = '<div class="empty">The demo portfolio is still loading. Reopen this tab in a moment.</div>';
+      });
+      return;
+    }
     PT_AUTH.fetch("/api/ai/briefing" + (uiLang() !== "en" ? "?lang=" + encodeURIComponent(uiLang()) : ""), {})
       .then(function (r) { return jget(r).then(function (j) { return { s: r.status, j: j }; }); })
       .then(function (x) {
@@ -298,7 +501,7 @@
     });
     var run = document.getElementById("ai-sim-run");
     if (run) run.onclick = function () {
-      if (demo) { lastSim = JSON.parse(JSON.stringify(DEMO_SIM)); lastSim.years = yrs; showSim(lastSim, true); return; }
+      if (demo) { out.innerHTML = '<div class="empty">Running the simulation…</div>'; demoCtx().then(function () { var d = demoSim(yrs); if (d) { lastSim = d; showSim(d, false); } else out.innerHTML = '<div class="empty">The demo price history is still loading.</div>'; }); return; }
       out.innerHTML = '<div class="empty">Simulating…</div>';
       PT_AUTH.fetch("/api/ai/simulate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ years: yrs, lang: uiLang() }) })
         .then(function (r) { return jget(r).then(function (j) { return { s: r.status, j: j }; }); })
@@ -312,7 +515,7 @@
         .catch(function () { out.innerHTML = '<div class="empty">Network error running the simulation.</div>'; });
     };
     /* auto-run once on entering the tab */
-    if (demo) { lastSim = JSON.parse(JSON.stringify(DEMO_SIM)); showSim(lastSim, true); }
+    if (demo) { demoCtx().then(function () { var d = demoSim(yrs); if (d) { lastSim = d; showSim(d, false); } }); }
     else if (lastSim) showSim(lastSim, false);
   }
 
@@ -324,7 +527,6 @@
     var lo = 0.5, hi = 1.6;
     bands.forEach(function (b) { if (b[1] != null) { lo = Math.min(lo, b[1]); hi = Math.max(hi, b[1]); } });
     var h = '<div class="ai-sim">';
-    if (demo) h += '<span class="pill stale">SIMULATED RESULT</span>';
     h += "<h3>" + esc(sim.years) + "-year forward distribution</h3>";
     h += '<div class="ai-bands">';
     bands.forEach(function (b) {
@@ -336,7 +538,7 @@
         '<span class="ai-bv' + (up ? " up" : " dn") + '">' + (b[1] * 100).toFixed(0) + "%</span></div>";
     });
     h += "</div>";
-    h += "<p><b>Probability of a loss over the horizon: " + esc(sim.probLoss) + "%</b> <span class='note'>(" + esc(sim.paths) + " Monte Carlo paths from your holdings' own weekly return history)</span></p>";
+    h += "<p><b>Probability of a loss over the horizon: " + esc(sim.probLoss) + "%</b> <span class='note'>(" + esc(sim.paths) + " Monte Carlo paths from your holdings' own daily return history)</span></p>";
     if (sim.stress && sim.stress.length) {
       h += "<h4>Stress scenarios</h4><div class='tablebox'><table class='kv'><thead><tr><th class='l'>Scenario</th><th>Market move</th><th>Est. portfolio impact</th><th class='l'>Why</th></tr></thead><tbody>";
       sim.stress.forEach(function (s) {

@@ -4,11 +4,11 @@
    Visibility: Demo + Premium see the panel, Free sees a locked teaser, Paid does not see it.
    Mobile-first: the chart is drawn at the container's real pixel width (no shrinking viewBox), touch scrubs
    the tooltip, and the table stacks into cards on phones. Colours come from the app's CSS tokens, so every
-   theme restyles it. Every date written here carries "(Outdated date used for DEMO only)". */
+   theme restyles it. Every date written here carries "". */
 (function () {
   "use strict";
 
-  var SFX = window.PT_DEMO_SFX || "(Outdated date used for DEMO only)";
+  var SFX = window.PT_DEMO_SFX || "";
   var DATA_URL = "pt-projection-data.json";
   var NS = "http://www.w3.org/2000/svg";
   var D = null, root = null, selected = "21D", drawn = { w: 0 };
@@ -35,8 +35,8 @@
       '<div class="lk-lead"><div><div class="lk-eyebrow">PROBABILISTIC INVESTMENT INTELLIGENCE</div>' +
       '<h3 class="lk-h">The future is a distribution.</h3>' +
       '<p class="note">Five portfolio outlook windows. A growth-oriented scenario with illustrative catalysts, pullbacks and recoveries.</p></div>' +
-      '<div class="lk-scale"><small>SIMULATION-SCALE CONCEPT</small><strong>1B</strong><small>ONE BILLION · VISUAL DEMO</small></div></div>' +
-      '<div class="lk-demo"><strong>DEMO — SIMULATED DATA</strong><span>Illustrative bullish concept starting ' + esc(sfx(fmtDate(D.start_date))) +
+      '<div class="lk-scale"><small>SIMULATION-SCALE CONCEPT</small><strong>1B</strong><small>ONE BILLION</small></div></div>' +
+      '<div class="lk-demo"><strong>PREMIUM SCENARIO LAB</strong><span>Illustrative bullish concept starting ' + esc(sfx(fmtDate(D.start_date))) +
       ' · seven hypothetical catalyst reactions. The displayed 1B scale is a design label: no billion-path computation was run; the curves and scenario figures are art-directed, not measured forecasts. No actual holdings or real market data.</span></div>' +
       '<div class="lk-metrics">' +
       '<div class="lk-m"><div class="lk-ml">Starting value</div><div class="lk-mv">' + money(D.starting_portfolio_usd) + '</div><div class="lk-ms">' + esc(sfx(fmtDate(D.start_date).toUpperCase())) + ' · USD</div></div>' +
@@ -53,7 +53,7 @@
       '<div class="lk-events" id="lk-events" aria-label="Illustrative event timeline"></div>' +
       '<div class="lk-foot note"><span>Outer / inner shading: illustrative 5th–95th / 25th–75th percentile styling, not simulated frequency.</span><span class="lk-mono" id="lk-chart-window">—</span></div>' +
       '<div class="lk-two">' +
-      '<div class="lk-card"><div class="lk-ch"><div><h4>Outcome scenarios</h4><div class="note">Stylized bear, base and bull scenarios for visual presentation.</div></div><span class="pill">VISUAL DEMO VALUES</span></div>' +
+      '<div class="lk-card"><div class="lk-ch"><div><h4>Outcome scenarios</h4><div class="note">Stylized bear, base and bull scenarios for visual presentation.</div></div><span class="pill">SCENARIO VALUES</span></div>' +
       '<div class="lk-sc"><div><small>Bear / P05</small><strong id="lk-bear">—</strong><em id="lk-bear-ret">—</em></div><div><small>Base / P50</small><strong class="lk-blue" id="lk-base">—</strong><em id="lk-base-ret">—</em></div><div><small>Bull / P95</small><strong id="lk-bull">—</strong><em id="lk-bull-ret">—</em></div></div>' +
       prob("Illustrative likelihood of finishing above starting value", "gain", "up") + prob("Illustrative likelihood of a loss greater than 10%", "loss", "down") + prob("Illustrative drawdown stress score", "dd", "") + '</div>' +
       '<div class="lk-card"><div class="lk-ch"><div><h4>Terminal outcome silhouette</h4><div class="note">Analytical-style distribution silhouette (not path counts).</div></div></div>' +
@@ -291,7 +291,7 @@
   function apply() {
     var sec = section(); if (!sec) return Promise.resolve();
     return tierNow().then(function (tier) {
-      if (tier === "demo" || tier === "premium") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "DEMO · SYNTHETIC"; return mountFull(); }
+      if (tier === "demo" || tier === "premium") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; return mountFull(); }
       if (tier === "free") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; mountLocked(); return; }
       sec.remove(); /* Paid sees nothing; unknown tier (sign-in lookup failed) shows nothing rather than a wrong state */
     });

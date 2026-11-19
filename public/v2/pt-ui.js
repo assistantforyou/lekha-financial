@@ -364,7 +364,7 @@
     if (DEMO()) {
       acct = (AUTH && AUTH.session())
         ? "<p class='note'><b>Demo mode is on.</b> You are signed in but exploring the simulated terminal — none of your real data is loaded.</p><div class='set-row'><a class='btn pri' href='" + location.pathname + "'>Exit demo · load my real portfolio</a></div>"
-        : "<p class='note'><b>You're exploring the DEMO — a fully simulated Portfolio Terminal.</b> Every price, chart and number here is synthetic. Create a free account to use the real product with real data.</p>" +
+        : "<p class='note'><b>You're exploring the demo.</b> Create a free account to use the real product with your own holdings.</p>" +
           "<form class='set-f' id='set-auth' autocomplete='on'><input type='email' id='set-email' name='email' placeholder='Email' autocomplete='username' autocapitalize='none' autocorrect='off' spellcheck='false' inputmode='email' aria-label='Email' required><input type='password' id='set-pw' name='password' placeholder='Password (8+ characters)' autocomplete='current-password' aria-label='Password' required>" +
           "<div class='set-row'><button class='btn pri' type='submit' data-a='login'>Sign in</button><button class='btn' type='submit' data-a='signup'>Create free account</button><button class='btn link' type='button' id='set-forgot'>Forgot password?</button></div></form>";
     } else if (signed) {

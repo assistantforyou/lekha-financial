@@ -1101,15 +1101,15 @@ function renderBreadth(){
   const inds=[{name:"Semiconductors",key:"SEMI",ind:true,list:B.stocks.filter(x=>OB_SEMI.includes(x.tk))},{name:"Aerospace & defense",key:"AD",ind:true,list:B.stocks.filter(x=>OB_AD.includes(x.tk))}];
   for(const r of rowsD.concat(inds)){r.v=BR_OFF.map(([lab,o])=>breadthPct(r.list,o,m));r.now=r.v[4];r.d1m=r.now&&r.v[2]?r.now.p-r.v[2].p:null;r.d1w=r.now&&r.v[3]?r.now.p-r.v[3].p:null}
   const body=rowsD.slice(1).sort((a,b)=>(b.now?b.now.p:-1)-(a.now?a.now.p:-1));
-  const tr=r=>{const etf=SECTOR_ETF[r.key];const exp=r.d1m!=null&&r.d1m>=10,con=r.d1m!=null&&r.d1m<=-10;
-    const chip=etf||SECTOR_SPDR[r.key];
+  const tr=r=>{const etf=SECTOR_ETF[r.key]||SECTOR_SPDR[r.key];const exp=r.d1m!=null&&r.d1m>=10,con=r.d1m!=null&&r.d1m<=-10;
+    const chip=etf;
     return `<tr class="${r.key==="ALL"?"br-all":""}${r.ind?" br-ind":""}${etf?" br-link":""}" ${etf?`data-etf="${etf}" tabindex="0" title="Show ${etf} on the RRG"`:""}><th scope="row" class="l">${r.ind?"↳ ":""}${esc(r.name)}${r.ind?` <span class="muted">(${r.list.length})</span>`:""}${chip?` <span class="etf">${chip}</span>`:""}</th>`+
     r.v.map((c,i)=>`<td class="n${i===4?" now":""}" style="background:${brBg(c&&c.p)}" title="${esc(r.name)} · ${S.brMetric}-day · ${BR_OFF[i][0]==="Now"?"now":BR_OFF[i][0]+" ago"}: ${c?c.a+" of "+c.t+" stocks above":"no data"}">${c?Math.round(c.p)+"%":"–"}</td>`).join("")+
     `<td class="n ${cls(r.d1m)}">${r.d1m==null?"–":(r.d1m>0?"▲ +":r.d1m<0?"▼ −":"")+Math.abs(Math.round(r.d1m))}${exp?' <span class="chip bull">Expanding</span>':con?' <span class="chip bear">Contracting</span>':""}</td></tr>`};
   el.innerHTML=`<table class="br"><thead><tr><th class="l">Sector</th>${BR_OFF.map(([l])=>`<th>${l==="Now"?"Now":l+" ago"}</th>`).join("")}<th>1M change (pts)</th></tr></thead><tbody>${tr(rowsD[0])}${body.map(tr).join("")}${inds.map(tr).join("")}</tbody></table>`;
   const all=rowsD[0];const strong=body.filter(r=>r.now&&r.now.p>70),weak=body.filter(r=>r.now&&r.now.p<30);
   const ex=[...body].filter(r=>r.d1m!=null).sort((a,b)=>b.d1m-a.d1m);const top=ex[0],bot=ex[ex.length-1];
-  const conf=[];for(const r of body.concat(inds)){const etf=SECTOR_ETF[r.key];if(!etf||!r.now||!S.rot)continue;const s=rrgSeries(etf,"W");if(!s||!s.length)continue;const lp=s[s.length-1];const q=quadOf(lp.x,lp.y);const strongRS=q==="Leading"||q==="Improving";const broad=r.now.p>=50;
+  const conf=[];for(const r of body.concat(inds)){const etf=SECTOR_ETF[r.key]||SECTOR_SPDR[r.key];if(!etf||!r.now||!S.rot)continue;const s=rrgSeries(etf,"W");if(!s||!s.length)continue;const lp=s[s.length-1];const q=quadOf(lp.x,lp.y);const strongRS=q==="Leading"||q==="Improving";const broad=r.now.p>=50;
     conf.push(`<b>${etf}</b> is ${q} with ${Math.round(r.now.p)}% of ${esc(r.name.toLowerCase())} stocks above their ${S.brMetric}-day: ${strongRS?(broad?"strength is backed by broad participation":"relative strength rests on a minority of stocks"):(broad?"relative strength is fading while most stocks hold their trend":"weak and narrow")}`)}
   const tot=B.stocks.length,priced=B.stocks.filter(s=>s.flags).length,short=B.stocks.filter(s=>s.flags&&s.flags[2*0+m]==="x").map(s=>s.tk);
   $("br-read").innerHTML=`<p>${tagObs} ${all.now?Math.round(all.now.p):"–"}% of S&amp;P 500 stocks are above their ${S.brMetric}-day average${all.d1m!=null?` (${all.d1m>=0?"+":"−"}${Math.abs(Math.round(all.d1m))} pts in a month)`:""}. Broad participation (above 70%): <b>${strong.map(r=>esc(r.name)).join(", ")||"none"}</b>. Weak breadth (below 30%): <b>${weak.map(r=>esc(r.name)).join(", ")||"none"}</b>.</p>

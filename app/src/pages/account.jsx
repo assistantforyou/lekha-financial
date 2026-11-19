@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { AlertTriangle, Check, Download, KeyRound, LogOut, Mail, RefreshCw, Trash2, Upload, UserRound } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { AlertTriangle, Check, Download, LogOut, RefreshCw, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,10 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Progress } from "@/components/ui/progress"
 import { DataState, ErrorBox, PageHeader } from "@/components/common"
 import { api, useData } from "@/lib/api"
 import * as A from "@/lib/account"
@@ -34,7 +31,7 @@ function AuthForms() {
       else { const j = mode === "login" ? await A.login(email, pw) : await A.signup(email, pw); if (j.confirm) setMsg({ ok: true, t: j.message }); else { toast.success("Signed in. Loading your account…"); setTimeout(() => (location.href = location.pathname + "#/portfolio/overview"), 200); setTimeout(() => location.reload(), 350) } }
     } catch (err) { setMsg({ ok: false, t: errMsg(err) }) } finally { setBusy(false) }
   }
-  return (<Card><CardHeader><CardTitle>{mode === "login" ? "Sign in" : mode === "signup" ? "Create your free account" : "Reset your password"}</CardTitle><CardDescription>{isDemo() ? "You are in the sample-portfolio demo. An account keeps your own holdings, watchlist, layout and settings on every device and unlocks real data." : "Use your email and password."}</CardDescription></CardHeader>
+  return (<Card><CardHeader><CardTitle>{mode === "login" ? "Sign in" : mode === "signup" ? "Create your free account" : "Reset your password"}</CardTitle><CardDescription>{isDemo() ? "You are exploring the demo. An account keeps your own holdings, watchlist, layout and settings on every device and switches to real market data." : "Use your email and password."}</CardDescription></CardHeader>
     <form onSubmit={submit}><CardContent className="space-y-3"><Field label="Email" id="auth-email"><Input id="auth-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
       {mode !== "recover" && <Field label="Password" id="auth-pw" hint={mode === "signup" ? "8 to 72 characters." : undefined}><Input id="auth-pw" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} maxLength={72} value={pw} onChange={(e) => setPw(e.target.value)} /></Field>}
       {msg && <Alert variant={msg.ok ? "success" : "destructive"}><AlertDescription>{msg.t}</AlertDescription></Alert>}</CardContent>
@@ -52,9 +49,9 @@ export function Profile({ item, navigate, me }) {
           <CardContent className="space-y-3"><Field label="Display name" id="dn" hint="Shown in the app. Saved with your preferences and synced to your account."><div className="flex gap-2"><Input id="dn" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} /><Button variant="outline" onClick={() => { A.setPref("displayName", name.trim()); toast.success("Saved") }}>Save</Button></div></Field>
             <dl className="grid grid-cols-2 gap-y-2 text-sm"><dt className="text-muted-foreground">Plan</dt><dd><Badge variant="secondary">{me ? me.tier : tier || "…"}</Badge>{me && me.is_admin && <Badge variant="warn" className="ml-1">Admin</Badge>}</dd>
               {me && me.period_end && me.tier !== "free" && <><dt className="text-muted-foreground">Renews</dt><dd>{date(me.period_end)}</dd></>}<dt className="text-muted-foreground">Sync</dt><dd>{sync ? (sync.error ? <span className="down-t">Error: {sync.error}</span> : sync.pending ? `Saving ${sync.pending}…` : "Up to date") : "–"}</dd></dl></CardContent>
-          <CardFooter className="flex-wrap"><Button variant="outline" onClick={() => navigate("account/plans")}>Plans & billing</Button><Button variant="outline" onClick={() => navigate("account/security")}>Security</Button><Button variant="ghost" onClick={async () => { await A.logout(); location.href = location.pathname + "#/portfolio/overview"; location.reload() }}><LogOut />Sign out</Button></CardFooter></Card>
+          <CardFooter className="flex-wrap"><Button variant="outline" onClick={() => navigate("account/plans")}>Plans & billing</Button><Button variant="ghost" onClick={async () => { await A.logout(); location.href = location.pathname + "#/portfolio/overview"; location.reload() }}><LogOut />Sign out</Button></CardFooter></Card>
         <Card><CardHeader><CardTitle>Your data</CardTitle><CardDescription>Holdings, watchlist, saved valuations, layouts and reports live in this browser and are mirrored to your account.</CardDescription></CardHeader><CardContent><Button variant="outline" onClick={() => navigate("account/data")}>Export, import and sync</Button></CardContent></Card></>
-        : <><AuthForms /><Card><CardHeader><CardTitle>What an account adds</CardTitle></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground"><p>• Real prices, news and valuation on your own holdings (the demo uses a fictional portfolio).</p><p>• Holdings, watchlist, layout and settings sync across devices.</p><p>• Paid and Premium plans unlock full history, the AI analyst, the LLM council and larger simulations.</p><p>Your password never reaches this page's code after sign-in: only a session token is stored in this browser.</p></CardContent></Card></>}
+        : <><AuthForms /><Card><CardHeader><CardTitle>What an account adds</CardTitle></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground"><p>• Real prices, news and filings on your own holdings instead of the demo portfolio.</p><p>• Holdings, watchlist, layout and settings sync across devices.</p><p>• Paid and Premium plans add deeper history, more symbols and higher AI limits.</p><p>Your password never reaches this page's code after sign-in: only a session token is stored in this browser.</p></CardContent></Card></>}
     </div></div>)
 }
 
@@ -81,20 +78,75 @@ export function Preferences({ item, navigate }) {
 }
 
 /* ---------------- Plans & billing ---------------- */
-const ROWS = ["Market data", "Portfolio tracking", "Historical analysis", "Valuation coverage", "Advanced indicators", "Company research workspace", "AI research agent (cited)", "AI investment analyst", "LLM council (five perspectives + CEO)", "1B simulation engine (1M-path runs)", "Stress testing"]
-const VALS = { demo: ["Simulated", "Simulated", "Simulated", "Simulated", "Demo", "Yes", "15 questions/day", "Demo only", "Demo only", "Demo only", "Demo only"], free: ["Real", "20 holdings", "5 years", "12 symbols", "Basic", "Yes", "30 questions/day", "–", "–", "–", "–"], paid: ["Real", "Unlimited", "Full history", "Unlimited", "Full", "Yes", "30 questions/day", "–", "–", "–", "Standard"], premium: ["Real", "Unlimited", "Full history", "Unlimited", "Full", "Yes", "80 questions/day", "Included", "Included", "Included", "Advanced"] }
 const PRICE = { demo: "Free", free: "Free", paid: "฿699/mo", premium: "฿1,299/mo" }
+const TIERS = [
+  {
+    id: "demo", name: "Demo", tagline: "Everything unlocked, no account.",
+    body: "Open the full terminal with every panel switched on. The portfolio is a deterministic sample and every price, filing and AI answer is computed from that sample data in this browser — nothing is saved, nothing is sent to an account, and nothing is billed.",
+    points: [
+      ["Whole app, no sign-up", "All portfolio, research, sector, macro, simulation, council and analyst screens are available immediately."],
+      ["Premium AI features included", "Ask the analyst, the daily briefing, the five-perspective council and the 1M-path simulation engine all run in the demo."],
+      ["Sample data, real maths", "Quotes, fundamentals and history come from a fixed simulated dataset; every ratio, weight, P&L and simulation is calculated from it with the same code the paid tiers use."],
+      ["Nothing persisted", "Holdings, layouts and settings stay in this browser only, and reset whenever you clear site data."],
+    ],
+  },
+  {
+    id: "free", name: "Free", tagline: "Real market data, your own portfolio.",
+    body: "For tracking a real portfolio with real quotes and filings. Data comes from the free provider tiers, so history is shorter, the symbol cap is lower and the AI researcher has a daily question limit.",
+    points: [
+      ["Real quotes and filings", "Live-ish US quotes (IEX feed), SEC EDGAR financial statements, FRED macro series and publisher headlines instead of the simulated ones."],
+      ["Up to 20 holdings", "Enough for a personal portfolio. Every lot, cost basis, weight, unrealized P&L and performance chart works as in the paid plans."],
+      ["5 years of history", "Enough for drawdowns, rolling returns and a 1-year simulation; longer studies need Paid or Premium."],
+      ["12 valuation symbols", "DCF and residual-income models for your twelve largest names; the rest of the valuation tab stays locked."],
+      ["30 AI research questions a day", "The cited research agent that retrieves filings and news before answering. The premium analyst, council and 1M-path runs are not included."],
+    ],
+  },
+  {
+    id: "paid", name: "Paid", tagline: "Unlimited tracking and full history.",
+    body: "The working tier: no caps on holdings, symbols or history, and the full indicator and valuation set. It does not include the premium AI analyst, the LLM council or the 1M-path engine — those are Premium.",
+    points: [
+      ["Unlimited holdings and symbols", "Track as many accounts, currencies and positions as you like. Valuation models cover every holding, not just the first twelve."],
+      ["Full price history", "The entire available daily series per symbol, so multi-year drawdowns, rolling beta, factor regressions and volatility studies are usable."],
+      ["All advanced indicators", "Sector breadth internals, relative rotation trails, risk appetite, factor and peer valuation, volatility cones and overbought/oversold bands."],
+      ["Standard stress testing", "Rate-shock, tech-drawdown and recession scenarios on your actual weights, run on the standard path count."],
+      ["30 AI research questions a day", "Same cited research agent as Free, without the sample-size squeeze on portfolio-size limits."],
+    ],
+  },
+  {
+    id: "premium", name: "Premium", tagline: "The analyst, the council and 1M paths.",
+    body: "Everything in Paid plus the AI layer: a portfolio analyst you can question, a daily briefing written from your holdings, the five-perspective LLM council with a CEO synthesis, and the full 1M-path simulation engine.",
+    points: [
+      ["AI investment analyst", "Ask about positions, concentration, drawdowns or what would change the view, and get an answer computed from your live weights and history — plus a briefing every day."],
+      ["LLM council", "Five independent perspectives on one question, then a CEO synthesis that names the disagreements. Saved as a report you can reread."],
+      ["1B simulation engine", "Up to one million Monte Carlo paths on worker threads: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
+      ["Advanced stress testing", "The full scenario library plus custom shocks on rates, sectors and factors, applied to your real weights."],
+      ["80 AI research questions a day", "Roughly three times the Paid allowance across the analyst, research agent and council."],
+      ["Everything in Paid", "Unlimited holdings, full history, unlimited valuation coverage and every advanced indicator."],
+    ],
+  },
+]
 export function Plans({ item, navigate, me }) {
   const sess = useSession(), signedIn = !!(sess && sess.access_token) && !isDemo(), cur = signedIn ? (me ? me.tier : "free") : "demo", [busy, setBusy] = useState(null), qs = new URLSearchParams(location.search), billing = qs.get("billing")
   useEffect(() => { if (billing) { try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {} if (billing === "success") { toast.success("Payment received. Your plan switches on as soon as Stripe confirms it."); setTimeout(() => location.reload(), 4500) } else toast("Checkout cancelled. Nothing was charged.") } }, [])
   const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   const manage = async () => { setBusy("portal"); try { const j = await A.portal(); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{["demo", "free", "paid", "premium"].map((t) => <Card key={t} className={cn(cur === t && "border-primary", t === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}><CardHeader><div className="flex items-center justify-between"><CardTitle className="capitalize">{t}</CardTitle>{cur === t && <Badge variant="default">Current</Badge>}</div><div className="num text-2xl font-semibold">{PRICE[t]}</div></CardHeader>
-      <CardContent><dl className="space-y-1.5 text-[13px]">{ROWS.map((r, i) => <div key={r} className="flex justify-between gap-3 border-b border-border/50 pb-1"><dt className="text-muted-foreground">{r}</dt><dd className={cn("text-right", VALS[t][i] === "–" && "text-muted-foreground/50", VALS[t][i] === "Included" && "font-semibold text-[var(--up)]")}>{VALS[t][i]}</dd></div>)}</dl></CardContent>
-      <CardFooter>{t === "demo" ? (cur !== "demo" && <Button variant="outline" asChild><a href="?demo=1">Try the demo</a></Button>) : t === "free" ? (!signedIn && <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button>) : cur === t ? null : t === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
+    <div className="grid gap-4 md:grid-cols-2">{TIERS.map((t) => <Card key={t.id} className={cn("flex flex-col", cur === t.id && "border-primary", t.id === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}>
+      <CardHeader className="gap-2 pb-3">
+        <div className="flex items-center justify-between gap-3"><CardTitle className="text-xl">{t.name}</CardTitle>{cur === t.id && <Badge variant="default">Current</Badge>}</div>
+        <div className="num text-2xl font-semibold">{PRICE[t.id]}</div>
+        <p className="text-[13.5px] font-medium text-foreground">{t.tagline}</p>
+        <CardDescription className="text-[13px] leading-relaxed">{t.body}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex-1 space-y-3 pt-1">
+        {t.points.map(([title, detail]) => <div key={title} className="rounded-lg border border-border/60 bg-background/40 p-3">
+          <div className="flex items-start gap-2 text-[13.5px] font-semibold"><Check className={cn("mt-0.5 size-4 shrink-0", t.id === "demo" ? "text-[var(--warn)]" : "text-[var(--up)]")} />{title}</div>
+          <p className="ml-6 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{detail}</p>
+        </div>)}
+      </CardContent>
+      <CardFooter className="pt-0">{t.id === "demo" ? (cur !== "demo" ? <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button> : <span className="text-[12.5px] text-muted-foreground">You are in the demo. Everything is already unlocked.</span>) : t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
     {signedIn && me && me.tier !== "free" && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · renews {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button></CardContent></Card>}
-    <p className="mt-4 text-[12px] text-muted-foreground">All tiers run the same app: what changes is whether data is simulated or real, how deep it goes, and the AI features. Prices are in Thai baht and billed through Stripe; cancel any time in the billing portal. Entitlements are enforced on the server.</p></div>)
+    <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. The demo needs no account; entitlements for paid tiers are enforced on the server.</p></div>)
 }
 
 /* ---------------- Dashboard layout (the classic layout editor, framed) ---------------- */
@@ -117,32 +169,11 @@ export function DataPage({ item, navigate }) {
   const doImport = async (f) => { try { const n = A.importAll(JSON.parse(await f.text())); toast.success(`Restored ${n} items. Reloading…`); setTimeout(() => location.reload(), 800) } catch (e) { toast.error(errMsg(e)) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card><CardHeader><CardTitle>Import holdings from a statement</CardTitle><CardDescription>Broker PDF, screenshot or CSV. An AI model reads it, you review every line, and only ticked lines are saved. Nothing is stored on our servers.</CardDescription></CardHeader><CardFooter><Button onClick={() => navigate("portfolio/holdings")}><Upload />Open holdings & import</Button></CardFooter></Card>
-      <Card><CardHeader><CardTitle>Back up or move your data</CardTitle><CardDescription>Everything this browser keeps for the app (holdings, watchlist, valuation settings, layouts, saved reports). Session tokens and passcodes are never included.</CardDescription></CardHeader><CardFooter className="flex-wrap"><Button variant="outline" onClick={doExport}><Download />Export JSON</Button><Button variant="outline" onClick={() => file.current && file.current.click()}><Upload />Restore from file</Button><input ref={file} type="file" accept="application/json" hidden onChange={(e) => e.target.files[0] && doImport(e.target.files[0])} /></CardFooter></Card>
+      <Card><CardHeader><CardTitle>Import holdings from a statement</CardTitle><CardDescription>Broker PDF, screenshot or CSV. An AI model reads it, you review every line, and only ticked lines are saved.</CardDescription></CardHeader><CardFooter><Button onClick={() => navigate("portfolio/holdings")}><Upload />Open holdings & import</Button></CardFooter></Card>
+      <Card><CardHeader><CardTitle>Back up or move your data</CardTitle></CardHeader><CardFooter className="flex-wrap"><Button variant="outline" onClick={doExport}><Download />Export JSON</Button><Button variant="outline" onClick={() => file.current && file.current.click()}><Upload />Restore from file</Button><input ref={file} type="file" accept="application/json" hidden onChange={(e) => e.target.files[0] && doImport(e.target.files[0])} /></CardFooter></Card>
       <Card><CardHeader><CardTitle>Account sync</CardTitle><CardDescription>{signed ? "Documents are mirrored to your account within a second of every change." : "Sign in to sync. In the demo, data stays on this device."}</CardDescription></CardHeader><CardContent className="space-y-2 text-sm">
         {signed ? <><div className="flex items-center gap-2">Status: {sync && sync.error ? <Badge variant="down">{sync.error}</Badge> : sync && sync.pending ? <Badge variant="warn">saving {sync.pending}</Badge> : <Badge variant="up">up to date</Badge>}</div>
           <ul className="max-h-40 overflow-auto rounded-md border border-border text-[12px]">{keys.map((k) => <li key={k} className="flex justify-between gap-2 border-b border-border/60 px-2 py-1 last:border-0"><span className="font-mono">{k}</span><span className="text-muted-foreground">{stamps[k] ? dateTime(stamps[k]) : "not synced yet"}</span></li>)}{!keys.length && <li className="px-2 py-2 text-muted-foreground">No documents yet.</li>}</ul>
           <Button size="sm" variant="outline" onClick={async () => { const r = await PT_SYNC.flush(); toast(r && r.ok ? "Synced" : "Nothing to sync"); force((x) => x + 1) }}><RefreshCw />Sync now</Button></> : <p className="text-muted-foreground">Not signed in.</p>}</CardContent></Card>
-      <Card><CardHeader><CardTitle>Where the numbers come from</CardTitle><CardDescription>Every figure shows its source, time and whether it is reported or calculated.</CardDescription></CardHeader><CardContent className="space-y-1.5 text-[13px]">
-        {[["Prices & quotes", "Alpaca IEX → Finnhub → FMP → Yahoo → Twelve Data"], ["Financial statements & filings", "SEC EDGAR (XBRL) → FMP"], ["News", "Finnhub + Yahoo Finance + CNBC, MarketWatch, Fed, BBC, Nasdaq (merged, de-duplicated)"], ["Macro", "FRED (St. Louis Fed)"], ["FX", "ECB reference rates via Frankfurter"], ["Crypto", "CoinGecko"], ["Ratios, growth, DCF, risk", "Calculated by the app (deterministic code, never by the AI)"]].map(([a, b]) => <div key={a} className="flex flex-wrap justify-between gap-x-3 border-b border-border/50 pb-1"><span className="text-muted-foreground">{a}</span><span className="text-right">{b}</span></div>)}</CardContent></Card>
     </div></div>)
-}
-
-/* ---------------- Security ---------------- */
-export function Security({ item, navigate }) {
-  const sess = useSession(), signed = !!(sess && sess.access_token) && !isDemo(), [pw, setPw] = useState(""), [pw2, setPw2] = useState(""), [email, setEmail] = useState(""), [emailPw, setEmailPw] = useState(""), [del, setDel] = useState({ open: false, pw: "", confirm: "", busy: false, err: null })
-  if (!signed) return <div><PageHeader title={item.title} description={item.desc} /><Alert><div><AlertTitle>Sign in to manage security</AlertTitle><AlertDescription>Password, email and account deletion apply to a signed-in account. <button className="text-primary underline" onClick={() => navigate("account/profile")}>Go to Profile</button></AlertDescription></div></Alert></div>
-  const doDelete = async () => { setDel((d) => ({ ...d, busy: true, err: null })); try { await A.deleteAccount(del.pw, del.confirm); await A.logout(); try { Object.keys(localStorage).filter((k) => k.startsWith("ptpub.v1.") && !k.includes("demo")).forEach((k) => localStorage.removeItem(k)) } catch (e) {} location.href = "/"; } catch (e) { setDel((d) => ({ ...d, busy: false, err: errMsg(e) })) } }
-  return (<div><PageHeader title={item.title} description={item.desc} />
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card><CardHeader><CardTitle className="flex items-center gap-2"><KeyRound className="size-4" />Change password</CardTitle></CardHeader><CardContent className="space-y-3"><Field label="New password" id="np" hint="8 to 72 characters."><Input id="np" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field><Field label="Repeat new password" id="np2"><Input id="np2" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} /></Field></CardContent>
-        <CardFooter><Button disabled={pw.length < 8 || pw !== pw2} onClick={async () => { try { await A.changePassword(pw); toast.success("Password changed"); setPw(""); setPw2("") } catch (e) { toast.error(errMsg(e)) } }}>Change password</Button>{pw && pw2 && pw !== pw2 && <span className="text-xs down-t">Passwords differ</span>}</CardFooter></Card>
-      <Card><CardHeader><CardTitle className="flex items-center gap-2"><Mail className="size-4" />Change email</CardTitle><CardDescription>Currently {sess.email}. We send a confirmation link to the new address; nothing changes until you click it.</CardDescription></CardHeader><CardContent className="space-y-3"><Field label="New email" id="ne"><Input id="ne" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field><Field label="Current password" id="nepw" hint="Required to change your sign-in email."><Input id="nepw" type="password" autoComplete="current-password" value={emailPw} onChange={(e) => setEmailPw(e.target.value)} /></Field></CardContent>
-        <CardFooter><Button disabled={!email.includes("@") || emailPw.length < 8} onClick={async () => { try { const j = await A.changeEmail(email, emailPw); toast.success(j.message); setEmail(""); setEmailPw("") } catch (e) { toast.error(errMsg(e)) } }}>Send confirmation</Button></CardFooter></Card>
-      <Card><CardHeader><CardTitle>Session</CardTitle><CardDescription>Signed in on this browser. Tokens are kept in local storage and refreshed automatically.</CardDescription></CardHeader><CardFooter><Button variant="outline" onClick={async () => { await A.logout(); location.href = location.pathname + "#/portfolio/overview"; location.reload() }}><LogOut />Sign out</Button></CardFooter></Card>
-      <Card className="border-[color-mix(in_srgb,var(--down)_45%,var(--border))]"><CardHeader><CardTitle className="flex items-center gap-2 text-[var(--down)]"><Trash2 className="size-4" />Delete account</CardTitle><CardDescription>Permanently deletes your login and the holdings, settings and reports stored on our servers. This cannot be undone. Cancel any paid plan first.</CardDescription></CardHeader><CardFooter><Button variant="destructive" onClick={() => setDel({ open: true, pw: "", confirm: "", busy: false, err: null })}>Delete my account…</Button></CardFooter></Card>
-    </div>
-    <Dialog open={del.open} onOpenChange={(o) => setDel((d) => ({ ...d, open: o }))}><DialogContent><DialogHeader><DialogTitle>Delete your account?</DialogTitle><DialogDescription>Enter your password and type DELETE to confirm. Export your data first if you want a copy.</DialogDescription></DialogHeader>
-      <Field label="Password" id="dp"><Input id="dp" type="password" autoComplete="current-password" value={del.pw} onChange={(e) => setDel({ ...del, pw: e.target.value })} /></Field><Field label="Type DELETE" id="dc"><Input id="dc" value={del.confirm} onChange={(e) => setDel({ ...del, confirm: e.target.value })} /></Field>{del.err && <Alert variant="destructive"><AlertDescription>{del.err}</AlertDescription></Alert>}
-      <DialogFooter><Button variant="outline" onClick={() => setDel({ ...del, open: false })}>Cancel</Button><Button variant="destructive" disabled={del.busy || del.confirm !== "DELETE" || del.pw.length < 8} onClick={doDelete}>{del.busy ? "Deleting…" : "Delete permanently"}</Button></DialogFooter></DialogContent></Dialog></div>)
 }
