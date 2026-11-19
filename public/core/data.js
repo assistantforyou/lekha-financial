@@ -109,8 +109,8 @@ export async function loadHistory(force) {
   D.holdings = loadHoldings();
   const items = D.holdings.items.filter((h) => !isCash(h));
   if (!items.length) { D.series = {}; D.stats = {}; D.loaded.history = true; emit("history"); return; }
-  const sig = (isDemo() ? "d:" : "r:") + items.map((h) => symOf(h) + h.qty).sort().join(",");
-  const text = await swr("hist:" + sig, force ? 0 : isDemo() ? 36e5 : 10 * 6e4, () => csv("HISTORY"), (v) => { if (v && !D.loaded.history) { rebuildSeries(v); D.loaded.history = true; emit("history"); } });
+  const sig = (isDemo() ? "dl:" : "r:") + items.map((h) => symOf(h) + h.qty).sort().join(",");
+  const text = await swr("hist:" + sig, force ? 0 : 10 * 6e4, () => csv("HISTORY"), (v) => { if (v && !D.loaded.history) { rebuildSeries(v); D.loaded.history = true; emit("history"); } });
   if (text) { rebuildSeries(text); D.loaded.history = true; emit("history"); }
 }
 async function loadFx() {
@@ -145,7 +145,6 @@ function demoNews() {
   ];
 }
 export async function loadNews(lang = "en", force) {
-  if (isDemo()) { D.news = demoNews(); D.newsAt = Date.now(); D.macroLine = t("Stocks are firmer, bond yields are easing and investors are leaning towards risk."); D.loaded.news = true; emit("news"); return; }
   const get = (l) => swr("news:" + l, force ? 0 : 5 * 6e4, async () => { const r = await fetch(`${location.origin}/api/free/collection/news?lang=${encodeURIComponent(l)}`); return r.ok ? r.json() : null; }, (v) => Array.isArray(v) && apply(v));
   const apply = (docs) => { const n = normNews(docs); if (n.length) { D.news = n; D.newsAt = Date.now(); D.macroLine = docs[0].data.macro || ""; D.loaded.news = true; emit("news"); } };
   try {
@@ -153,14 +152,15 @@ export async function loadNews(lang = "en", force) {
     if (lang !== "en" && !(await cacheGet("news:" + lang, 5 * 6e4))) { D.newsBusy = true; get("en").catch(() => {}); }
     await get(lang); D.newsBusy = false;
   } catch (e) { D.errors.news = "x"; D.newsBusy = false; }
+  if (!D.news.length && isDemo()) { D.news = demoNews(); D.newsAt = Date.now(); D.macroLine = t("Stocks are firmer, bond yields are easing and investors are leaning towards risk."); D.loaded.news = true; emit("news"); }
 }
 
 /* ----- macro, mood, volatility, sectors (market-wide, cached) ----- */
 const lastTwo = (a) => (Array.isArray(a) && a.length ? { v: a[a.length - 1][1], prev: a.length > 1 ? a[a.length - 2][1] : null, date: a[a.length - 1][0] } : null);
 export async function loadMarket() {
   const ds = window.PT_DATA_SOURCE;
-  const doc = (p, ttl) => swr("doc:" + (isDemo() ? "d:" : "r:") + p, ttl, () => ds.getDoc(p)).catch(() => null);
-  const [m, f, vol, rot] = await Promise.all([doc("meta/macro", 6 * 36e5), doc("meta/fgi", 3 * 36e5), swr("csv:" + (isDemo() ? "d:" : "r:") + "VOL", 6 * 36e5, () => csv("VOLATILITY")).catch(() => null), swr("csv:" + (isDemo() ? "d:" : "r:") + "ROT", 36e5, () => csv("ROTATION")).catch(() => null)]);
+  const doc = (p, ttl) => swr("doc:" + (isDemo() ? "dl:" : "r:") + p, ttl, () => ds.getDoc(p)).catch(() => null);
+  const [m, f, vol, rot] = await Promise.all([doc("meta/macro", 6 * 36e5), doc("meta/fgi", 3 * 36e5), swr("csv:" + (isDemo() ? "dl:" : "r:") + "VOL", 6 * 36e5, () => csv("VOLATILITY")).catch(() => null), swr("csv:" + (isDemo() ? "dl:" : "r:") + "ROT", 36e5, () => csv("ROTATION")).catch(() => null)]);
   if (m) D.macro = { cpi: lastTwo(m.cpiYoY), fed: lastTwo(m.fedFunds), ten: lastTwo(m.tenYear) };
   if (f && f.fgi) D.fgi = { score: f.fgi.score, prev: f.fgi.prevClose, w1: f.fgi.prev1w, m1: f.fgi.prev1m };
   if (vol) {
@@ -193,7 +193,10 @@ const clamp01 = (x) => Math.max(0.1, Math.min(0.92, x)), clampN = (x, a, b) => M
 export async function loadStreet() {
   const rows = positions().filter((r) => !r.cash);
   if (!rows.length) return;
-  if (isDemo()) { const d = demoStreet(rows); Object.assign(D.street, d.street); Object.assign(D.tnews, d.news); Object.assign(D.earnings, d.earnings); D.loaded.street = true; emit("street"); return; }
+  if (isDemo()) {
+    try { const r = await fetch(`${location.origin}/api/free/demo?k=street`); if (!r.ok) throw 0; const j = await r.json(); Object.assign(D.street, j.street || {}); Object.assign(D.tnews, j.news || {}); Object.assign(D.earnings, j.earnings || {}); D.loaded.street = true; emit("street"); return; }
+    catch (e) { const d = demoStreet(rows); Object.assign(D.street, d.street); Object.assign(D.tnews, d.news); Object.assign(D.earnings, d.earnings); D.loaded.street = true; emit("street"); return; }
+  }
   const syms = rows.map((r) => r.tk).filter((s) => /^[A-Z][A-Z\-]{0,5}$/.test(s)).slice(0, 25);
   if (!syms.length) return;
   const apply = (j) => { if (!j) return; Object.assign(D.street, j.street || {}); Object.assign(D.tnews, j.news || {}); Object.assign(D.earnings, j.earnings || {}); D.loaded.street = true; emit("street"); };

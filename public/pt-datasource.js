@@ -41,10 +41,10 @@
      shows in demo mode is followed by "(Outdated date used for DEMO only)"; other tiers see real time. ---- */
   var DEMO_ISO = "2026-08-18", DEMO_SFX = "(Outdated date used for DEMO only)";
   window.PT_DEMO_DATE = DEMO_ISO; window.PT_DEMO_SFX = DEMO_SFX;
-  window.ptNow = function () { return window.PT_DEMO_MODE ? Date.parse(DEMO_ISO + "T22:00:00Z") : Date.now(); };
+  window.ptNow = function () { return Date.now(); };   /* the sample portfolio runs on live market data, so it uses the real clock */
   /* Asia/Bangkok calendar day (UTC+7), the day the quant log and valuation history are keyed by */
-  window.ptBkkDay = function () { return window.PT_DEMO_MODE ? DEMO_ISO : new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); };
-  window.ptSfx = function (s) { return window.PT_DEMO_MODE ? String(s) + " " + DEMO_SFX : String(s); };
+  window.ptBkkDay = function () { return new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); };
+  window.ptSfx = function (s) { return String(s); };
   try { localStorage.removeItem("ptpub.v1.source"); } catch (e) {} /* picker config is gone */
 
   /* quote symbol for a holding: US tickers as-is; HKD -> 0700.HK, THB -> PTT.BK (suffix added when missing) */
@@ -87,13 +87,38 @@
     if (changed) (function again(tries) { if (window.PT_HOLD) window.PT_HOLD.apply(); else if (tries < 20) setTimeout(function () { again(tries + 1); }, 250); })(0);
   }
 
+
+  /* The sample portfolio runs on REAL market data: the fixed sample tickers come from /api/free/demo (the same providers a signed-in
+     account uses), market-wide sets from the public /api/free endpoints. If any call fails, that one dataset falls back to the
+     local simulation so the page never breaks. */
+  function liveDemo(sim) {
+    var B = location.origin + "/api/free";
+    function txt(u) { return fetch(u).then(function (r) { return r.ok && r.status !== 204 ? r.text() : null; }); }
+    function js(u) { return fetch(u).then(function (r) { return r.ok ? r.json() : null; }); }
+    return {
+      fetchCsv: function (k) {
+        var personal = k === "HISTORY" || k === "FACTOR" || k === "VALIN";
+        return txt(personal ? B + "/demo?k=" + k : B + "/csv/" + encodeURIComponent(k)).then(function (t) {
+          if (!t) throw 0;
+          if (k === "HISTORY") computeLive(t, holdingSymbols(), holdingMap());
+          return t;
+        }).catch(function () { return sim.fetchCsv(k); });
+      },
+      getDoc: function (p) { return js(B + "/doc?path=" + encodeURIComponent(p)).then(function (v) { if (v && typeof v === "object" && !Array.isArray(v)) return v; throw 0; }).catch(function () { return sim.getDoc(p); }); },
+      getCollection: function (n) {
+        var u = n === "fund" || n === "rev" ? B + "/demo?k=" + n : B + "/collection/" + encodeURIComponent(n);
+        return js(u).then(function (v) { if (Array.isArray(v) && v.length) return v; throw 0; }).catch(function () { return sim.getCollection(n); });
+      }
+    };
+  }
+
   window.PT_TIER_READY = function () { return Promise.resolve({ tier: "demo" }); };
   if (window.PT_DEMO_MODE) {
     /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ---- */
-    window.PT_SOURCE_LABEL = "DEMO — SIMULATED DATA";
+    window.PT_SOURCE_LABEL = "Sample portfolio";
     if (window.PT_DEMO && window.PT_DEMO.source) {
       try { window.PT_DEMO._seedDemo(); } catch (e) {}
-      window.PT_DATA_SOURCE = window.PT_DEMO.source();
+      window.PT_DATA_SOURCE = liveDemo(window.PT_DEMO.source());
     }
     return;
   }

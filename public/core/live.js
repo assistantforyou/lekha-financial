@@ -48,7 +48,15 @@ async function pollReal() {
   if (session === "open") { const newest = Math.max(0, ...Object.values(j.q || {}).map((x) => Date.parse(x.t) || 0)); if (newest && Date.now() - newest > 25 * 6e4) session = "closed"; }
   apply(j.q, session, Date.parse(j.asOf) || Date.now(), false);
 }
-/* ---------- sample-mode simulator ---------- */
+/* ---------- sample portfolio: real prices for the fixed sample tickers (public, cached on the server) ---------- */
+async function pollDemo() {
+  const r = await fetch("/api/free/demo?k=quotes"); if (!r.ok) throw new Error("demo_" + r.status);
+  const j = await r.json(); if (!j.q || !Object.keys(j.q).length) throw new Error("demo_empty");
+  if (j.fx && j.fx.usdthb > 0) { D.fx.usdthb = j.fx.usdthb; D.fx.hkdusd = j.fx.hkdusd || D.fx.hkdusd; }
+  let session = j.session; if (session === "open") { const newest = Math.max(0, ...Object.values(j.q).map((x) => Date.parse(x.t) || 0)); if (newest && Date.now() - newest > 25 * 6e4) session = "closed"; }
+  apply(j.q, session, Date.parse(j.asOf) || Date.now(), true);
+}
+/* ---------- fallback simulator (only if the real sample feed is unreachable) ---------- */
 function simTick() {
   const items = D.holdings.items.filter((h) => !isCash(h) && D.stats[h.tk]);
   if (!items.length) return;
@@ -70,7 +78,10 @@ async function loop() {
   const demo = isDemo();
   let wait;
   try {
-    if (demo) { simTick(); wait = 2200 + Math.random() * 1800; status.mode = "sample"; }
+    if (demo) {
+      if (D.demoLive !== false) { try { await pollDemo(); D.demoLive = true; status.mode = "live"; wait = nextInterval() || 5000; } catch (e) { D.demoLive = D.demoLive === true ? true : false; if (D.demoLive) { wait = 15000; } } }
+      if (D.demoLive === false) { simTick(); wait = 2200 + Math.random() * 1800; status.mode = "sample"; }
+    }
     else {
       const leaderAlive = Date.now() - lastHeard < Math.max(15000, interval * 3);
       status.leader = !leaderAlive;

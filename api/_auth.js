@@ -54,6 +54,8 @@ async function requireUser(req, res) {
 // and refuses (402) unless it is on the allowed list. `need` in the response body tells the
 // UI which plans would unlock the endpoint; the stored plan is never taken from the client.
 async function requireTier(req, res, allowed) {
+  // the public sample portfolio (api/_h/free/demo.js) calls handlers on a synthetic request it alone can flag; it gets paid-tier depth
+  if (req.__demoPublic === true) return { user_id: "demo-public", email: null, plan: "paid", sub_status: "active", period_end: "2999-01-01T00:00:00Z", is_admin: false };
   const list = Array.isArray(allowed) ? allowed.filter((t) => TIERS.includes(t)) : [];
   if (!list.length) throw new Error("requireTier: no valid tiers allowed");
   const u = await userFrom(req);

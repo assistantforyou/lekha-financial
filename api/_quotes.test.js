@@ -27,5 +27,10 @@ const call = async (body, token = "tok", method = "POST") => {
   assert.strictEqual(alpacaCalls, 1, "second request inside the cache window does not hit Alpaca"); assert.strictEqual(authCalls, 1, "verified token is remembered briefly");
   assert.strictEqual(again.body.q.AAPL.px, 201.5);
   assert.strictEqual(r.headers["Cache-Control"], "no-store");
+  // the public sample portfolio bypass exists only for requests flagged by the server itself
+  const { requireTier } = require("./_auth");
+  const mk = () => ({ code: null, status(c) { this.code = c; return this; }, json() { return this; } });
+  const ok = await requireTier({ __demoPublic: true, headers: {} }, mk(), ["paid"]); assert.strictEqual(ok.plan, "paid");
+  const r2 = mk(); assert.strictEqual(await requireTier({ headers: {}, body: { __demoPublic: true }, query: { __demoPublic: "true" } }, r2, ["paid"]), null); assert.strictEqual(r2.code, 401, "a client cannot set the flag");
   console.log("quotes tests ok");
 })().catch((e) => { console.error(e); process.exit(1); });
