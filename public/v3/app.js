@@ -8,12 +8,12 @@ import { runCouncil, buildEvents } from "/core/council.js";
 import { LineChart } from "/core/charts.js";
 import { cacheGet, cacheSet } from "/core/cache.js";
 import { esc } from "/core/util.js";
-import { icon, bindInfo, money, moneySigned, pct, price, tone, curr, openSheet } from "/v2/ui.js";
-import { openAuth, openAsk, openAdd, openImport, confirmRemove } from "/v2/sheets.js";
-import { RANGES, rangeLabel, segHtml, bindSeg, lastN, streetBlock, impactPill, leanBar, leanLabel, leanTone, eventName, dateChip, inDays, sectorName } from "/v2/views/shared.js";
-import me from "/v2/views/me.js";
-import analysis from "/v2/views/analysis.js";
-import { personaName, personaStyle, PERSONA_META, reasonText } from "/v2/views/outlook.js";
+import { icon, bindInfo, money, moneySigned, pct, price, tone, curr, openSheet } from "/ui.js";
+import { openAuth, openAsk, openAdd, openImport, confirmRemove } from "/sheets.js";
+import { RANGES, rangeLabel, segHtml, bindSeg, lastN, streetBlock, impactPill, leanBar, leanLabel, leanTone, eventName, dateChip, inDays, sectorName } from "/views/shared.js";
+import me from "/views/me.js";
+import analysis from "/views/analysis.js";
+import { personaName, personaStyle, PERSONA_META, reasonText } from "/views/outlook.js";
 import { reasons, PERSONAS } from "/core/council.js";
 
 const $ = (s) => document.querySelector(s);
