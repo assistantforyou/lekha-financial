@@ -15,4 +15,5 @@ for (const code of ["th", "zh-Hans", "ja", "ko", "es", "hi", "vi", "fr"]) write(
 const T = JSON.parse(readFileSync(join(R, "scripts/i18n/zh-hant.json"), "utf8")), hans = parse("zh-Hans"), hant = {};
 const conv = (s) => { for (const [a, b] of T.phrases) s = s.split(a).join(b); return [...s].map((c) => T.chars[c] || c).join(""); };
 for (const [k, v] of Object.entries(hans)) hant[k] = conv(v);
+for (const [k, v] of Object.entries(EXTRA)) if (v["zh-Hant"] || v["zh-Hans"]) hant[k] = v["zh-Hant"] || conv(v["zh-Hans"]);
 write("zh-Hant", hant);

@@ -1,0 +1,50 @@
+/* v3 "Desk": a dense multi-pane trading-desk layout. Square, monospaced, amber-on-black; reuses v2's dialog and form styles. */
+:root{--bg:#f1eee3;--card:#faf8f0;--card2:#ebe7d8;--ink:#1b1a14;--muted:#6f6b58;--line:#d3ceb8;--accent:#a86a00;--accent-ink:#fff;--accent-soft:#f0e0b8;--up:#1c7a2c;--down:#b3261e;--r:3px;--shadow:none;--chart:#a86a00;--chart2:#6f6b58}
+:root[data-theme="dark"],:root:not([data-theme="light"]){--bg:#0a0a08;--card:#11110e;--card2:#171711;--ink:#e9e5d3;--muted:#8d8870;--line:#2a2920;--accent:#ffb000;--accent-ink:#1a1100;--accent-soft:#2b2000;--up:#5fd35f;--down:#ff5a4d;--chart:#ffb000;--chart2:#8d8870;--shadow:none;color-scheme:dark}
+:root[data-theme="light"]{color-scheme:light}
+body.desk{font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Noto Sans Mono","Noto Sans Thai","Noto Sans CJK SC",monospace;font-size:calc(13px*var(--z));line-height:1.4;height:100dvh;display:grid;grid-template-rows:auto auto auto minmax(0,1fr);overflow:hidden}
+.desk .card,.desk .btn,.desk .seg,.desk .seg button,.desk .chip,.desk .pill,.desk .field input,.desk .field select,.desk .sheet,.desk .iconbtn,.desk .msg,.desk .plan,.desk .tile{border-radius:var(--r)}
+.desk .sheet{border-radius:var(--r)}
+#bar{display:flex;align-items:center;gap:.6rem;padding:.4rem .8rem;border-bottom:1px solid var(--line);background:var(--card)}
+#bar .brand{font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);margin-right:.4rem;white-space:nowrap}
+#cmd{flex:1;max-width:26rem;min-height:2rem;padding:0 .7rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;text-transform:uppercase}
+#cmd::placeholder{text-transform:none;color:var(--muted)}
+#bar .sp{flex:1}
+#tape{overflow:hidden;white-space:nowrap;border-bottom:1px solid var(--line);background:var(--card2);font-size:.85em}
+#tape .run{display:inline-block;padding:.3rem 0;animation:tape 60s linear infinite}
+#tape:hover .run{animation-play-state:paused}
+#tape span.t{margin:0 1.2rem;cursor:pointer}#tape b{color:var(--accent)}
+@keyframes tape{to{transform:translateX(-50%)}}
+#mtabs{display:none}
+#desk{display:grid;grid-template-columns:minmax(17rem,24%) minmax(0,1fr) minmax(19rem,27%);grid-template-rows:minmax(0,1fr) auto;gap:1px;background:var(--line);min-height:0}
+.pane{background:var(--bg);overflow:auto;padding:.7rem .8rem;min-height:0}
+#p-hold{grid-row:1/3}#p-main{grid-column:2;grid-row:1}#p-feed{grid-column:3;grid-row:1/3}#p-council{grid-column:2;grid-row:2;max-height:11.5rem;padding:.5rem .8rem}
+.pane h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.pane .ch{margin-bottom:.4rem}
+table.t{width:100%;border-collapse:collapse}
+table.t th{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:right;font-weight:600;padding:.2rem .3rem;border-bottom:1px solid var(--line);position:sticky;top:-.7rem;background:var(--bg)}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t td{padding:.32rem .3rem;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t tr.hr{cursor:pointer}table.t tr.hr:hover td{background:var(--card2)}
+table.t tr.sel td{background:var(--accent-soft)}table.t td.k{font-weight:800}
+.big{font-size:2rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.mh{display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap;margin-bottom:.5rem}
+.cc{display:flex;gap:.5rem;overflow-x:auto;padding-bottom:.3rem}
+.cm{flex:none;width:11.5rem;border:1px solid var(--line);background:var(--card);padding:.4rem .55rem;cursor:pointer;text-align:left}
+.cm:hover{border-color:var(--accent)}.cm b{display:block;font-size:.78rem;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cm .m{font-size:1.15rem;font-weight:800}.cm .rng{height:1rem}
+.pane .seg{background:transparent}
+.pane .news-i .hl{font-size:.88rem}
+.pane .evt{padding:.5rem 0}
+@media(max-width:999px){
+  body.desk{grid-template-rows:auto auto auto minmax(0,1fr)}
+  #mtabs{display:inline-flex;margin:.4rem .6rem}
+  #desk{display:block;overflow:auto}
+  .pane{display:none;max-height:none!important;height:100%}
+  #desk[data-show="hold"] #p-hold,#desk[data-show="main"] #p-main,#desk[data-show="feed"] #p-feed,#desk[data-show="council"] #p-council{display:block}
+  #cmd{max-width:none}#bar .brand span{display:none}
+}
+body.desk{grid-template-columns:minmax(0,1fr);max-width:100vw}
+#bar{min-width:0;overflow:hidden}#cmd{min-width:0}
+#desk,.pane{min-width:0}
+@media(max-width:999px){#bar{gap:.35rem;padding:.4rem .5rem}#bar .brand{margin:0}#cmd{flex:1 1 4rem}#bar .live{display:none}#mtabs{max-width:calc(100vw - 1.2rem)}}

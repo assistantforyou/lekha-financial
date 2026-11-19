@@ -376,4 +376,6 @@ export default {"1 month":"1か月",
 "{n} lines imported":"{n}行を取り込みました",
 "{tk} drives about {pct}% of the expected gain.":"{tk}が期待される利益の約{pct}%を生み出します。",
 "{tk} earnings":"{tk}の決算",
-"{tk} is behind about {pct}% of the ups and downs.":"{tk}が値動きの約{pct}%の要因です。"};
+"{tk} is behind about {pct}% of the ups and downs.":"{tk}が値動きの約{pct}%の要因です。",
+"Jump to a ticker…":"ティッカーへ移動…",
+"Price":"価格"};

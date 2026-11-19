@@ -376,4 +376,6 @@ export default {"1 month":"1个月",
 "{n} lines imported":"已导入{n}行",
 "{tk} drives about {pct}% of the expected gain.":"{tk}贡献了约{pct}%的预期收益。",
 "{tk} earnings":"{tk}财报",
-"{tk} is behind about {pct}% of the ups and downs.":"{tk}造成了约{pct}%的波动。"};
+"{tk} is behind about {pct}% of the ups and downs.":"{tk}造成了约{pct}%的波动。",
+"Jump to a ticker…":"跳转到股票代码…",
+"Price":"价格"};

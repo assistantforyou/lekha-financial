@@ -30,6 +30,10 @@
       "destination": "/v2/index.html"
     },
     {
+      "source": "/v3",
+      "destination": "/v3/index.html"
+    },
+    {
       "source": "/api/free/:r*",
       "destination": "/api/free?__r=:r*"
     },

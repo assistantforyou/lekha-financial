@@ -376,4 +376,6 @@ export default {"1 month":"1 महीना",
 "{n} lines imported":"{n} पंक्तियाँ इम्पोर्ट हुईं",
 "{tk} drives about {pct}% of the expected gain.":"{tk} अपेक्षित लाभ का लगभग {pct}% देता है।",
 "{tk} earnings":"{tk} के नतीजे",
-"{tk} is behind about {pct}% of the ups and downs.":"{tk} उतार-चढ़ाव के लगभग {pct}% के पीछे है।"};
+"{tk} is behind about {pct}% of the ups and downs.":"{tk} उतार-चढ़ाव के लगभग {pct}% के पीछे है।",
+"Jump to a ticker…":"किसी टिकर पर जाएँ…",
+"Price":"कीमत"};

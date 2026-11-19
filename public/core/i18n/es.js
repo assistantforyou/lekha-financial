@@ -376,4 +376,6 @@ export default {"1 month":"1 mes",
 "{n} lines imported":"{n} líneas importadas",
 "{tk} drives about {pct}% of the expected gain.":"{tk} aporta cerca del {pct}% de la ganancia esperada.",
 "{tk} earnings":"Resultados de {tk}",
-"{tk} is behind about {pct}% of the ups and downs.":"{tk} está detrás de cerca del {pct}% de los altibajos."};
+"{tk} is behind about {pct}% of the ups and downs.":"{tk} está detrás de cerca del {pct}% de los altibajos.",
+"Jump to a ticker…":"Ir a un símbolo…",
+"Price":"Precio"};

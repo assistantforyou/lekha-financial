@@ -376,4 +376,6 @@ export default {"1 month":"1개월",
 "{n} lines imported":"{n}줄을 가져왔습니다",
 "{tk} drives about {pct}% of the expected gain.":"{tk}이(가) 기대 수익의 약 {pct}%를 이끕니다.",
 "{tk} earnings":"{tk} 실적",
-"{tk} is behind about {pct}% of the ups and downs.":"{tk}이(가) 등락의 약 {pct}%를 차지합니다."};
+"{tk} is behind about {pct}% of the ups and downs.":"{tk}이(가) 등락의 약 {pct}%를 차지합니다.",
+"Jump to a ticker…":"티커로 이동…",
+"Price":"가격"};

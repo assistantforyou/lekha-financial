@@ -10,7 +10,7 @@ const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return
 export function keys() {
   const set = new Set();
   const re = /\bt\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\$]|\\.)*`)/g;
-  for (const f of [...walk(join(ROOT, "v2")), ...walk(join(ROOT, "core"))]) {
+  for (const f of [...walk(join(ROOT, "v2")), ...walk(join(ROOT, "v3")), ...walk(join(ROOT, "core"))]) {
     const src = readFileSync(f, "utf8");
     for (const m of src.matchAll(re)) { const q = m[1][0]; set.add(JSON.parse(q === '"' ? m[1] : '"' + m[1].slice(1, -1).replace(/"/g, '\\"').replace(/\\'/g, "'") + '"')); }
   }

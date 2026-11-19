@@ -52,8 +52,9 @@ export async function signOut() {
   window.PT_AUTH.setSession(null);
   try { if (window.PT_SYNC) window.PT_SYNC.reset(); } catch (e) { /* ignore */ }
 }
-export async function checkout(plan) { const r = await post("/api/billing/checkout", { plan, ret: "/v2" }, true); return r.ok && r.j.url ? { url: r.j.url } : { error: r.j.error || "failed", status: r.status }; }
-export async function billingPortal() { const r = await post("/api/billing/portal", { ret: "/v2" }, true); return r.ok && r.j.url ? { url: r.j.url } : { error: r.j.error || "failed", status: r.status }; }
+const retPath = () => (/^\/v3/.test(location.pathname) ? "/v3" : "/v2");
+export async function checkout(plan) { const r = await post("/api/billing/checkout", { plan, ret: retPath() }, true); return r.ok && r.j.url ? { url: r.j.url } : { error: r.j.error || "failed", status: r.status }; }
+export async function billingPortal() { const r = await post("/api/billing/portal", { ret: retPath() }, true); return r.ok && r.j.url ? { url: r.j.url } : { error: r.j.error || "failed", status: r.status }; }
 export async function ai(path, body, method = "POST") {
   const r = await window.PT_AUTH.fetch("/api/ai/" + path, method === "GET" ? {} : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
   const j = await r.json().catch(() => ({}));

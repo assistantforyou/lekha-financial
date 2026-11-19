@@ -376,4 +376,6 @@ export default {"1 month":"1 เดือน",
 "{n} lines imported":"นำเข้า {n} บรรทัดแล้ว",
 "{tk} drives about {pct}% of the expected gain.":"{tk} ขับเคลื่อนประมาณ {pct}% ของกำไรที่คาดไว้",
 "{tk} earnings":"ประกาศกำไร {tk}",
-"{tk} is behind about {pct}% of the ups and downs.":"{tk} อยู่เบื้องหลังประมาณ {pct}% ของความผันผวน"};
+"{tk} is behind about {pct}% of the ups and downs.":"{tk} อยู่เบื้องหลังประมาณ {pct}% ของความผันผวน",
+"Jump to a ticker…":"ไปที่ชื่อย่อหุ้น…",
+"Price":"ราคา"};

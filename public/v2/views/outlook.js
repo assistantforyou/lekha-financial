@@ -128,3 +128,4 @@ export default {
   },
   invalidate() { res = null; sig = ""; },
 };
+export { name as personaName, style as personaStyle, META as PERSONA_META, reasonText };

@@ -376,4 +376,6 @@ export default {"1 month":"1 tháng",
 "{n} lines imported":"Đã nhập {n} dòng",
 "{tk} drives about {pct}% of the expected gain.":"{tk} đóng góp khoảng {pct}% khoản lãi kỳ vọng.",
 "{tk} earnings":"Báo cáo lợi nhuận {tk}",
-"{tk} is behind about {pct}% of the ups and downs.":"{tk} đứng sau khoảng {pct}% các biến động lên xuống."};
+"{tk} is behind about {pct}% of the ups and downs.":"{tk} đứng sau khoảng {pct}% các biến động lên xuống.",
+"Jump to a ticker…":"Đi tới mã cổ phiếu…",
+"Price":"Giá"};

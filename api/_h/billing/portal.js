@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
     const p = await profile(u);
     if (!p.stripe_customer_id) return res.status(404).json({ error: "No billing account yet." });
     const origin = `https://${req.headers["x-forwarded-host"] || req.headers.host}`;
-    const s = await stripe("POST", "billing_portal/sessions", { customer: p.stripe_customer_id, return_url: origin + ((req.body && req.body.ret === "/v2") ? "/v2" : "/") });
+    const s = await stripe("POST", "billing_portal/sessions", { customer: p.stripe_customer_id, return_url: origin + ((req.body && ["/v2", "/v3"].includes(req.body.ret)) ? req.body.ret : "/") });
     return res.status(200).json({ url: s.url });
   } catch (e) {
     console.error("portal failed:", e.message);

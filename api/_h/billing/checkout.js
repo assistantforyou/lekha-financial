@@ -26,7 +26,7 @@ module.exports = async (req, res) => {
       const c = await stripe("POST", "customers", { email: u.email, metadata: { user_id: u.id } });
       customer = c.id; await updateProfile(u.id, { stripe_customer_id: customer });
     }
-    const ret = req.body && req.body.ret === "/v2" ? "/v2" : "/";
+    const ret = req.body && ["/v2", "/v3"].includes(req.body.ret) ? req.body.ret : "/";
     const origin = `https://${req.headers["x-forwarded-host"] || req.headers.host}`;
     const s = await stripe("POST", "checkout/sessions", {
       mode: "subscription", customer, client_reference_id: u.id,

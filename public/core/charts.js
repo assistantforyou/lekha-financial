@@ -24,7 +24,7 @@ export function LineChart(host, opts) {
   function draw() {
     W = Math.max(240, Math.round(host.clientWidth || 320));
     const mobile = W < 520, H = o.height || (mobile ? Math.round(W * 0.62) : Math.round(Math.min(380, Math.max(240, W * 0.34))));
-    const mrows = o.markers && o.markers.length ? (o.markers.length > 3 ? 3 : 1) : 0, L = mobile ? 44 : 58, R = mobile ? 10 : 18, T = 14 + mrows * (mobile ? 19 : 21) + (mrows ? 6 : 0), B = mobile ? 24 : 28, fs = mobile ? 11 : 12;
+    const mrows = o.markers && o.markers.length ? (o.markers.length > 3 ? 3 : 1) : 0, L = mobile ? 54 : 60, R = mobile ? 10 : 18, T = 14 + mrows * (mobile ? 19 : 21) + (mrows ? 6 : 0), B = mobile ? 24 : 28, fs = mobile ? 11 : 12;
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H); svg.innerHTML = "";
     const all = []; o.series.forEach((s) => s.pts.forEach((p) => all.push(p))); (o.bands || []).forEach((b) => { b.hi.forEach((p) => all.push(p)); b.lo.forEach((p) => all.push(p)); });
     if (!all.length) return;
