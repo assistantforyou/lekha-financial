@@ -53,13 +53,23 @@ function personaRow(id, lo, hi) {
   const letter = { you: "Y", compounder: "C", growth: "G", momentum: "M", macro: "A", income: "S", contrarian: "R", quant: "Q", fomo: "E" }[id];
   return `<div class="per ${o ? "open" : ""}" data-p="${id}"><button class="phead" aria-expanded="${o}"><span class="av" style="background:${META[id].c}">${letter}</span><span class="pn"><span class="nm" style="display:block">${esc(name(id))}</span><span class="st" style="display:block">${esc(style(id))}</span></span><span class="pmed ${tone(h.p50)}">${esc(pct(h.p50, 1))}</span>${rangeBar(h, lo, hi)}</button><div class="pbody" id="pb-${id}"></div></div>`;
 }
+function trades(id) {
+  const P = res.personas[id]; if (!P || !inp) return "";
+  const rows = inp.assets.map((a, i) => ({ tk: a.tk, now: a.w0 || 0, to: (P.w && P.w[i]) || 0 })).map((x) => ({ ...x, d: x.to - x.now })).filter((x) => Math.abs(x.d) >= 0.004).sort((a, b) => b.d - a.d);
+  if (!rows.length) return `<div class="small muted">${esc(t("No positions change under this style."))}</div>`;
+  const line = (x, buy) => `<div class="row"><b>${esc(x.tk)}</b><span class="sp"></span><span class="tiny muted">${esc(pct(x.now, 1, false))} → ${esc(pct(x.to, 1, false))}</span><span class="${buy ? "up" : "down"} small">${esc(buy ? t("Buy") : x.to <= 0.001 ? t("Exit") : t("Trim"))} ${esc(pct(Math.abs(x.d), 1, false))}</span></div>`;
+  const buys = rows.filter((x) => x.d > 0).slice(0, 6), sells = rows.filter((x) => x.d < 0).slice(0, 6);
+  return `<div class="stack"><h3>${esc(t("What they would do"))}</h3><div class="small muted">${esc(t("Target weights for the next 12 months from today's portfolio. The universe is your holdings plus index and sector ETFs, so a style can move money into areas you do not own yet."))}</div>
+    <div class="kv2"><div><div class="tiny muted">${esc(t("Would buy"))}</div>${buys.map((x) => line(x, true)).join("") || `<div class="tiny muted">–</div>`}</div>
+    <div><div class="tiny muted">${esc(t("Would trim or exit"))}</div>${sells.map((x) => line(x, false)).join("") || `<div class="tiny muted">–</div>`}</div></div></div>`;
+}
 function personaBody(id) {
   const P = res.personas[id], h = P.hz[hz], R = reasons(res, inp, id, hz), out = aiOut[id + hz + getLang()];
   const aiBlock = out ? `<div class="aiout"><b>${esc(out.headline)}</b><ul class="bul">${out.why.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><div class="small"><b>${esc(t("What could go wrong"))}:</b> ${esc(out.risk)}</div><div class="small"><b>${esc(t("What would change this"))}:</b> ${esc(out.change)}</div></div>`
     : out === false ? `<div class="err small">${esc(t("Could not write the explanation right now. Try again in a moment."))}</div>` : "";
   return `<div class="stack"><div id="fan-${id}" style="min-height:14rem"></div><div class="legend"><span><i style="background:${META[id].c}"></i>${esc(t("Middle outcome"))}</span><span><i style="background:${META[id].c};opacity:.35;height:.5rem"></i>${esc(t("Likely range (middle 50%)"))}</span><span><i style="background:${META[id].c};opacity:.15;height:.5rem"></i>${esc(t("Wide range (90%)"))}</span>${id !== "you" ? `<span><i style="background:var(--chart2)"></i>${esc(t("Doing nothing"))}</span>` : ""}</div>
     <div class="kv"><div><span>${esc(t("Chance of a gain"))}</span><b class="${tone(h.pGain - 0.5)}">${Math.round(h.pGain * 100)}%</b></div><div><span>${esc(t("Chance of losing over 10%"))}</span><b>${Math.round(h.pLoss10 * 100)}%</b></div><div><span>${esc(t("Typical worst dip"))}</span><b>${Math.round(h.ddMed * 100)}%</b></div><div><span>${esc(t("Bad case (1 in 20)"))}</span><b class="${tone(h.p5)}">${esc(pct(h.p5, 0))}</b></div><div><span>${esc(t("Good case (1 in 20)"))}</span><b class="up">${esc(pct(h.p95, 0))}</b></div><div><span>${esc(t("Cash held"))}</span><b>${Math.round(P.cash * 100)}%</b></div></div></div>
-    <div class="stack"><h3>${esc(t("Why this outcome"))}</h3><ul class="bul">${R.map((r) => `<li>${esc(reasonText(r))}</li>`).join("")}</ul>${aiBlock}<div id="aibox-${id}">${aiButton(id)}</div></div>`;
+    <div class="stack"><h3>${esc(t("Why this outcome"))}</h3><ul class="bul">${R.map((r) => `<li>${esc(reasonText(r))}</li>`).join("")}</ul>${trades(id)}${aiBlock}<div id="aibox-${id}">${aiButton(id)}</div></div>`;
 }
 function aiButton(id) {
   const tier = tierName(D.me);
@@ -91,12 +101,23 @@ const signature = () => positions().map((r) => r.tk + Math.round(r.qty)).join("|
 function runCard() {
   if (running) return `<div class="card"><div class="small"><b>${esc(t("Running {n} simulated futures…", { n: fmtNum(paths) }))}</b></div><div class="runbar" id="runbar" style="margin-top:.5rem"><i style="width:${Math.round(prog * 100)}%"></i></div></div>`;
   if (error) return `<div class="card"><div class="err">${esc(t("The simulation could not run. Add some holdings and try again."))}</div></div>`;
-  if (!res) return "";
+  if (!res) return `<div class="card"><div class="small"><b>${esc(t("Preparing the simulation…"))}</b></div><div class="skel" style="height:2.4rem;margin-top:.5rem"></div></div>`;
   const sizes = [5000, 10000, 25000, 50000];
   return `<div class="card flat">${cardHead(t("How this was calculated"), `<p>${esc(t("We simulate {n} different ways the next year could unfold. Each one has a random market move every day, extra shock days around the events above, and noise in each of your stocks, using each stock's own past ups and downs. All nine personas live through the same futures, so differences come from their rules, not luck.", { n: fmtNum(res.paths) }))}</p><p>${esc(t("Expected returns are the interest rate plus market risk, nudged by analyst targets and news tone. It is a what-if model, not a forecast or advice."))}</p><p>${esc(t("Starting point: {mood}. Market swings assumed: {vol}% a year.", { mood: D.fgi ? t("mood score {s}", { s: Math.round(D.fgi.score) }) : t("mood unknown"), vol: (res.market.vol * 100).toFixed(0) }))}</p>`)}
     <div class="small muted">${esc(t("{n} futures × {d} trading days × 9 personas, run in {s} seconds on this device.", { n: fmtNum(res.paths), d: res.days, s: (res.ms / 1000).toFixed(1) }))}</div>
     <div class="row" style="margin-top:.6rem"><span class="small muted">${esc(t("Run more futures"))}:</span>${sizes.map((n) => `<button class="chip" data-paths="${n}" aria-pressed="${n === paths}">${fmtNum(n)}</button>`).join("")}</div></div>`;
 }
+function accuracyCard() {
+  return `<div class="card flat">${cardHead(t("How accurate is this?"), `<p>${esc(t("Each of the nine investors is a rule set, not a real person or a fund: how much it tilts towards cheap, growing, trending or defensive stocks, how often it rebalances, and how much cash it holds. They all live through the same simulated futures, so the differences are the rules."))}</p>`)}
+    <ul class="bul">
+      <li>${esc(t("The futures are a Monte Carlo model, not a forecast. It uses each stock's past volatility, its sensitivity to the market and its recent trend, plus dated events. It cannot know earnings surprises, wars or policy changes."))}</li>
+      <li>${esc(t("More runs make the numbers steadier, not truer: the sampling error falls with the square root of the number of paths, but the model's assumptions still set the answer."))}</li>
+      <li>${esc(t("Probabilities are the share of simulated futures, not a measured chance. Treat the middle outcome as a centre of gravity and the range as the honest part."))}</li>
+      <li>${esc(t("Costs, taxes, spreads and slippage are not modelled. Real rebalancing keeps less than the simulation shows."))}</li>
+      <li>${esc(t("Every persona can only buy your holdings plus index and sector ETFs. It is a realistic menu, not the whole US market."))}</li>
+    </ul></div>`;
+}
+
 export default {
   render() {
     const rows = positions().filter((r) => !r.cash);
@@ -107,12 +128,12 @@ export default {
     return `<div class="page">${eventsCard()}
       <div class="card">${cardHead(t("Nine investors, one portfolio"), `<p>${esc(t("What if nine different kinds of investors managed your exact holdings? Each follows its own rules for what to hold, trim and avoid. Tap one to see its range of outcomes and the reasons behind them."))}</p><p>${esc(t("The bar shows the wide range (90% of futures fall inside it). The thick tick is the middle outcome. The thin line marks breaking even."))}</p>`)}
         <div class="row" style="margin-bottom:.8rem">${segHtml("hz", HORIZONS.map(([k]) => [k, hzLabel(k)]), hz)}${running ? `<span class="small muted sp">${esc(t("Updating…"))}</span>` : ""}</div>
-        <div class="stack" id="plist">${order.map((id) => personaRow(id, lo, hi)).join("")}</div></div>${runCard()}</div>`;
+        <div class="stack" id="plist">${order.map((id) => personaRow(id, lo, hi)).join("")}</div></div>${accuracyCard()}${runCard()}</div>`;
   },
   mount(root, ctx) {
     ctxRef = ctx; chart = null;
     const need = !res || (sig !== signature() && D.loaded.history);
-    if (need && D.loaded.history && !running) start(ctx.rerender);
+    if (need && !running) start(ctx.rerender);
     bindSeg(root, "hz", (k) => { hz = k; ctx.rerender(); });
     if (openP && res) { const b = root.querySelector("#pb-" + openP); if (b) { b.innerHTML = personaBody(openP); drawFan(openP); } }
     root.addEventListener("click", async (e) => {

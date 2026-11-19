@@ -69,6 +69,14 @@ export function buildInput(paths = 10000) {
     const rk = D.risk[r.tk] || {}, st = D.stats[r.tk] || {}, s = D.street[r.tk], px = r.px, v = D.val[r.tk];
     return { tk: r.tk, w0: r.valueUsd / tot.value, beta: rk.beta != null ? rk.beta : 1, vol: rk.vol != null ? rk.vol : 0.3, idio: rk.idio != null ? rk.idio : 0.25, upside: s && s.pt && s.pt.mean && px ? s.pt.mean / px - 1 : null, mos: v && px ? v.base / px - 1 : null, mom: rk.mom != null ? rk.mom : st.y1 != null ? st.y1 : null, dd: st.from52 != null ? st.from52 : 0, m1: st.m1 != null ? st.m1 : 0, tone: mediaLean(r.tk) || 0 };
   });
+  /* a wider investable universe: index and sector ETFs the personas can rotate into, not only what you already own */
+  const UNIVERSE = ["SPY", "QQQ", "XLK", "XLF", "XLE", "XLV", "XLP", "XLY", "XLI", "XLU", "XLB", "XLC", "XLRE", "SMH", "ITA"];
+  const have = new Set(assets.map((a) => a.tk));
+  for (const tk of UNIVERSE) {
+    if (have.has(tk)) continue;
+    const rk = D.risk[tk] || {}, st = D.stats[tk] || {}, s = D.street[tk];
+    assets.push({ tk, w0: 0, beta: rk.beta != null ? rk.beta : 1, vol: rk.vol != null ? rk.vol : 0.18, idio: rk.idio != null ? rk.idio : 0.16, upside: s && s.pt && s.pt.mean && st.px ? s.pt.mean / st.px - 1 : null, mos: null, mom: rk.mom != null ? rk.mom : st.y1 != null ? st.y1 : null, dd: st.from52 != null ? st.from52 : 0, m1: st.m1 != null ? st.m1 : 0, tone: 0, wider: true });
+  }
   const sumW = assets.reduce((s, a) => s + a.w0, 0), cash0 = Math.max(0, 1 - sumW);
   const ten = D.macro && D.macro.ten ? D.macro.ten.v / 100 : 0.04;
   const sig = inv.map((r) => r.tk + r.qty).sort().join(",") + iso(new Date());

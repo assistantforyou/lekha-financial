@@ -39,7 +39,10 @@ export function LineChart(host, opts) {
     for (let i = 0; i <= nx; i++) { const x = x0 + ((x1 - x0) * i) / nx, tx = mk("text", { x: L + (pw * i) / nx, y: H - 7, "text-anchor": i === 0 ? "start" : i === nx ? "end" : "middle", "font-size": fs, class: "ax" }); tx.textContent = o.xFmt ? o.xFmt(x) : x; svg.append(tx); }
     const line = (pts) => pts.map((p, i) => (i ? "L" : "M") + sx(p[0]).toFixed(1) + " " + sy(p[1]).toFixed(1)).join("");
     for (const b of o.bands || []) svg.append(mk("path", { d: line(b.hi) + b.lo.slice().reverse().map((p) => "L" + sx(p[0]).toFixed(1) + " " + sy(p[1]).toFixed(1)).join("") + "Z", fill: b.color || "var(--accent)", opacity: b.opacity || 0.15 }));
-    if (o.ref != null) svg.append(mk("line", { x1: L, x2: W - R, y1: sy(o.ref), y2: sy(o.ref), class: "refline" }));
+    if (o.ref != null) {
+      svg.append(mk("line", { x1: L, x2: W - R, y1: sy(o.ref), y2: sy(o.ref), class: "refline" }));
+      if (o.refLabel) { const rt = mk("text", { x: W - R - 4, y: sy(o.ref) - 6, "text-anchor": "end", "font-size": fs, class: "reflabel" }); rt.textContent = o.refLabel; svg.append(rt); }
+    }
     for (const s of o.series) {
       if (!s.pts.length) continue;
       if (s.area) svg.append(mk("path", { d: line(s.pts) + `L${sx(s.pts[s.pts.length - 1][0]).toFixed(1)} ${T + ph}L${sx(s.pts[0][0]).toFixed(1)} ${T + ph}Z`, fill: s.color, opacity: 0.1 }));
@@ -59,6 +62,35 @@ export function LineChart(host, opts) {
     svg.append(cur);
     const hit = mk("rect", { x: L, y: T, width: pw, height: ph, fill: "transparent", style: "touch-action:pan-y;cursor:crosshair" }); svg.append(hit);
     const bsearch = (pts, x) => { let lo = 0, hi = pts.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (pts[m][0] < x) lo = m + 1; else hi = m; } return lo > 0 && Math.abs(pts[lo - 1][0] - x) < Math.abs(pts[lo][0] - x) ? lo - 1 : lo; };
+    /* drag to measure: press, drag across the chart, and the shaded window reports the change between the two ends */
+    if (o.measure) {
+      const sel = mk("g", { visibility: "hidden", "pointer-events": "none" });
+      const shade = mk("rect", { y: T, height: ph, fill: "var(--accent)", opacity: "0.14" });
+      const e1 = mk("line", { y1: T, y2: T + ph, class: "guide" }), e2 = mk("line", { y1: T, y2: T + ph, class: "guide" });
+      sel.append(shade, e1, e2); svg.append(sel);
+      const mtip = document.createElement("div"); mtip.className = "mtip"; mtip.hidden = true; host.append(mtip);
+      const pxOf = (ev) => { const b = svg.getBoundingClientRect(); return Math.max(L, Math.min(W - R, ((ev.clientX - b.left) / b.width) * W)); };
+      const xvOf = (px) => x0 + ((px - L) / pw) * (x1 - x0);
+      let from = null;
+      const clear = () => { sel.setAttribute("visibility", "hidden"); mtip.hidden = true; };
+      const render = (a, b) => {
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        sel.setAttribute("visibility", "visible");
+        shade.setAttribute("x", lo); shade.setAttribute("width", Math.max(1, hi - lo));
+        e1.setAttribute("x1", lo); e1.setAttribute("x2", lo); e2.setAttribute("x1", hi); e2.setAttribute("x2", hi);
+        const s = o.series.find((x) => x.pts && x.pts.length); if (!s) return;
+        const p1 = s.pts[bsearch(s.pts, xvOf(lo))], p2 = s.pts[bsearch(s.pts, xvOf(hi))];
+        const d = p2[1] - p1[1], pc = p1[1] ? d / p1[1] : 0;
+        mtip.innerHTML = o.measureFmt ? o.measureFmt(p1, p2, d, pc) : `<b>${o.xFmt ? o.xFmt(p1[0]) : p1[0]} → ${o.xFmt ? o.xFmt(p2[0]) : p2[0]}</b><span class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : "−"}${o.yFmt ? o.yFmt(Math.abs(d)) : Math.abs(d).toFixed(2)} · ${(pc * 100).toFixed(1)}%</span>`;
+        mtip.hidden = false;
+        const rel = (((lo + hi) / 2) / W) * host.clientWidth, tw = mtip.offsetWidth;
+        mtip.style.left = Math.max(2, Math.min(rel - tw / 2, host.clientWidth - tw - 2)) + "px";
+      };
+      hit.addEventListener("pointerdown", (ev) => { from = pxOf(ev); try { hit.setPointerCapture(ev.pointerId); } catch (e) {} render(from, from); move(ev); });
+      hit.addEventListener("pointermove", (ev) => { if (from != null) { render(from, pxOf(ev)); move(ev); } });
+      const done = (ev) => { if (from == null) return; const to = pxOf(ev); if (Math.abs(to - from) < 8) clear(); else render(from, to); from = null; };
+      hit.addEventListener("pointerup", done); hit.addEventListener("pointercancel", done);
+    }
     function move(ev) {
       const b = svg.getBoundingClientRect(), px = ((ev.clientX - b.left) / b.width) * W, xv = x0 + ((px - L) / pw) * (x1 - x0);
       const rows = o.series.map((s, i) => { if (!s.pts.length) return null; const p = s.pts[bsearch(s.pts, xv)]; dots[i].setAttribute("cx", sx(p[0])); dots[i].setAttribute("cy", sy(p[1])); return { s, p }; }).filter(Boolean);

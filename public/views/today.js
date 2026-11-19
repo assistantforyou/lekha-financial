@@ -42,9 +42,10 @@ function nextCard() {
     ${ev.length ? ev.map((e) => `<button class="evt" data-go="#/outlook/${esc(e.id)}">${dateChip(e.date)}<span><b>${esc(eventName(e))}</b><br><span class="tiny muted">${esc(inDays(e.calDays))}${e.approx ? " · " + esc(t("estimated date")) : ""}</span></span><span style="width:5.5rem">${leanBar(e.lean)}<span class="tiny ${leanTone(e.lean)}" style="display:block;text-align:center;margin-top:.2rem">${esc(leanLabel(e.lean))}</span></span></button>`).join("") : `<div class="muted small">${esc(t("No dated events found yet."))}</div>`}</div>`;
 }
 function storyCard() {
-  const n = D.news[0];
-  return `<div class="card">${cardHead(t("Top story"), `<p>${esc(t("The news is collected from public finance feeds, ranked and summarised by an AI model. Tap the story to see why it matters to you."))}</p>`, D.newsAt ? `<span class="tiny muted">${esc(fmtAgo(D.newsAt))}</span>` : "")}
-    ${n ? `<div class="news-i" data-news><button><span class="row">${impactPill(n.impact)}<span class="tiny muted">${esc(n.source)}</span></span><span class="hl">${esc(n.headline)}</span></button><div class="det"><span>${esc(n.summary)}</span>${n.why ? `<span><b>${esc(t("Why it matters"))}:</b> ${esc(n.why)}</span>` : ""}${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(t("Read the full story"))}</a>` : ""}</div></div><a class="small" href="#/market">${esc(t("More news"))}</a>` : `<div class="skel" style="height:4rem"></div>`}</div>`;
+  const list = D.news.slice(0, 4);
+  return `<div class="card">${cardHead(t("Top stories"), `<p>${esc(t("The news is collected from public finance feeds, ranked and summarised by an AI model. Tap a story to see why it matters to you."))}</p>`, D.newsAt ? `<span class="tiny muted">${esc(fmtAgo(D.newsAt))}</span>` : "")}
+    ${list.length ? list.map((n) => `<div class="news-i" data-news><button><span class="row">${impactPill(n.impact)}<span class="tiny muted">${esc(n.source)}</span>${n.at ? `<span class="tiny muted sp">${esc(fmtAgo(n.at))}</span>` : ""}</span><span class="hl">${esc(n.headline)}</span></button><div class="det"><span>${esc(n.summary)}</span>${n.why ? `<span><b>${esc(t("Why it matters"))}:</b> ${esc(n.why)}</span>` : ""}${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(t("Read the full story"))}</a>` : ""}</div></div>`).join("") : `<div class="skel" style="height:4rem"></div>`}
+    <a class="small" href="#/market">${esc(t("More news"))}</a></div>`;
 }
 
 function drawChart(root) {
@@ -69,7 +70,7 @@ export default {
     const inv = rows.filter((r) => !r.cash && r.valueUsd), gain = [...inv].sort((a, b) => b.dayPct - a.dayPct).slice(0, 3), lose = [...inv].sort((a, b) => a.dayPct - b.dayPct).slice(0, 3).filter((r) => r.dayPct < 0 && !gain.includes(r));
     const mv = (r) => `<button class="mv" data-go="#/holdings/${esc(r.tk)}"><b>${esc(r.tk)}</b><span class="${tone(r.dayPct)}" data-live="day" data-tk="${esc(r.tk)}">${esc(pct(r.dayPct))}</span></button>`;
     return `<div class="page">
-      ${isDemo() ? `<div class="card flat row demo-banner"><span class="pill up">${esc(t("Demo account"))}</span><span class="small muted sp">${esc(t("A sample portfolio on live market data. None of it is your real money."))}</span><a class="btn sm" href="#/me">${esc(t("Create account"))}</a></div>` : ""}
+      ${isDemo() ? `<div class="card flat row demo-banner"><span class="pill up">${esc(t("Demo account"))}</span></div>` : ""}
       <div class="grid">
         <div class="card hero full">
           <div class="row"><span class="muted small">${esc(t("Total value"))}</span></div>
@@ -82,7 +83,7 @@ export default {
           <div class="small muted" style="margin-top:.2rem">${esc(t("Shows how today's holdings would have performed, not your actual past trades."))}</div>
         </div>
         <div class="card full">${cardHead(t("Biggest moves today"), `<p>${esc(t("Your best and worst performers since yesterday's close. Tap one to open it."))}</p>`)}<div class="movers">${gain.map(mv).join("")}${lose.map(mv).join("")}</div></div>
-        ${nextCard()}${streetCard(rows)}${moodCard()}${storyCard()}<div class="card full row"><a class="btn" href="/v2">${esc(t("Projection Lab"))}</a><span class="small muted">${esc(t("1B portfolio projection and stress tests."))}</span></div>
+        ${nextCard()}${streetCard(rows)}${moodCard()}${storyCard()}<div class="card full row"><a class="btn" href="#/projection">${esc(t("Projection Lab"))}</a><span class="small muted">${esc(t("1B projection, five horizons and stress scenarios."))}</span></div>
       </div></div>`;
   },
   mount(root) {

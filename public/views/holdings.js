@@ -8,7 +8,7 @@ import { icon, cardHead, money, moneySigned, pct, price, tone, curr } from "../u
 import { RANGES, rangeLabel, segHtml, bindSeg, lastN, streetBlock, impactPill, inDays } from "./shared.js";
 import { openAdd, openImport, confirmRemove } from "../sheets.js";
 
-let sort = "value", open = null, charts = {}, hrange = {};
+let sort = "value", dir = -1, open = null, charts = {}, hrange = {};
 const COLORS = ["var(--chart)", "var(--chart3)", "#6b7bd6", "#c4568a", "#4aa3c7", "#8f6f3a", "#7aa35c", "#b55d4a"];
 const sorters = { value: (a, b) => b.valueUsd - a.valueUsd, day: (a, b) => b.dayPct - a.dayPct, pnl: (a, b) => (b.pnlPct ?? -9) - (a.pnlPct ?? -9), weight: (a, b) => b.weight - a.weight };
 
@@ -34,6 +34,7 @@ function body(r) {
   return `<div class="stack">
       <div class="row">${segHtml("r-" + r.tk, RANGES.filter((x) => x[0] !== "6M").map(([k]) => [k, rangeLabel(k)]), hrange[r.tk] || "1Y")}</div>
       <div id="c-${esc(r.tk)}" style="min-height:12rem"></div>
+      <div class="tiny muted">${esc(t("Drag across the chart to measure the change over any stretch."))}${avg ? " " + esc(t("The dashed line is your average cost.")) : ""}</div>
       <div class="kv">
         <div><span>${esc(t("Shares"))}</span><b>${esc(fmtNum(r.qty, r.qty % 1 ? 2 : 0))}</b></div>
         <div><span>${esc(t("Average cost"))}</span><b>${avg ? esc(price(avg, nat)) : "–"}</b></div>
@@ -54,7 +55,9 @@ function drawChart(tk) {
   const s = D.series[tk]; if (!s || s.length < 2) { host.innerHTML = `<div class="empty small">${esc(t("No price history for this stock."))}</div>`; return; }
   const r = positions().find((x) => x.tk === tk), n = RANGES.find((x) => x[0] === (hrange[tk] || "1Y"))[1], P = lastN(s, n), rate = 1, up = P[P.length - 1][1] >= P[0][1];
   const days = (P[P.length - 1][0] - P[0][0]) / 864e5;
-  const opts = { series: [{ id: tk, color: up ? "var(--up)" : "var(--down)", pts: P, area: true }], height: 210, label: t("Price history"), xFmt: (x) => fmtDate(new Date(x), days > 500 ? { month: "short", year: "2-digit" } : { day: "numeric", month: "short" }), yFmt: (v) => price(v * rate, r ? r.cur : "USD").replace(/\.00$/, ""), tip: (x, rr) => `<b>${esc(fmtDate(new Date(x), { day: "numeric", month: "short", year: "numeric" }))}</b><br>${esc(price(rr[0].p[1], r ? r.cur : "USD"))}` };
+  const cur = r ? r.cur : "USD", holding = D.holdings.items.find((h) => h.tk === tk), avg = holding && holding.qty ? holding.cost / holding.qty : null;
+  const avgLine = avg && avg > 0 ? { ref: avg, refLabel: `${t("Your cost")} ${price(avg, cur)}` } : {};
+  const opts = { series: [{ id: tk, color: up ? "var(--up)" : "var(--down)", pts: P, area: true }], height: 220, label: t("Price history"), measure: true, ...avgLine, xFmt: (x) => fmtDate(new Date(x), days > 500 ? { month: "short", year: "2-digit" } : { day: "numeric", month: "short" }), yFmt: (v) => price(v * rate, cur).replace(/\.00$/, ""), measureFmt: (p1, p2, d, pc) => `<b>${esc(fmtDate(new Date(p1[0]), { day: "numeric", month: "short", year: "2-digit" }))} → ${esc(fmtDate(new Date(p2[0]), { day: "numeric", month: "short", year: "2-digit" }))}</b><span class="${d >= 0 ? "up" : "down"}">${d >= 0 ? "+" : "−"}${esc(price(Math.abs(d), cur))} · ${esc(pct(pc, 1))}</span>${avg ? `<span class="muted">${esc(t("vs your cost"))} ${esc(pct(p2[1] / avg - 1, 1))}</span>` : ""}`, tip: (x, rr) => `<b>${esc(fmtDate(new Date(x), { day: "numeric", month: "short", year: "numeric" }))}</b><br>${esc(price(rr[0].p[1], cur))}${avg ? `<br><span class="muted">${esc(t("Your cost"))} ${esc(price(avg, cur))} · <span class="${tone(rr[0].p[1] - avg)}">${esc(pct(rr[0].p[1] / avg - 1, 1))}</span></span>` : ""}` };
   if (charts[tk]) charts[tk].destroy(); charts[tk] = LineChart(host, opts);
 }
 function openRow(root, tk) {
@@ -71,15 +74,16 @@ export default {
   render() {
     const rows = positions(), tot = totals(rows).value;
     if (!rows.length) return `<div class="page"><div class="card"><div class="empty"><h2>${esc(t("No holdings yet"))}</h2><p>${esc(t("Add them one by one or import a broker statement."))}</p><div class="row" style="justify-content:center"><button class="btn primary" data-act="add">${icon("plus")} ${esc(t("Add a holding"))}</button><button class="btn" data-act="import">${icon("file")} ${esc(t("Import a statement"))}</button></div></div></div></div>`;
-    const list = [...rows].sort(sorters[sort]);
+    const list = [...rows].sort(sorters[sort]); if (dir > 0) list.reverse();
     return `<div class="page">
       <div class="card">${cardHead(t("Where your money is"), `<p>${esc(t("Your holdings grouped by theme. A single colour taking up most of the bar means your results depend heavily on that one area."))}</p>`, `<button class="btn sm" data-act="add">${icon("plus")} ${esc(t("Add"))}</button><button class="btn sm" data-act="import">${icon("file")} ${esc(t("Import"))}</button>`)}${allocation(rows)}</div>
-      <div class="row">${segHtml("srt", [["value", t("Value")], ["day", t("Today")], ["pnl", t("Gain")], ["weight", t("Size")]], sort)}<span class="small muted sp">${esc(t("{n} holdings · {v}", { n: rows.filter((r) => !r.cash).length, v: money(tot, 0) }))}</span></div>
+      <div class="sortbar"><span class="small muted">${esc(t("Sort by"))}</span><select class="sel" id="hsort" aria-label="${esc(t("Sort holdings by"))}">${[["value", t("Value")], ["day", t("Today")], ["pnl", t("Gain")], ["weight", t("Size")]].map(([k, l]) => `<option value="${k}"${sort === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select><button class="iconbtn" id="hdir" aria-label="${esc(t("Sort direction"))}" title="${esc(dir < 0 ? t("High to low") : t("Low to high"))}">${dir < 0 ? "↓" : "↑"}</button><span class="small muted sp">${esc(t("{n} holdings · {v}", { n: rows.filter((r) => !r.cash).length, v: money(tot, 0) }))}</span></div>
       <div class="stack" id="hlist">${list.map((r) => (r.cash ? "" : rowHtml(r))).join("")}${list.filter((r) => r.cash).map((r) => `<div class="card flat row"><b>${esc(t("Cash"))}</b><span class="muted small">${esc(r.cur)}</span><b class="sp">${esc(money(r.valueUsd, 0))}</b></div>`).join("")}</div></div>`;
   },
   mount(root, ctx) {
     charts = {};
-    bindSeg(root, "srt", (k) => { sort = k; ctx.rerender(); });
+    const sel = root.querySelector("#hsort"); if (sel) sel.addEventListener("change", () => { sort = sel.value; ctx.rerender(); });
+    const dr = root.querySelector("#hdir"); if (dr) dr.addEventListener("click", () => { dir = -dir; ctx.rerender(); });
     root.addEventListener("click", (e) => {
       const h = e.target.closest(".hhead"); if (h) return openRow(root, h.parentElement.dataset.tk);
       const a = e.target.closest("[data-act]"); if (a) return a.dataset.act === "add" ? openAdd() : openImport();
