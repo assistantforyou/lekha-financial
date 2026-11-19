@@ -13,17 +13,6 @@ const PLAN_ROWS = () => [
   { id: "paid", name: t("Paid"), price: 699, items: [t("Unlimited holdings"), t("Full price history"), t("Extra analyst and estimate data"), t("Everything in Free")] },
   { id: "premium", name: t("Premium"), price: 1299, items: [t("AI analyst: ask, daily briefing, stress test"), t("AI explanation of every investor in the outlook"), t("Everything in Paid")] },
 ];
-const sources = () => {
-  const ago = (ms) => (ms ? fmtAgo(ms) : t("not loaded yet"));
-  return [
-    [t("Stock prices"), t("Real-time trades from the IEX exchange through Alpaca for US stocks; Yahoo Finance for Hong Kong and Thai stocks. Your screen asks for fresh prices about every 5 seconds while the US market is open, and slower when it is closed."), `${t("Last price update")}: ${ago(D.liveAt)}`],
-    [t("Price history and charts"), t("Daily closing prices from Alpaca (US) and Yahoo Finance (other markets), kept in your browser for 10 minutes so charts open instantly."), ""],
-    [t("News"), t("Public finance feeds: CNBC, MarketWatch, BBC Business, Nasdaq, Seeking Alpha and the Federal Reserve, plus Yahoo Finance headlines for each stock you own. The list is rebuilt on the first visit after 90 minutes."), `${t("Last news update")}: ${ago(D.newsAt)}`],
-    [t("Analyst ratings and targets"), t("Buy, Hold and Sell counts and price targets from financial data providers. Shared between users and refreshed daily, because analysts rarely change their views faster than that."), ""],
-    [t("Inflation, interest rates, mood"), t("Official US data from the Federal Reserve (FRED), and CNN's fear and greed index."), ""],
-    [t("What uses AI"), t("Only these: (1) the news summaries and good-or-bad labels, (2) translation of those summaries, (3) reading broker statements you upload, and on Premium (4) the analyst chat, daily briefing, stress test and the written explanations in the outlook. Prices, charts, ratings and all simulation numbers are plain data and math, not AI."), ""],
-  ];
-};
 export default {
   render() {
     const p = prefs.get(), tier = tierName(D.me), signed = tier !== "demo", em = D.me && D.me.email;
@@ -37,8 +26,7 @@ export default {
         <div class="field">${esc(t("Text size"))}${segHtml("sz", [["S", t("Small")], ["M", t("Medium")], ["L", t("Large")], ["XL", t("Extra large")]], p.size)}</div>
         <div class="field">${esc(t("Show money in"))}${segHtml("cu", [["USD", "USD"], ["THB", "THB ฿"]], p.cur)}</div></div></div>
       <div class="card full">${cardHead(t("Plans"), `<p>${esc(t("Everything works on every plan. Higher plans add depth: more holdings, more history, and the AI analyst."))}</p><p>${esc(t("Billing is monthly and handled securely by Stripe. Cancel any time from Manage billing."))}</p>`)}<div class="plans">${PLAN_ROWS().map((pl) => `<div class="plan ${pl.id === tier ? "cur" : ""}"><b>${esc(pl.name)}</b><div class="pr">${esc(fmtMoney(pl.price, "THB", 0))} <small>${esc(t("per month"))}</small></div><ul>${pl.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>${pl.id === tier ? `<span class="pill up" style="justify-self:start">${esc(t("Your plan"))}</span>` : pl.price && tier !== "premium" ? `<button class="btn primary" data-plan="${pl.id}">${esc(t("Choose {plan}", { plan: pl.name }))}</button>` : pl.price ? "" : ""}</div>`).join("")}</div></div>
-      <div class="card full">${cardHead(t("Where the data comes from"), `<p>${esc(t("Plain answers about what is real-time, what is cached, and what is AI."))}</p>`)}<div class="stack">${sources().map(([h, b, s]) => `<div><b class="small">${esc(h)}</b><div class="small muted">${esc(b)}</div>${s ? `<div class="tiny">${esc(s)}</div>` : ""}</div>`).join("")}</div></div>
-      <div class="card full row"><a class="btn" href="/">${esc(t("Open the classic terminal"))}</a><span class="small muted">${esc(t("Deep valuation models, sector rotation and the full original tools."))}</span></div>
+      <div class="card full row"><a class="btn" href="/v2">${esc(t("Open the classic terminal"))}</a><span class="small muted">${esc(t("Deep valuation models, sector rotation and the full original tools."))}</span></div>
     </div></div>`;
   },
   mount(root, ctx) {

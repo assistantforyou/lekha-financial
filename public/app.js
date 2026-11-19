@@ -5,11 +5,11 @@ import * as live from "/core/live.js";
 import { prefs, isDemo, signedIn, tierName } from "/core/store.js";
 import { esc } from "/core/util.js";
 import { icon, bindInfo, money, moneySigned, pct, price, tone, curr, openSheet } from "./ui.js";
-import today from "./views/today.js"; import holdings from "./views/holdings.js"; import market from "./views/market.js"; import outlook from "./views/outlook.js"; import me from "./views/me.js"; import analysis from "./views/analysis.js";
+import today from "./views/today.js"; import holdings from "./views/holdings.js"; import market from "./views/market.js"; import risk from "./views/risk.js"; import outlook from "./views/outlook.js"; import me from "./views/me.js"; import analysis from "./views/analysis.js";
 import { openAuth, openAsk } from "./sheets.js";
 
-const VIEWS = { today, holdings, market, outlook, analysis, me }, ORDER = ["today", "holdings", "market", "outlook", "analysis", "me"];
-const LABEL = () => ({ today: t("Today"), holdings: t("Holdings"), market: t("Market"), outlook: t("Outlook"), analysis: t("Analysis"), me: t("Me") });
+const VIEWS = { today, holdings, market, risk, outlook, analysis, me }, ORDER = ["today", "holdings", "market", "risk", outlook, analysis, me"];
+const LABEL = () => ({ today: t("Today"), holdings: t("Holdings"), market: t("Market"), risk: t("Risk"), outlook: t("Outlook"), analysis: t("Analysis"), me: t("Me") });
 const $ = (s) => document.querySelector(s);
 let route = { id: "today", param: null }, raf = 0;
 

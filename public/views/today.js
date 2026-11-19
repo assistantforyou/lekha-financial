@@ -80,7 +80,7 @@ export default {
           <div class="small muted" style="margin-top:.2rem">${esc(t("Shows how today's holdings would have performed, not your actual past trades."))}</div>
         </div>
         <div class="card full">${cardHead(t("Biggest moves today"), `<p>${esc(t("Your best and worst performers since yesterday's close. Tap one to open it."))}</p>`)}<div class="movers">${gain.map(mv).join("")}${lose.map(mv).join("")}</div></div>
-        ${nextCard()}${streetCard(rows)}${moodCard()}${storyCard()}
+        ${nextCard()}${streetCard(rows)}${moodCard()}${storyCard()}<div class="card full row"><a class="btn" href="/v2">${esc(t("Projection Lab"))}</a><span class="small muted">${esc(t("1B portfolio projection and stress tests."))}</span></div>
       </div></div>`;
   },
   mount(root) {
