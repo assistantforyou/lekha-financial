@@ -139,7 +139,23 @@
         r.readAsArrayBuffer(f);
       }
       else {
-        r.onload = function () { resolve({ mime: f.type, data: String(r.result).split(",")[1] || "" }); };
+        r.onload = function () {
+          var raw = { mime: f.type, data: String(r.result).split(",")[1] || "" };
+          // screenshots/photos: re-encode as JPEG (a 1.2 MB PNG becomes ~300 KB) so the upload and the model read are faster
+          if (!/^image\/(png|jpe?g|webp)$/i.test(f.type)) return resolve(raw);
+          var img = new Image();
+          img.onload = function () {
+            try {
+              var k = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+              var c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+              var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+              var j = c.toDataURL("image/jpeg", 0.85).split(",")[1] || "";
+              resolve(j && j.length < raw.data.length ? { mime: "image/jpeg", data: j } : raw);
+            } catch (e) { resolve(raw); }
+          };
+          img.onerror = function () { resolve(raw); };
+          img.src = "data:" + f.type + ";base64," + raw.data;
+        };
         r.readAsDataURL(f);
       }
     });
@@ -186,19 +202,23 @@
     var big = fs.filter(function (f) { return f.size > MAX; })[0];
     if (big) return say(big.name + " is over 3 MB. Export fewer pages or a CSV.", true);
     $("imp-go").disabled = true;
-    var results = [], failed = [];
-    try {
-      for (var i = 0; i < fs.length; i++) {
-        say("Reading file " + (i + 1) + " of " + fs.length + " (" + fs[i].name + ")… up to a minute each.");
-        try {
-          results.push(await readOne(fs[i]));
-        } catch (e) {
-          failed.push({ name: fs[i].name, msg: e.message || "could not be read" });
-        }
+    var slots = new Array(fs.length), failed = [], done = 0, next = 0;
+    function progress() { say("Reading " + fs.length + " file" + (fs.length > 1 ? "s" : "") + " in parallel… " + done + " of " + fs.length + " done."); }
+    progress();
+    async function worker() {
+      while (next < fs.length) {
+        var i = next++;
+        try { slots[i] = await readOne(fs[i]); }
+        catch (e) { failed.push({ name: fs[i].name, msg: e.message || "could not be read" }); }
+        done++; progress();
       }
+    }
+    try {
+      await Promise.all(new Array(Math.min(3, fs.length)).fill(0).map(worker));
     } finally {
       $("imp-go").disabled = false;
     }
+    var results = slots.filter(Boolean);
     if (!results.length) return say("No files could be read. " + failed.map(function (f) { return f.name + ": " + f.msg; }).join(" "), true);
     review(mergeResults(results, failed));
   });
