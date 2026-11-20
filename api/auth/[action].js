@@ -1,6 +1,6 @@
 // POST /api/auth/signup|login|refresh|logout|password|email|delete|recover|prefs, GET /api/auth/me
 // Session tokens are returned to the browser (stored in localStorage there); passwords are never stored or logged here.
-const { gotrue, admin, userFrom, profile, updateProfile, publicProfile, bearer } = require("../_auth");
+const { gotrue, admin, userFrom, profile, updateProfile, publicProfile, bearer, callbackUrl, withRedirect } = require("../_auth");
 const { sb } = require("../_lib");
 const { rateHit } = require("../_lib");
 const { clientId } = require("../_history");
@@ -61,7 +61,7 @@ module.exports = async (req, res) => {
     if (!EMAIL.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
     if (password.length < 8 || password.length > 72) return res.status(400).json({ error: "Passwords are 8 to 72 characters." });
     const r = action === "signup"
-      ? await gotrue("signup", { method: "POST", body: JSON.stringify({ email, password }) })
+      ? await gotrue(withRedirect("signup", callbackUrl(req)), { method: "POST", body: JSON.stringify({ email, password }) })
       : await gotrue("token?grant_type=password", { method: "POST", body: JSON.stringify({ email, password }) });
     const j = await r.json().catch(() => ({}));
     if (r.status === 429) return res.status(429).json({ error: "Too many attempts. Wait a few minutes." });
@@ -86,7 +86,7 @@ module.exports = async (req, res) => {
   }
   if (action === "recover") {
     const email = String(b.email || "").trim().toLowerCase();
-    if (EMAIL.test(email)) await gotrue("recover", { method: "POST", body: JSON.stringify({ email }) }).catch(() => {});
+    if (EMAIL.test(email)) await gotrue(withRedirect("recover", callbackUrl(req)), { method: "POST", body: JSON.stringify({ email }) }).catch(() => {});
     return res.status(200).json({ ok: true, message: "If that email has an account, a reset link is on its way." });
   }
   if (action === "password") {
@@ -102,7 +102,7 @@ module.exports = async (req, res) => {
     if (!u) return res.status(401).json({ error: "Sign in first." });
     if (!EMAIL.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
     if (!(await reauth(u, String(b.password || ""), res))) return;
-    const r = await gotrue("user", { method: "PUT", headers: { Authorization: `Bearer ${bearer(req)}` }, body: JSON.stringify({ email }) });
+    const r = await gotrue(withRedirect("user", callbackUrl(req)), { method: "PUT", headers: { Authorization: `Bearer ${bearer(req)}` }, body: JSON.stringify({ email }) });
     return r.ok ? res.status(200).json({ ok: true, message: "Check the new address for a confirmation link. Your sign-in email changes when you confirm it." }) : res.status(400).json({ error: "Could not start the email change." });
   }
   // permanently delete the account and its stored state. Re-checks the password, requires the typed word DELETE, and refuses while a paid plan is active.
