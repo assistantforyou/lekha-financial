@@ -113,7 +113,7 @@ function normalizeResult(raw) {
     const evidence = clean(p.evidence, 100);
     if (!evidence) flags.push("no source quote");
     // the line's own arithmetic: quantity x price should equal the printed market value (catches misread digits)
-    if (qty != null && qty > 0 && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) / mv > 0.02) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
+    if (qty != null && qty > 0 && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) > Math.max(mv * 0.02, 0.02)) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
     const key = tk + "|" + cur;
     const prev = merged.get(key);
     if (prev && prev.qty != null && qty != null) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; if (mv != null) prev.mv = (prev.mv || 0) + mv; prev.flags.push("duplicate lines combined"); warn(`${tk}: duplicate lines were combined.`); continue; }
