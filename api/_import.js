@@ -78,9 +78,9 @@ const clean = (s, n) => String(s == null ? "" : s).replace(/[\u0000-\u001f]/g, "
 
 // Re-validate whatever the model returned into holdings items {tk, cur, qty, cost, px, name, evidence}.
 function normalizeResult(raw) {
-  const out = { account: maskDigits(clean(raw && raw.account, 40)), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], unresolved: [], warnings: [], reportedCount: (() => { const n = num(raw && raw.reported_count); return n != null && n > 0 && n < 1000 ? Math.round(n) : null; })() };
+  const out = { account: maskDigits(clean(raw && raw.account, 40)), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], unresolved: [], warnings: [], notes: [], reportedCount: (() => { const n = num(raw && raw.reported_count); return n != null && n > 0 && n < 1000 ? Math.round(n) : null; })() };
   const warn = (w) => { if (out.warnings.length < 30) out.warnings.push(clean(w, 200)); };
-  for (const w of Array.isArray(raw && raw.warnings) ? raw.warnings.slice(0, 10) : []) warn(w);
+  for (const w of Array.isArray(raw && raw.warnings) ? raw.warnings.slice(0, 10) : []) { const t = clean(w, 200); if (t) out.notes.push(t); } // the reader's own remarks ("row partly hidden"): shown collapsed, not as problems
   const items = Array.isArray(raw && raw.positions) ? raw.positions.slice(0, 300) : [];
   const merged = new Map();
   for (const p of items) {
@@ -113,7 +113,7 @@ function normalizeResult(raw) {
     const evidence = clean(p.evidence, 100);
     if (!evidence) flags.push("no source quote");
     // the line's own arithmetic: quantity x price should equal the printed market value (catches misread digits)
-    if (qty != null && qty > 0 && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) > Math.max(mv * 0.02, 0.02)) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
+    if (qty != null && qty > 0 && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) > Math.max(mv * 0.005, 0.02)) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
     const key = tk + "|" + cur;
     const prev = merged.get(key);
     if (prev && prev.qty != null && qty != null) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; if (mv != null) prev.mv = (prev.mv || 0) + mv; prev.flags.push("duplicate lines combined"); warn(`${tk}: duplicate lines were combined.`); continue; }

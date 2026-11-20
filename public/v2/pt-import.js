@@ -43,6 +43,7 @@
     "#imp-dlg .pg-bar.err .pg-fill{background:var(--down)}#imp-dlg .pg-bar.ok .pg-fill{background:var(--up,var(--accent))}" +
     "#imp-dlg .pg-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px}#imp-dlg .pg-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}" +
     "#imp-dlg .pg-stat{color:var(--muted);flex:0 0 auto;font-variant-numeric:tabular-nums}#imp-dlg .pg-all .pg-top{font-weight:600;font-size:13px}" +
+    "#imp-dlg .imp-notes{margin-top:8px;font-size:12px;color:var(--muted)}#imp-dlg .imp-notes ul{margin:6px 0 0;padding-left:18px}" +
     "@media (max-width:520px){#imp-dlg{padding:12px}#imp-dlg .imp-row{justify-content:stretch}#imp-dlg .imp-row .btn{flex:1 1 auto}}";
   document.head.appendChild(css);
 
@@ -205,10 +206,13 @@
     return j;
   }
 
+  // A line seen twice (overlapping scroll screenshots, or two readings that disagree): keep the one whose numbers hold up.
+  function weak(p) { return (p.flags || []).filter(function (f) { return /ESTIMATED|but the line shows|no source quote|disagree|no share count/.test(f); }).length; }
+
   function mergeResults(results, failed) {
-    var out = { account: "", asOf: "", positions: [], cash: [], warnings: [] }, accounts = [], byKey = {}, counts = {}, found = {};
+    var out = { account: "", asOf: "", positions: [], cash: [], warnings: [], notes: [] }, accounts = [], byKey = {}, counts = {}, found = {};
     results.forEach(function (r) {
-      var acct = (r.account || "Imported").slice(0, 40);
+      var acct = (r.account || "Imported").slice(0, 40), tag = results.length > 1 ? (r.file || "A file") + ": " : "";
       if (accounts.indexOf(acct) < 0) accounts.push(acct);
       if (r.asOf && !out.asOf) out.asOf = r.asOf;
       if (r.reportedCount) counts[acct] = Math.max(counts[acct] || 0, r.reportedCount);
@@ -216,15 +220,16 @@
         p.acct = acct;
         var k = acct + "|" + p.tk + "|" + p.cur, prev = byKey[k];
         found[acct] = (found[acct] || {}); found[acct][p.tk] = 1;
-        if (prev && prev.qty != null && p.qty != null && Math.abs(prev.qty - p.qty) <= Math.max(1e-6, Math.abs(prev.qty) * 0.001)) {
-          // the same line seen in an overlapping screenshot: keep one (the later, fully visible one)
-          out.positions[out.positions.indexOf(prev)] = p; byKey[k] = p; return;
-        }
-        if (prev) out.warnings.push(p.tk + " appears twice in " + acct + " with different quantities (" + prev.qty + " vs " + p.qty + "). Untick the one you don't want — only the last ticked row is imported.");
-        byKey[k] = p; out.positions.push(p);
+        if (!prev) { byKey[k] = p; out.positions.push(p); return; }
+        var same = prev.qty != null && p.qty != null && Math.abs(prev.qty - p.qty) <= Math.max(1e-6, Math.abs(prev.qty) * 0.001);
+        var wp = weak(prev), wn = weak(p), keep = wn <= wp ? p : prev; // tie -> the later screenshot
+        if (!same && wp === wn) out.warnings.push(p.tk + " appears twice in " + acct + " with different quantities (" + prev.qty + " vs " + p.qty + ") and both look equally reliable. Untick the one you don't want — only the last ticked row is imported.");
+        else if (!same) out.notes.push(p.tk + ": two screenshots disagreed (" + prev.qty + " vs " + p.qty + "); kept " + keep.qty + ", the reading whose numbers add up.");
+        out.positions[out.positions.indexOf(prev)] = keep; byKey[k] = keep;
       });
       (r.cash || []).forEach(function (c) { c.acct = acct; out.cash.push(c); });
-      (r.warnings || []).forEach(function (w) { out.warnings.push((results.length > 1 ? (r.file || "A file") + ": " : "") + w); });
+      (r.warnings || []).forEach(function (w) { out.warnings.push(tag + w); });
+      (r.notes || []).forEach(function (w) { out.notes.push(tag + w); });
     });
     // a share count that was only estimated from today's price becomes exact when the same ticker shows a price at the
     // same time on another screenshot (e.g. the same stock held at two brokers)
@@ -241,7 +246,7 @@
       if (counts[a] && n < counts[a]) out.warnings.unshift("MISSING? The app shows " + counts[a] + " holdings for " + a + " but only " + n + " were found. Add a screenshot of the rows you skipped (scroll with a little overlap).");
     });
     out.account = accounts[0] || "Imported";
-    if (accounts.length > 1) out.warnings.push("Files from different accounts stay under separate labels (" + accounts.join(", ") + "). Change the Account column per row if needed.");
+    if (accounts.length > 1) out.notes.push("Files from different accounts stay under separate labels (" + accounts.join(", ") + "). Change the Account field on a row if needed.");
     failed.forEach(function (f) { out.warnings.push(f.name + " could not be read: " + f.msg); });
     return out;
   }
@@ -336,6 +341,7 @@
     var h = "<div class='imp-f' style='grid-template-columns:1fr 1fr'><label style='font-size:12px'>Account label<input type='text' id='imp-acct' maxlength='40' style='width:100%' value='" + esc(res.account || "Imported") + "'></label>" +
       "<label style='font-size:12px'>When importing<select id='imp-mode' style='width:100%'><option value='merge'>Add / update these lines</option><option value='replace'>Replace everything in this account label</option></select></label></div>";
     if (res.warnings.length) h += "<ul class='imp-warn'>" + res.warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul>";
+    if (res.notes && res.notes.length) h += "<details class='imp-notes'><summary>Reader notes (" + res.notes.length + ")</summary><ul>" + res.notes.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul></details>";
     h += "<div class='imp-tbl'><table><thead><tr><th></th><th>Account</th><th>Ticker</th><th>Quantity</th><th>Total cost</th><th>Price</th><th>Cur.</th><th>Theme</th><th>Evidence</th></tr></thead><tbody>";
     rows.forEach(function (r, i) {
       var cash = r.tk === "CASH";
