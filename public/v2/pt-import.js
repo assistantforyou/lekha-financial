@@ -35,6 +35,14 @@
     "#imp-dlg td input[type=number]{width:92px}#imp-dlg td input[type=text]{width:84px}#imp-dlg .imp-ev{color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#imp-dlg .imp-ev.imp-flag{color:var(--warn,#e0a030);white-space:normal;min-width:180px}" +
     "#imp-dlg .imp-row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;align-items:center}#imp-msg{font-size:12px;min-height:18px;margin-top:8px;color:var(--muted)}" +
     "#imp-dlg ul.imp-warn{margin:8px 0 0;padding-left:18px;font-size:12px;color:var(--warn)}" +
+    "#imp-prog{margin-top:12px;display:grid;gap:10px}#imp-prog[hidden]{display:none}" +
+    "#imp-dlg .pg-bar{height:8px;border-radius:4px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden;position:relative}" +
+    "#imp-dlg .pg-fill{height:100%;width:0;background:var(--accent);transition:width .25s ease}" +
+    "#imp-dlg .pg-bar.busy .pg-fill:after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);animation:pgsh 1.2s linear infinite}" +
+    "@keyframes pgsh{from{transform:translateX(-100%)}to{transform:translateX(100%)}}" +
+    "#imp-dlg .pg-bar.err .pg-fill{background:var(--down)}#imp-dlg .pg-bar.ok .pg-fill{background:var(--up,var(--accent))}" +
+    "#imp-dlg .pg-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px}#imp-dlg .pg-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}" +
+    "#imp-dlg .pg-stat{color:var(--muted);flex:0 0 auto;font-variant-numeric:tabular-nums}#imp-dlg .pg-all .pg-top{font-weight:600;font-size:13px}" +
     "@media (max-width:520px){#imp-dlg{padding:12px}#imp-dlg .imp-row{justify-content:stretch}#imp-dlg .imp-row .btn{flex:1 1 auto}}";
   document.head.appendChild(css);
 
@@ -50,6 +58,7 @@
     "<label class='imp-lab' for='imp-file'>Statements (you can pick several)<input type='file' id='imp-file' name='statements' multiple accept='.pdf,.png,.jpg,.jpeg,.webp,.csv,.tsv,.txt,application/pdf,image/png,image/jpeg,image/webp,text/csv,text/plain'></label>" +
     "<div class='imp-files' id='imp-files' hidden></div>" +
     "</div>" +
+    "<div id='imp-prog' hidden></div>" +
     "<div id='imp-msg' role='status' aria-live='polite'></div>" +
     "<div class='imp-row'><button class='btn' id='imp-cancel' type='button'>Close</button><button class='btn' id='imp-go' type='submit' style='border-color:var(--accent);color:var(--accent)'>Read statements</button></div>" +
     "</form>" +
@@ -72,6 +81,7 @@
     $("imp-files").hidden = true; $("imp-files").innerHTML = "";
     $("imp-review").hidden = true; $("imp-review").innerHTML = "";
     $("imp-go").hidden = false; $("imp-go").disabled = false;
+    $("imp-prog").hidden = true; $("imp-prog").innerHTML = "";
     say(""); dlg.showModal();
   }
   btn.addEventListener("click", openDlg);
@@ -161,12 +171,32 @@
     });
   }
 
-  async function readOne(f) {
+  // POST JSON with REAL upload progress (fetch cannot report it). Resolves {status, json}.
+  function postJson(url, text, onUpload) {
+    return new Promise(function (resolve) {
+      var x = new XMLHttpRequest();
+      x.open("POST", url); x.setRequestHeader("Content-Type", "application/json"); x.timeout = 120000;
+      x.upload.onprogress = function (e) { if (e.lengthComputable) onUpload(e.loaded / e.total); };
+      x.upload.onload = function () { onUpload(1, true); };
+      function end(status, msg) { var j = {}; try { j = JSON.parse(x.responseText || "{}"); } catch (e) {} if (msg && !j.error) j.error = msg; resolve({ status: status, json: j }); }
+      x.onload = function () { end(x.status); };
+      x.onerror = function () { end(0, "Network error. Check your connection and try again."); };
+      x.ontimeout = function () { end(0, "The server took too long to answer."); };
+      x.send(text);
+    });
+  }
+
+  // ui: {prepare(0..1), upload(0..1), reading(true)}: every value comes from a real event, nothing is simulated.
+  async function readOne(f, ui) {
     if (f.size > MAX) throw new Error(f.name + " is over 3 MB. Export fewer pages or a CSV.");
+    ui.prepare(0);
     var body = await readFile(f);
-    var r = await fetch("/api/parse-positions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    var j = await r.json().catch(function () { return {}; });
-    if (!r.ok) {
+    ui.prepare(1);
+    var text = JSON.stringify(body);
+    ui.upload(0);
+    var r = await postJson("/api/parse-positions", text, function (p, done) { ui.upload(p); if (done) ui.reading(true); });
+    var j = r.json || {};
+    if (r.status < 200 || r.status >= 300) {
       var err = new Error(j.error || "Import failed (" + r.status + ").");
       err.status = r.status;
       throw err;
@@ -223,27 +253,77 @@
     if (fs.length > MAX_FILES) return say("Pick up to " + MAX_FILES + " files at a time.", true);
     var big = fs.filter(function (f) { return f.size > MAX; })[0];
     if (big) return say(big.name + " is over 3 MB. Export fewer pages or a CSV.", true);
-    $("imp-go").disabled = true;
-    var slots = new Array(fs.length), failed = [], done = 0, next = 0;
-    function progress() { say("Reading " + fs.length + " file" + (fs.length > 1 ? "s" : "") + " in parallel… " + done + " of " + fs.length + " done."); }
-    progress();
+    $("imp-go").disabled = true; say("");
+    // progress model: prepare 10% + upload 30% + AI reading 55% + checking 5% per file. The "reading" share only moves when the
+    // answer actually arrives, so the bar never runs ahead of what has really happened.
+    var W = { prepare: 10, upload: 30, read: 55, check: 5 };
+    var st = fs.map(function () { return { prepare: 0, upload: 0, read: 0, check: 0, state: "wait", t0: 0, note: "" }; });
+    var box = $("imp-prog"); box.hidden = false;
+    box.innerHTML = "<div class='pg-all'><div class='pg-top'><span>Overall</span><span class='pg-stat' id='pg-all-s'></span></div><div class='pg-bar' id='pg-all-b' role='progressbar' aria-valuemin='0' aria-valuemax='100'><div class='pg-fill'></div></div></div>" +
+      fs.map(function (f, i) { return "<div><div class='pg-top'><span class='pg-name'>" + esc(f.name) + "</span><span class='pg-stat' id='pg-s" + i + "'>Waiting</span></div><div class='pg-bar' id='pg-b" + i + "'><div class='pg-fill'></div></div></div>"; }).join("");
+    var shown = 0;
+    function pct(i) { var x = st[i]; if (x.state === "err") return 100; return W.prepare * x.prepare + W.upload * x.upload + W.read * x.read + W.check * x.check; }
+    function paint() {
+      var tot = 0, finished = 0;
+      st.forEach(function (x, i) {
+        var p = Math.round(pct(i)); tot += p; if (x.state === "done" || x.state === "err") finished++;
+        var bar = $("pg-b" + i), label;
+        if (x.state === "err") label = x.note || "Failed";
+        else if (x.state === "done") label = "Done";
+        else if (x.state === "read") label = (x.note ? x.note + " · " : "") + "AI is reading… " + Math.max(0, Math.round((Date.now() - x.t0) / 1000)) + "s";
+        else if (x.state === "upload") label = "Uploading " + Math.round(x.upload * 100) + "%";
+        else if (x.state === "prepare") label = "Preparing" + (x.note ? " · " + x.note : "");
+        else label = x.note || "Waiting";
+        bar.className = "pg-bar" + (x.state === "read" ? " busy" : x.state === "err" ? " err" : x.state === "done" ? " ok" : "");
+        bar.firstChild.style.width = (x.state === "err" ? 100 : p) + "%";
+        $("pg-s" + i).textContent = label + (x.state === "done" || x.state === "err" || x.state === "wait" ? "" : " · " + p + "%");
+      });
+      var all = Math.max(shown, Math.round(tot / fs.length)), ab = $("pg-all-b"); shown = all; // the overall bar never moves backwards
+      ab.firstChild.style.width = all + "%"; ab.setAttribute("aria-valuenow", all);
+      $("pg-all-s").textContent = finished + " of " + fs.length + " files finished · " + all + "%";
+    }
+    var tick = setInterval(paint, 500); paint();
+    function ui(i) {
+      return {
+        prepare: function (v) { st[i].prepare = v; st[i].state = v < 1 ? "prepare" : st[i].state; paint(); },
+        upload: function (v) { st[i].upload = v; if (v < 1) st[i].state = "upload"; paint(); },
+        reading: function () { st[i].upload = 1; st[i].state = "read"; st[i].t0 = Date.now(); paint(); }
+      };
+    }
+    var slots = new Array(fs.length), failed = [], next = 0;
+    async function attempt(i) {
+      st[i].prepare = st[i].upload = st[i].read = st[i].check = 0; st[i].state = "prepare";
+      return readOne(fs[i], ui(i));
+    }
     async function worker() {
       while (next < fs.length) {
         var i = next++;
         try {
-          try { slots[i] = await readOne(fs[i]); }
-          catch (e) { if (e.status === 502 || e.status === 503 || e.status === 429) { await new Promise(function (r) { setTimeout(r, 2500); }); slots[i] = await readOne(fs[i]); } else throw e; } // one automatic retry for a busy AI service
-        } catch (e) { failed.push({ name: fs[i].name, msg: e.message || "could not be read" }); }
-        done++; progress();
+          try { slots[i] = await attempt(i); }
+          catch (e) {
+            if (!/Daily import limit/.test(e.message || "") && (e.status === 502 || e.status === 503 || e.status === 429 || e.status === 0 || e.status === undefined && /Network|too long/.test(e.message))) {
+              st[i].note = "Busy, retrying"; st[i].state = "wait"; paint();
+              await new Promise(function (r) { setTimeout(r, 2500); });
+              st[i].note = ""; slots[i] = await attempt(i); // one automatic retry for a busy AI service
+            } else throw e;
+          }
+          st[i].prepare = st[i].upload = st[i].read = st[i].check = 1; st[i].state = "done"; // an answer can only arrive after every earlier stage
+        } catch (e) {
+          st[i].state = "err"; st[i].note = e.message || "Could not be read";
+          failed.push({ name: fs[i].name, msg: e.message || "could not be read" });
+        }
+        paint();
       }
     }
     try {
       await Promise.all(new Array(fs.length).fill(0).map(worker));
     } finally {
+      clearInterval(tick); paint();
       $("imp-go").disabled = false;
     }
     var results = slots.filter(Boolean);
     if (!results.length) return say("No files could be read. " + failed.map(function (f) { return f.name + ": " + f.msg; }).join(" "), true);
+    $("imp-prog").hidden = true;
     review(mergeResults(results, failed));
   });
 
