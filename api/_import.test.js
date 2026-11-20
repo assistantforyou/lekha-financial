@@ -28,7 +28,7 @@ assert.ok(r.positions.every((p) => /^[A-Z0-9.\-:]{1,16}$/.test(p.tk)));
 assert.strictEqual(r.cash.length, 1); assert.strictEqual(r.cash[0].qty, 250);
 assert.ok(r.warnings.some((w) => w.includes("no ticker")));
 assert.ok(r.warnings.some((w) => w.includes("JPY")));
-assert.ok(r.warnings.some((w) => w.includes("blurry")));
+assert.ok(r.notes.some((w) => w.includes("blurry")) && !r.warnings.some((w) => w.includes("blurry")), "the reader's own remarks are notes, not problems");
 // 15*150 + 1*? (no price) -> incomplete cross-check warning rather than a false mismatch
 assert.ok(r.warnings.some((w) => w.includes("cross-checked")));
 
