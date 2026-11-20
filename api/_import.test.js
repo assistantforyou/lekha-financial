@@ -1,6 +1,6 @@
 // Run: node api/_import.test.js
 const assert = require("assert");
-const { checkUpload, normalizeResult, crossCheck, fillQuantities, maskDigits, RESPONSE_SCHEMA } = require("./_import");
+const { checkUpload, normalizeResult, crossCheck, fillQuantities, isSparse, maskDigits, RESPONSE_SCHEMA } = require("./_import");
 
 assert.ok(checkUpload({ mime: "application/x-msdownload", size: 10 }));
 assert.ok(checkUpload({ mime: "application/pdf", size: 0 }));
@@ -39,8 +39,12 @@ assert.ok(off.warnings.some((w) => w.includes("add up to")));
 assert.ok(normalizeResult({ positions: [] }).warnings.some((w) => w.includes("No holdings")));
 assert.ok(normalizeResult(null).warnings.length >= 1);
 assert.strictEqual(maskDigits("acct 123456789012 qty 100"), "acct ********9012 qty 100");
-// quantity is optional on purpose: some apps (Dime US stocks) show only a holding value
-assert.ok(!RESPONSE_SCHEMA.properties.positions.items.required.includes("quantity"));
+// quantity may be null (Dime US stocks show only a value) but the field must be present, or lazy models return bare tickers
+const req = RESPONSE_SCHEMA.properties.positions.items.required;
+for (const f of ["quantity", "market_value", "price", "avg_cost", "unrealized_pl", "evidence"]) assert.ok(req.includes(f), f);
+assert.strictEqual(RESPONSE_SCHEMA.properties.positions.items.properties.quantity.nullable, true);
+assert.ok(isSparse({ positions: [{ kind: "security", ticker: "PG" }, { kind: "security", ticker: "AAPL" }] }), "bare tickers are a failed reading");
+assert.ok(!isSparse({ positions: [{ kind: "security", ticker: "HACK", market_value: 481.27 }, { kind: "security", ticker: "X", quantity: 2 }] }));
 console.log("import ok");
 assert.strictEqual(normalizeResult({ account: "Demo Account 123456789012", positions: [] }).account, "Demo Account ********9012");
 console.log("account mask ok");

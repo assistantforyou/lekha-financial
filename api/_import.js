@@ -48,13 +48,21 @@ const RESPONSE_SCHEMA = {
           currency: { type: "STRING", nullable: true },
           evidence: { type: "STRING", nullable: true },
         },
-        required: ["kind"],
+        required: ["kind", "ticker", "name", "quantity", "market_value", "price", "total_cost", "avg_cost", "unrealized_pl", "currency", "evidence"],
       },
     },
     warnings: { type: "ARRAY", items: { type: "STRING" } },
   },
   required: ["positions"],
 };
+
+// A reading is "sparse" when most lines carry neither a quantity nor a market value (a lazy model returning bare tickers).
+function isSparse(raw) {
+  const items = Array.isArray(raw && raw.positions) ? raw.positions.filter((p) => p && p.kind !== "cash") : [];
+  if (!items.length) return false;
+  const useful = items.filter((p) => num(p.quantity) != null || num(p.market_value) != null).length;
+  return useful < items.length / 2;
+}
 
 function checkUpload({ mime, size }) {
   if (!MIME.has(String(mime || "").toLowerCase())) return "Unsupported file type. Use PDF, PNG, JPG, WEBP, CSV or text.";
@@ -181,4 +189,4 @@ async function fillQuantities(out, getQuotes) {
   return out;
 }
 
-module.exports = { fillQuantities, crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };
+module.exports = { isSparse, fillQuantities, crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };

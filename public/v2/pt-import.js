@@ -220,8 +220,10 @@
     async function worker() {
       while (next < fs.length) {
         var i = next++;
-        try { slots[i] = await readOne(fs[i]); }
-        catch (e) { failed.push({ name: fs[i].name, msg: e.message || "could not be read" }); }
+        try {
+          try { slots[i] = await readOne(fs[i]); }
+          catch (e) { if (e.status === 502 || e.status === 503 || e.status === 429) { await new Promise(function (r) { setTimeout(r, 2500); }); slots[i] = await readOne(fs[i]); } else throw e; } // one automatic retry for a busy AI service
+        } catch (e) { failed.push({ name: fs[i].name, msg: e.message || "could not be read" }); }
         done++; progress();
       }
     }
