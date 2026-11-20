@@ -3,14 +3,12 @@
    for JSON per file, the results are merged -> you review and edit every line -> only the lines you tick are written to your
    holdings (browser storage). Nothing is saved on the server. Needs window.PT_HOLD {load, save, apply} exposed by the holdings editor. */
 (function () {
-  var PASS_KEY = "ptpub.v1.importpass", MAX = 3 * 1024 * 1024, MAX_FILES = 10;
+  var MAX = 3 * 1024 * 1024, MAX_FILES = 10;
   var anchor = document.getElementById("ph-clear");
   var H = window.PT_HOLD;
   if (!anchor || !H) return;
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
-  function getPass() { try { return localStorage.getItem(PASS_KEY) || ""; } catch (e) { return ""; } }
-  function setPass(v) { try { if (v) localStorage.setItem(PASS_KEY, v); else localStorage.removeItem(PASS_KEY); } catch (e) {} }
   function maskDigits(t) { return String(t).replace(/\b\d{8,}\b/g, function (m) { return new Array(m.length - 3).join("*") + m.slice(-4); }); }
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
 
@@ -51,7 +49,6 @@
     "<div class='imp-f'>" +
     "<label class='imp-lab' for='imp-file'>Statements (you can pick several)<input type='file' id='imp-file' name='statements' multiple accept='.pdf,.png,.jpg,.jpeg,.webp,.csv,.tsv,.txt,application/pdf,image/png,image/jpeg,image/webp,text/csv,text/plain'></label>" +
     "<div class='imp-files' id='imp-files' hidden></div>" +
-    "<label class='imp-lab' for='imp-pass'>Import passcode<span class='imp-pw'><input type='password' id='imp-pass' name='password' autocomplete='current-password' autocapitalize='none' autocorrect='off' spellcheck='false' enterkeyhint='go' required><button class='imp-eye' id='imp-eye' type='button' aria-label='Show passcode' aria-pressed='false'>Show</button></span></label>" +
     "</div>" +
     "<div id='imp-msg' role='status' aria-live='polite'></div>" +
     "<div class='imp-row'><button class='btn' id='imp-cancel' type='button'>Close</button><button class='btn' id='imp-go' type='submit' style='border-color:var(--accent);color:var(--accent)'>Read statements</button></div>" +
@@ -70,22 +67,11 @@
   }
 
   $("imp-file").addEventListener("change", listFiles);
-  $("imp-eye").addEventListener("click", function () {
-    var p = $("imp-pass"), show = p.type === "password";
-    p.type = show ? "text" : "password";
-    this.textContent = show ? "Hide" : "Show";
-    this.setAttribute("aria-pressed", String(show));
-    this.setAttribute("aria-label", show ? "Hide passcode" : "Show passcode");
-  });
-
   function openDlg() {
-    $("imp-pass").value = getPass();
     $("imp-file").value = "";
     $("imp-files").hidden = true; $("imp-files").innerHTML = "";
     $("imp-review").hidden = true; $("imp-review").innerHTML = "";
     $("imp-go").hidden = false; $("imp-go").disabled = false;
-    $("imp-pass").type = "password"; $("imp-eye").textContent = "Show";
-    $("imp-eye").setAttribute("aria-pressed", "false"); $("imp-eye").setAttribute("aria-label", "Show passcode");
     say(""); dlg.showModal();
   }
   btn.addEventListener("click", openDlg);
@@ -159,10 +145,10 @@
     });
   }
 
-  async function readOne(f, pass) {
+  async function readOne(f) {
     if (f.size > MAX) throw new Error(f.name + " is over 3 MB. Export fewer pages or a CSV.");
     var body = await readFile(f);
-    var r = await fetch("/api/parse-positions", { method: "POST", headers: { "Content-Type": "application/json", "X-PT-Passcode": pass }, body: JSON.stringify(body) });
+    var r = await fetch("/api/parse-positions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     var j = await r.json().catch(function () { return {}; });
     if (!r.ok) {
       var err = new Error(j.error || "Import failed (" + r.status + ").");
@@ -194,21 +180,19 @@
 
   $("imp-form").addEventListener("submit", async function (ev) {
     ev.preventDefault();
-    var fs = chosen(), pass = $("imp-pass").value.trim();
+    var fs = chosen();
     if (!fs.length) return say("Choose at least one file.", true);
     if (fs.length > MAX_FILES) return say("Pick up to " + MAX_FILES + " files at a time.", true);
     var big = fs.filter(function (f) { return f.size > MAX; })[0];
     if (big) return say(big.name + " is over 3 MB. Export fewer pages or a CSV.", true);
-    if (!pass) return say("Enter the import passcode.", true);
     $("imp-go").disabled = true;
     var results = [], failed = [];
     try {
       for (var i = 0; i < fs.length; i++) {
         say("Reading file " + (i + 1) + " of " + fs.length + " (" + fs[i].name + ")… up to a minute each.");
         try {
-          results.push(await readOne(fs[i], pass));
+          results.push(await readOne(fs[i]));
         } catch (e) {
-          if (e.status === 401) { setPass(""); say(e.message, true); return; }
           failed.push({ name: fs[i].name, msg: e.message || "could not be read" });
         }
       }
@@ -216,7 +200,6 @@
       $("imp-go").disabled = false;
     }
     if (!results.length) return say("No files could be read. " + failed.map(function (f) { return f.name + ": " + f.msg; }).join(" "), true);
-    setPass(pass);
     review(mergeResults(results, failed));
   });
 
