@@ -37,7 +37,7 @@
     "#imp-dlg ul.imp-warn{margin:8px 0 0;padding-left:18px;font-size:12px;color:var(--warn)}" +
     "#imp-prog{margin-top:12px;display:grid;gap:10px}#imp-prog[hidden]{display:none}" +
     "#imp-dlg .pg-bar{height:8px;border-radius:4px;background:var(--panel-2);border:1px solid var(--line);overflow:hidden;position:relative}" +
-    "#imp-dlg .pg-fill{height:100%;width:0;background:var(--accent);transition:width .25s ease}" +
+    "#imp-dlg .pg-fill{height:100%;width:0;background:var(--accent);transition:width .3s linear}" +
     "#imp-dlg .pg-bar.busy .pg-fill:after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);animation:pgsh 1.2s linear infinite}" +
     "@keyframes pgsh{from{transform:translateX(-100%)}to{transform:translateX(100%)}}" +
     "#imp-dlg .pg-bar.err .pg-fill{background:var(--down)}#imp-dlg .pg-bar.ok .pg-fill{background:var(--up,var(--accent))}" +
@@ -259,17 +259,19 @@
     var big = fs.filter(function (f) { return f.size > MAX; })[0];
     if (big) return say(big.name + " is over 3 MB. Export fewer pages or a CSV.", true);
     $("imp-go").disabled = true; say("");
-    // progress model: prepare 10% + upload 30% + AI reading 55% + checking 5% per file. The "reading" share only moves when the
-    // answer actually arrives, so the bar never runs ahead of what has really happened.
+    // progress model: prepare 10% + upload 30% + AI reading 55% + checking 5% per file. While the AI is reading, its share creeps
+    // forward all the time (fast at first, then ever slower, never reaching its end), so the bar keeps moving and only
+    // completes when the answer has really arrived.
     var W = { prepare: 10, upload: 30, read: 55, check: 5 };
     var st = fs.map(function () { return { prepare: 0, upload: 0, read: 0, check: 0, state: "wait", t0: 0, note: "" }; });
     var box = $("imp-prog"); box.hidden = false;
     box.innerHTML = "<div class='pg-all'><div class='pg-top'><span>Overall</span><span class='pg-stat' id='pg-all-s'></span></div><div class='pg-bar' id='pg-all-b' role='progressbar' aria-valuemin='0' aria-valuemax='100'><div class='pg-fill'></div></div></div>" +
       fs.map(function (f, i) { return "<div><div class='pg-top'><span class='pg-name'>" + esc(f.name) + "</span><span class='pg-stat' id='pg-s" + i + "'>Waiting</span></div><div class='pg-bar' id='pg-b" + i + "'><div class='pg-fill'></div></div></div>"; }).join("");
     var shown = 0;
-    function pct(i) { var x = st[i]; if (x.state === "err") return 100; return W.prepare * x.prepare + W.upload * x.upload + W.read * x.read + W.check * x.check; }
+    function readShare(x) { return x.state === "read" ? 0.97 * (1 - Math.exp(-(Date.now() - x.t0) / 14000)) : x.read; }
+    function pct(i) { var x = st[i]; if (x.state === "err") return 100; return W.prepare * x.prepare + W.upload * x.upload + W.read * readShare(x) + W.check * x.check; }
     function paint() {
-      var tot = 0, finished = 0;
+      var tot = 0, finished = 0, ab;
       st.forEach(function (x, i) {
         var p = Math.round(pct(i)); tot += p; if (x.state === "done" || x.state === "err") finished++;
         var bar = $("pg-b" + i), label;
@@ -280,14 +282,14 @@
         else if (x.state === "prepare") label = "Preparing" + (x.note ? " · " + x.note : "");
         else label = x.note || "Waiting";
         bar.className = "pg-bar" + (x.state === "read" ? " busy" : x.state === "err" ? " err" : x.state === "done" ? " ok" : "");
-        bar.firstChild.style.width = (x.state === "err" ? 100 : p) + "%";
+        bar.firstChild.style.width = (x.state === "err" ? 100 : Math.round(pct(i) * 10) / 10) + "%";
         $("pg-s" + i).textContent = label + (x.state === "done" || x.state === "err" || x.state === "wait" ? "" : " · " + p + "%");
       });
-      var all = Math.max(shown, Math.round(tot / fs.length)), ab = $("pg-all-b"); shown = all; // the overall bar never moves backwards
-      ab.firstChild.style.width = all + "%"; ab.setAttribute("aria-valuenow", all);
-      $("pg-all-s").textContent = finished + " of " + fs.length + " files finished · " + all + "%";
+      var exact = st.reduce(function (a, x, i) { return a + pct(i); }, 0) / fs.length, all = Math.max(shown, exact); shown = all; // the overall bar never moves backwards
+      ab = $("pg-all-b"); ab.firstChild.style.width = all.toFixed(1) + "%"; ab.setAttribute("aria-valuenow", Math.round(all));
+      $("pg-all-s").textContent = finished + " of " + fs.length + " files finished · " + Math.round(all) + "%";
     }
-    var tick = setInterval(paint, 500); paint();
+    var tick = setInterval(paint, 150); paint();
     function ui(i) {
       return {
         prepare: function (v) { st[i].prepare = v; st[i].state = v < 1 ? "prepare" : st[i].state; paint(); },
@@ -335,13 +337,12 @@
   var current = null;
   function review(res) {
     current = res;
-    var rows = res.positions.map(function (p) { return { sel: true, acct: p.acct || res.account || "Imported", tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, ev: ((p.flags || []).length ? "Review: " + p.flags.join("; ") + (p.evidence || p.name ? " | " : "") : "") + (p.evidence || p.name || "") }; })
+    var rows = res.positions.map(function (p) { return { sel: true, acct: p.acct || res.account || "Imported", tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, theme: p.theme || "Other", ev: ((p.flags || []).length ? "Review: " + p.flags.join("; ") + (p.evidence || p.name ? " | " : "") : "") + (p.evidence || p.name || "") }; })
       .concat(res.cash.map(function (c) { return { sel: true, acct: c.acct || res.account || "Imported", tk: "CASH", qty: c.qty, cost: null, px: null, cur: c.cur, ev: c.name || c.evidence || "Cash" }; }));
     current.rows = rows;
     var h = "<div class='imp-f' style='grid-template-columns:1fr 1fr'><label style='font-size:12px'>Account label<input type='text' id='imp-acct' maxlength='40' style='width:100%' value='" + esc(res.account || "Imported") + "'></label>" +
       "<label style='font-size:12px'>When importing<select id='imp-mode' style='width:100%'><option value='merge'>Add / update these lines</option><option value='replace'>Replace everything in this account label</option></select></label></div>";
     if (res.warnings.length) h += "<ul class='imp-warn'>" + res.warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul>";
-    if (res.notes && res.notes.length) h += "<details class='imp-notes'><summary>Reader notes (" + res.notes.length + ")</summary><ul>" + res.notes.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul></details>";
     h += "<div class='imp-tbl'><table><thead><tr><th></th><th>Account</th><th>Ticker</th><th>Quantity</th><th>Total cost</th><th>Price</th><th>Cur.</th><th>Theme</th><th>Evidence</th></tr></thead><tbody>";
     rows.forEach(function (r, i) {
       var cash = r.tk === "CASH";
@@ -354,7 +355,8 @@
         "<td class='imp-ev" + (r.ev.indexOf("Review: ") === 0 ? " imp-flag" : "") + "' title='" + esc(r.ev) + "'>" + esc(r.ev) + "</td></tr>";
     });
     h += "</tbody></table></div><div class='imp-row'><span class='muted' style='font-size:12px;margin-right:auto'>Check quantities against your statement. Lines without a price are not valued, and lines without a total cost count as pure gain in P&amp;L, until you fill them in.</span><button class='btn' id='imp-add' type='button' style='border-color:var(--accent);color:var(--accent)'>Import selected</button></div>";
-    var box = $("imp-review"); box.innerHTML = h; box.hidden = false; $("imp-go").hidden = true;
+    var box = $("imp-review"); box.innerHTML = h;
+    box.querySelectorAll("tbody tr").forEach(function (tr, i) { var sel = tr.querySelector("[data-f=theme]"), t = rows[i].theme; if (sel && t && Array.prototype.some.call(sel.options, function (o) { return o.value === t || o.text === t; })) sel.value = t; }); box.hidden = false; $("imp-go").hidden = true;
     say(rows.length ? "Review the lines below, edit anything that looks wrong, then import." : "No holdings were found in these files.", !rows.length);
     $("imp-add").addEventListener("click", doImport);
   }
@@ -377,7 +379,7 @@
       var acct = (g("acct") && g("acct").value.trim().slice(0, 40)) || def;
       var h = { acct: acct, tk: tk, theme: cash ? "Other" : String(g("theme").value || "Other"), cur: g("cur").value, qty: qty, cost: isFinite(cost) ? cost : null, px: isFinite(px) ? px : null };
       var i = st.items.findIndex(function (x) { return x.tk === h.tk && (x.acct || "") === h.acct; });
-      if (i >= 0) st.items[i] = h; else st.items.push(h);
+      if (i >= 0) { var old = st.items[i]; if (h.cost == null && old.cost != null) h.cost = old.cost; if (h.px == null && old.px != null) h.px = old.px; st.items[i] = h; } else st.items.push(h);
       added++;
     }
     if (!added) return say("No valid lines selected.", true);

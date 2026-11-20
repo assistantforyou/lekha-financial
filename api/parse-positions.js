@@ -1,8 +1,8 @@
 // POST /api/parse-positions  {mime, data (base64) | text}  -> {account, asOf, positions[], cash[], warnings[]}
 // Daily-capped (no passcode), and stores nothing: the file is
 // forwarded to the AI provider and the validated result is returned. Statement contents are never logged.
-const { checkUpload, normalizeResult, crossCheck, fillQuantities, maskDigits, MAX_BYTES } = require("./_import");
-const { extractVerified } = require("./_llm");
+const { checkUpload, normalizeResult, crossCheck, fillQuantities, classifyThemes, maskDigits, MAX_BYTES } = require("./_import");
+const { extractVerified, generateJson } = require("./_llm");
 const { rateHit } = require("./_lib");
 
 const DAILY_LIMIT = Number(process.env.IMPORT_DAILY_LIMIT) || 40;
@@ -39,11 +39,13 @@ module.exports = async (req, res) => {
   // daily cap, counted atomically in the database (fails closed)
   const day = new Date().toISOString().slice(0, 10);
   if (!(await rateHit("import/day/" + day, DAILY_LIMIT))) return fail(res, 429, "Daily import limit reached. Try again tomorrow.");
+  const t0 = Date.now();
   try {
     const { raw, second } = await extractVerified(input);
     let out = normalizeResult(raw);
     if (second) out = crossCheck(out, normalizeResult(second));
     out = await fillQuantities(out, (syms) => require("./_fin/service").getQuotes(syms));
+    if (Date.now() - t0 < 42000) out = await classifyThemes(out, generateJson); // AI picks each holding's theme; skipped when time is short
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(out);
   } catch (e) {
