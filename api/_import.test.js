@@ -96,3 +96,22 @@ assert.ok(!dime.warnings.some((w) => w.includes("skipped")), "value-only lines a
 const thai = normalizeResult({ account: "Dime", positions: [{ kind: "security", ticker: "TRUE", quantity: 800, price: 12.85, avg_cost: 11.2, market_value: 10280, unrealized_pl: 1320, currency: "THB", evidence: "Outstanding Shares 800" }] });
 assert.strictEqual(thai.positions[0].tk, "TRUE.BK"); assert.strictEqual(thai.positions[0].cost, 8960);
 assert.ok(thai.positions[0].flags.some((f) => f.includes(".BK")));
+
+// ICLN misread as IQLN: no quote for IQLN and no share count, so a look-alike symbol with a quote is used; themes come from the model
+(async () => {
+  const { classifyThemes, lookalikes } = require("./_import");
+  assert.ok(lookalikes("IQLN").includes("ICLN"));
+  const d = normalizeResult({ account: "Dime", positions: [
+    { kind: "security", ticker: "IQLN", market_value: 232.99, unrealized_pl: 33.31, currency: "USD", evidence: "IQLN 232.99" },
+    { kind: "security", ticker: "OPENZ", quantity: 1, currency: "USD", evidence: "OPENZ 1" },
+  ] });
+  await fillQuantities(d, async (syms) => ({ data: syms.includes("ICLN") ? { ICLN: { price: 20, currency: "USD" } } : {} }));
+  const ic = d.positions.find((p) => p.tk === "ICLN");
+  assert.ok(ic, "IQLN corrected to ICLN"); assert.strictEqual(ic.qty, Math.round((232.99 / 20) * 1e5) / 1e5);
+  assert.ok(d.positions.some((p) => p.tk === "OPENZ"), "a row with a known share count is never renamed");
+  assert.ok(!d.warnings.some((w) => w.includes("enter the share count")));
+  await classifyThemes(d, async () => ({ themes: [{ i: 0, theme: "Power & energy" }, { i: 1, theme: "Not a theme" }] }));
+  assert.strictEqual(ic.theme, "Power & energy"); assert.strictEqual(d.positions.find((p) => p.tk === "OPENZ").theme, undefined);
+  await classifyThemes(d, async () => { throw new Error("down"); }); // failure keeps the defaults
+  console.log("ticker repair and themes ok");
+})();

@@ -169,16 +169,44 @@ function crossCheck(a, b) {
   return a;
 }
 
+// Themes offered by the holdings editor (same list as the Theme select).
+const THEMES = ["Other", "Semiconductors", "Megacap tech", "Photonics", "Software", "Power & energy", "Healthcare", "Financials", "Index fund", "Gold"];
+
+// Characters a vision reader confuses with each other in a small ticker font (C/Q/O/G/0, I/L/1, ...).
+const CONFUSABLE = { C: "QOG", Q: "CO", O: "QC0D", G: "C6", D: "O0", I: "L1J", L: "I1", J: "I", S: "5", B: "8", Z: "2", U: "V", V: "UY", M: "N", N: "M", H: "N", E: "F", F: "E", P: "R", R: "P", A: "4", T: "I", Y: "V", W: "VV" };
+function lookalikes(tk) {
+  const out = new Set();
+  for (let i = 0; i < tk.length && out.size < 16; i++) for (const c of CONFUSABLE[tk[i]] || "") if (c.length === 1) out.add(tk.slice(0, i) + c + tk.slice(i + 1));
+  out.delete(tk);
+  return [...out];
+}
+
 // Rows that show a holding value but no share count (some apps): estimate shares = value / current price. This is approximate
 // (the screenshot's price may differ from now), so the row is flagged. `getQuotes(symbols)` -> {data:{SYM:{price,currency}}}.
+// Also: a missing price is filled from the live quote, and a ticker the reader probably misread (no quote exists for it, and the
+// share count is still unknown) is corrected to a look-alike symbol that does have a quote.
 async function fillQuantities(out, getQuotes) {
-  const pend = out.positions.filter((p) => p.qty == null);
-  if (!pend.length) return out;
-  let q = {};
-  try { q = (await getQuotes([...new Set(pend.map((p) => p.tk))])).data || {}; } catch (e) { q = {}; }
-  for (const p of pend) {
-    const quote = q[p.tk], px = quote && Number(quote.price);
-    if (px > 0 && p.mv > 0 && (!quote.currency || String(quote.currency).toUpperCase() === p.cur)) {
+  const need = out.positions.filter((p) => p.qty == null || p.px == null);
+  if (!need.length) return out;
+  const fetchQ = async (syms) => { try { return (await getQuotes(syms)).data || {}; } catch (e) { return {}; } };
+  const ok = (p, quote) => quote && Number(quote.price) > 0 && (!quote.currency || String(quote.currency).toUpperCase() === p.cur);
+  let q = await fetchQ([...new Set(need.map((p) => p.tk))]);
+  const dead = need.filter((p) => p.qty == null && p.mv > 0 && !ok(p, q[p.tk]));
+  if (dead.length) {
+    const variants = new Map(dead.map((p) => [p, lookalikes(p.tk.replace(/\.BK$/, "")).map((v) => (p.tk.endsWith(".BK") ? v + ".BK" : v))]));
+    const vq = await fetchQ([...new Set([...variants.values()].flat())]);
+    for (const [p, vs] of variants) {
+      const hit = vs.find((v) => ok(p, vq[v]));
+      if (!hit) continue;
+      p.flags.push(`ticker read as ${p.tk}; no such symbol, corrected to ${hit}`);
+      out.notes.push(`${p.tk} was corrected to ${hit}.`);
+      q[hit] = vq[hit]; p.tk = hit;
+    }
+  }
+  for (const p of need) {
+    const quote = q[p.tk], good = ok(p, quote), px = good ? Number(quote.price) : null;
+    if (p.qty != null) { if (p.px == null && good) p.px = px; continue; }
+    if (good && p.mv > 0) {
       p.qty = Math.round((p.mv / px) * 1e5) / 1e5; p.px = px;
       p.flags.push(`share count estimated: value ${p.mv} / current price ${px}; verify with your broker`);
     } else {
@@ -189,4 +217,21 @@ async function fillQuantities(out, getQuotes) {
   return out;
 }
 
-module.exports = { isSparse, fillQuantities, crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };
+// Ask the model to file each holding under one of the editor's themes. `gen` is llm.generateJson. Never throws: on any failure
+// the rows keep the default theme.
+async function classifyThemes(out, gen) {
+  const rows = out.positions.filter((p) => p.tk);
+  if (!rows.length) return out;
+  const schema = { type: "OBJECT", properties: { themes: { type: "ARRAY", items: { type: "OBJECT", properties: { i: { type: "NUMBER" }, theme: { type: "STRING", enum: THEMES } }, required: ["i", "theme"] } } }, required: ["themes"] };
+  const list = rows.map((p, i) => `${i}. ${p.tk}${p.name ? " (" + p.name + ")" : ""}`).join("\n");
+  try {
+    const ai = await gen({ system: "You file stock and ETF tickers under exactly one theme from this list: " + THEMES.join(", ") + ". Use Index fund for broad market or international index ETFs, Semiconductors for chip makers and storage hardware, Megacap tech for the largest platform companies, Software for software, cybersecurity and data analytics, Power & energy for utilities, power producers and clean energy, Healthcare for pharma, biotech and medical, Financials for banks, insurers and brokers, Gold for gold and gold miners, Photonics for optical and laser firms. Use Other when nothing fits. Return one entry per input line, using its index.", user: list, schema, job: "import-theme", timeoutMs: 9000, deadlineMs: 9000, fallbackDeadlineMs: 9000 });
+    for (const t of Array.isArray(ai && ai.themes) ? ai.themes : []) {
+      const p = rows[Number(t && t.i)];
+      if (p && THEMES.includes(t.theme)) p.theme = t.theme;
+    }
+  } catch (e) { /* keep defaults */ }
+  return out;
+}
+
+module.exports = { isSparse, fillQuantities, classifyThemes, lookalikes, THEMES, crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };
