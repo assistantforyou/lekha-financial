@@ -1,6 +1,6 @@
 // Run: node api/_import.test.js
 const assert = require("assert");
-const { checkUpload, normalizeResult, crossCheck, maskDigits, RESPONSE_SCHEMA } = require("./_import");
+const { checkUpload, normalizeResult, crossCheck, fillQuantities, maskDigits, RESPONSE_SCHEMA } = require("./_import");
 
 assert.ok(checkUpload({ mime: "application/x-msdownload", size: 10 }));
 assert.ok(checkUpload({ mime: "application/pdf", size: 0 }));
@@ -39,7 +39,8 @@ assert.ok(off.warnings.some((w) => w.includes("add up to")));
 assert.ok(normalizeResult({ positions: [] }).warnings.some((w) => w.includes("No holdings")));
 assert.ok(normalizeResult(null).warnings.length >= 1);
 assert.strictEqual(maskDigits("acct 123456789012 qty 100"), "acct ********9012 qty 100");
-assert.ok(RESPONSE_SCHEMA.properties.positions.items.required.includes("quantity"));
+// quantity is optional on purpose: some apps (Dime US stocks) show only a holding value
+assert.ok(!RESPONSE_SCHEMA.properties.positions.items.required.includes("quantity"));
 console.log("import ok");
 assert.strictEqual(normalizeResult({ account: "Demo Account 123456789012", positions: [] }).account, "Demo Account ********9012");
 console.log("account mask ok");
@@ -61,3 +62,33 @@ assert.ok(A.positions.find((p) => p.tk === "X").flags.some((f) => f.includes("pr
 assert.ok(A.positions.some((p) => p.tk === "Y"));
 assert.ok(A.warnings.some((w) => w.includes("Cash in USD")));
 console.log("verification checks ok");
+
+// ---- the user's real screenshots ----
+// Webull-style: value + qty stacked, last price + avg cost stacked; cost must come from qty x avg, partial/logo rows never become holdings
+const webull = normalizeResult({ account: "Individual Cash", reported_count: 10, positions: [
+  { kind: "security", ticker: "PG", quantity: 5.66822, market_value: 966.77, price: 170.56, avg_cost: 148.37, unrealized_pl: 125.77, currency: "USD", evidence: "PG 966.77 5.66822" },
+  { kind: "security", ticker: "AAPL", quantity: 0.30858, market_value: 108.93, price: 352.99, avg_cost: 226.84, currency: "USD", evidence: "AAPL 108.93 DRIP 0.30858" },
+] });
+assert.strictEqual(webull.reportedCount, 10);
+const pg = webull.positions.find((p) => p.tk === "PG");
+assert.strictEqual(pg.cost, Math.round(5.66822 * 148.37 * 100) / 100); assert.deepStrictEqual(pg.flags, []);
+// Dime US stocks: value + P/L amount only. cost = value - P/L; share count is filled from a live price and flagged
+const dime = normalizeResult({ account: "Dime", reported_count: 10, positions: [
+  { kind: "security", ticker: "HACK", market_value: 481.27, unrealized_pl: 142.49, currency: "USD", evidence: "HACK 481.27 +142.49 USD" },
+  { kind: "security", ticker: "AVAV", market_value: 183.49, unrealized_pl: -183.92, currency: "USD", evidence: "AVAV 183.49" },
+] });
+const hk = dime.positions.find((p) => p.tk === "HACK");
+assert.strictEqual(hk.qty, null); assert.strictEqual(hk.cost, 338.78);
+assert.ok(!dime.warnings.some((w) => w.includes("skipped")), "value-only lines are no longer skipped");
+(async () => {
+  await fillQuantities(dime, async () => ({ data: { HACK: { price: 60, currency: "USD" }, AVAV: { price: 0 } } }));
+  assert.strictEqual(dime.positions.find((p) => p.tk === "HACK").qty, Math.round((481.27 / 60) * 1e5) / 1e5);
+  assert.ok(dime.positions.find((p) => p.tk === "HACK").flags.some((f) => f.includes("ESTIMATED")));
+  const av = dime.positions.find((p) => p.tk === "AVAV");
+  assert.strictEqual(av.qty, null); assert.ok(dime.warnings.some((w) => w.includes("AVAV") && w.includes("enter the share count")));
+  console.log("real-screenshot cases ok");
+})();
+// Dime Thai stock: THB, qty + cost per share printed; saved with the .BK exchange suffix
+const thai = normalizeResult({ account: "Dime", positions: [{ kind: "security", ticker: "TRUE", quantity: 800, price: 12.85, avg_cost: 11.2, market_value: 10280, unrealized_pl: 1320, currency: "THB", evidence: "Outstanding Shares 800" }] });
+assert.strictEqual(thai.positions[0].tk, "TRUE.BK"); assert.strictEqual(thai.positions[0].cost, 8960);
+assert.ok(thai.positions[0].flags.some((f) => f.includes(".BK")));

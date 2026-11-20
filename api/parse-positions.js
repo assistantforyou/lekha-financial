@@ -1,7 +1,7 @@
 // POST /api/parse-positions  {mime, data (base64) | text}  -> {account, asOf, positions[], cash[], warnings[]}
 // Daily-capped (no passcode), and stores nothing: the file is
 // forwarded to the AI provider and the validated result is returned. Statement contents are never logged.
-const { checkUpload, normalizeResult, crossCheck, maskDigits, MAX_BYTES } = require("./_import");
+const { checkUpload, normalizeResult, crossCheck, fillQuantities, maskDigits, MAX_BYTES } = require("./_import");
 const { extractVerified } = require("./_llm");
 const { rateHit } = require("./_lib");
 
@@ -43,6 +43,7 @@ module.exports = async (req, res) => {
     const { raw, second } = await extractVerified(input);
     let out = normalizeResult(raw);
     if (second) out = crossCheck(out, normalizeResult(second));
+    out = await fillQuantities(out, (syms) => require("./_fin/service").getQuotes(syms));
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(out);
   } catch (e) {

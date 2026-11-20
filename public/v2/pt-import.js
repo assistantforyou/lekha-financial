@@ -176,21 +176,33 @@
   }
 
   function mergeResults(results, failed) {
-    var out = { account: "", asOf: "", positions: [], cash: [], warnings: [] }, accounts = [];
+    var out = { account: "", asOf: "", positions: [], cash: [], warnings: [] }, accounts = [], byKey = {}, counts = {}, found = {};
     results.forEach(function (r) {
-      if (r.account && accounts.indexOf(r.account) < 0) accounts.push(r.account);
+      var acct = (r.account || "Imported").slice(0, 40);
+      if (accounts.indexOf(acct) < 0) accounts.push(acct);
       if (r.asOf && !out.asOf) out.asOf = r.asOf;
-      (r.positions || []).forEach(function (p) { out.positions.push(p); });
-      (r.cash || []).forEach(function (c) { out.cash.push(c); });
+      if (r.reportedCount) counts[acct] = Math.max(counts[acct] || 0, r.reportedCount);
+      (r.positions || []).forEach(function (p) {
+        p.acct = acct;
+        var k = acct + "|" + p.tk + "|" + p.cur, prev = byKey[k];
+        found[acct] = (found[acct] || {}); found[acct][p.tk] = 1;
+        if (prev && prev.qty != null && p.qty != null && Math.abs(prev.qty - p.qty) <= Math.max(1e-6, Math.abs(prev.qty) * 0.001)) {
+          // the same line seen in an overlapping screenshot: keep one (the later, fully visible one)
+          out.positions[out.positions.indexOf(prev)] = p; byKey[k] = p; return;
+        }
+        if (prev) out.warnings.push(p.tk + " appears twice in " + acct + " with different quantities (" + prev.qty + " vs " + p.qty + "). Untick the one you don't want — only the last ticked row is imported.");
+        byKey[k] = p; out.positions.push(p);
+      });
+      (r.cash || []).forEach(function (c) { c.acct = acct; out.cash.push(c); });
       (r.warnings || []).forEach(function (w) { out.warnings.push((results.length > 1 ? (r.file || "A file") + ": " : "") + w); });
     });
+    accounts.forEach(function (a) {
+      var n = Object.keys(found[a] || {}).length;
+      if (counts[a] && n < counts[a]) out.warnings.unshift("MISSING? The app shows " + counts[a] + " holdings for " + a + " but only " + n + " were found. Add a screenshot of the rows you skipped (scroll with a little overlap).");
+    });
     out.account = accounts[0] || "Imported";
-    if (accounts.length > 1) out.warnings.push("The files name different accounts (" + accounts.join(", ") + "). Everything here is saved under one account label — set it below, or import the files one at a time to keep them apart.");
+    if (accounts.length > 1) out.warnings.push("Files from different accounts stay under separate labels (" + accounts.join(", ") + "). Change the Account column per row if needed.");
     failed.forEach(function (f) { out.warnings.push(f.name + " could not be read: " + f.msg); });
-    var counts = {};
-    out.positions.forEach(function (p) { counts[p.tk] = (counts[p.tk] || 0) + 1; });
-    var dupes = Object.keys(counts).filter(function (k) { return counts[k] > 1; });
-    if (dupes.length) out.warnings.push("Some tickers appear more than once (" + dupes.slice(0, 8).join(", ") + (dupes.length > 8 ? ", …" : "") + "). Untick the rows you don't want — only the last ticked row for a ticker is imported.");
     return out;
   }
 
@@ -226,17 +238,17 @@
   var current = null;
   function review(res) {
     current = res;
-    var rows = res.positions.map(function (p) { return { sel: true, tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, ev: ((p.flags || []).map(function (f) { return "\u26A0 " + f; }).join(" · ") + (p.flags && p.flags.length ? " · " : "")) + (p.evidence || p.name || "") }; })
-      .concat(res.cash.map(function (c) { return { sel: true, tk: "CASH", qty: c.qty, cost: null, px: null, cur: c.cur, ev: c.name || c.evidence || "Cash" }; }));
+    var rows = res.positions.map(function (p) { return { sel: true, acct: p.acct || res.account || "Imported", tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, ev: ((p.flags || []).map(function (f) { return "\u26A0 " + f; }).join(" · ") + (p.flags && p.flags.length ? " · " : "")) + (p.evidence || p.name || "") }; })
+      .concat(res.cash.map(function (c) { return { sel: true, acct: c.acct || res.account || "Imported", tk: "CASH", qty: c.qty, cost: null, px: null, cur: c.cur, ev: c.name || c.evidence || "Cash" }; }));
     current.rows = rows;
     var h = "<div class='imp-f' style='grid-template-columns:1fr 1fr'><label style='font-size:12px'>Account label<input type='text' id='imp-acct' maxlength='40' style='width:100%' value='" + esc(res.account || "Imported") + "'></label>" +
       "<label style='font-size:12px'>When importing<select id='imp-mode' style='width:100%'><option value='merge'>Add / update these lines</option><option value='replace'>Replace everything in this account label</option></select></label></div>";
     if (res.warnings.length) h += "<ul class='imp-warn'>" + res.warnings.map(function (w) { return "<li>" + esc(w) + "</li>"; }).join("") + "</ul>";
-    h += "<div class='imp-tbl'><table><thead><tr><th></th><th>Ticker</th><th>Quantity</th><th>Total cost</th><th>Price</th><th>Cur.</th><th>Theme</th><th>Evidence</th></tr></thead><tbody>";
+    h += "<div class='imp-tbl'><table><thead><tr><th></th><th>Account</th><th>Ticker</th><th>Quantity</th><th>Total cost</th><th>Price</th><th>Cur.</th><th>Theme</th><th>Evidence</th></tr></thead><tbody>";
     rows.forEach(function (r, i) {
       var cash = r.tk === "CASH";
-      h += "<tr data-i='" + i + "'><td><input type='checkbox' data-f='sel' checked></td><td><input type='text' data-f='tk' value='" + esc(r.tk) + "'" + (cash ? " readonly" : "") + "></td>" +
-        "<td><input type='number' step='any' min='0' data-f='qty' value='" + esc(r.qty) + "'></td>" +
+      h += "<tr data-i='" + i + "'><td><input type='checkbox' data-f='sel' checked></td><td><input type='text' data-f='acct' maxlength='40' style='width:96px' value='" + esc(r.acct) + "'></td><td><input type='text' data-f='tk' value='" + esc(r.tk) + "'" + (cash ? " readonly" : "") + "></td>" +
+        "<td><input type='number' step='any' min='0' data-f='qty' value='" + esc(r.qty == null ? "" : r.qty) + "'></td>" +
         "<td><input type='number' step='any' min='0' data-f='cost' value='" + esc(r.cost == null ? "" : r.cost) + "'" + (cash ? " disabled" : "") + "></td>" +
         "<td><input type='number' step='any' min='0' data-f='px' value='" + esc(r.px == null ? "" : r.px) + "'" + (cash ? " disabled" : "") + "></td>" +
         "<td><select data-f='cur'>" + ["USD", "THB", "HKD"].map(function (c) { return "<option" + (c === r.cur ? " selected" : "") + ">" + c + "</option>"; }).join("") + "</select></td>" +
@@ -250,9 +262,13 @@
   }
 
   function doImport() {
-    var acct = $("imp-acct").value.trim().slice(0, 40), mode = $("imp-mode").value, st = H.load(), added = 0;
-    if (mode === "replace") st.items = st.items.filter(function (x) { return (x.acct || "") !== acct; });
+    var def = $("imp-acct").value.trim().slice(0, 40), mode = $("imp-mode").value, st = H.load(), added = 0;
     var trs = $("imp-review").querySelectorAll("tbody tr");
+    if (mode === "replace") {
+      var used = {};
+      for (var u = 0; u < trs.length; u++) { var ga = trs[u].querySelector("[data-f=acct]"); used[(ga && ga.value.trim().slice(0, 40)) || def] = 1; }
+      st.items = st.items.filter(function (x) { return !used[x.acct || ""]; });
+    }
     for (var k = 0; k < trs.length; k++) {
       var tr = trs[k], g = function (f) { return tr.querySelector("[data-f=" + f + "]"); };
       if (!g("sel").checked) continue;
@@ -260,6 +276,7 @@
       if (!tk || !(qty >= 0)) continue;
       var cost = g("cost").value === "" ? null : parseFloat(g("cost").value), px = g("px").value === "" ? null : parseFloat(g("px").value);
       var cash = tk === "CASH";
+      var acct = (g("acct") && g("acct").value.trim().slice(0, 40)) || def;
       var h = { acct: acct, tk: tk, theme: cash ? "Other" : String(g("theme").value || "Other"), cur: g("cur").value, qty: qty, cost: isFinite(cost) ? cost : null, px: isFinite(px) ? px : null };
       var i = st.items.findIndex(function (x) { return x.tk === h.tk && (x.acct || "") === h.acct; });
       if (i >= 0) st.items[i] = h; else st.items.push(h);
