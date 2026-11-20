@@ -407,7 +407,7 @@
     // import
     html += DEMO()
       ? card("set-import", "Statement import", "<p class='note'>Import is for your real account, so it's switched off in the demo — real statements never mix with simulated data. Create a free account to import a broker PDF, screenshot or CSV.</p>", "Import holdings from a broker PDF, screenshot or CSV.")
-      : card("set-import", "Statement import", "<div class='set-f'><input type='password' id='set-imppass' name='passcode' placeholder='Import passcode' value='" + h(LS("importpass") || "") + "' autocomplete='current-password' autocapitalize='none' autocorrect='off' spellcheck='false' aria-label='Import passcode'><button class='btn' type='button' id='set-impsave'>Save passcode</button></div><p class='note'>Pick one or several statements at once; you review every line before it is added.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
+      : card("set-import", "Statement import", "<p class='note'>Pick one or several statements at once; you review every line before it is added.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
 
     // admin
     if (u && u.is_admin) html += card("set-costs", "Running costs (admin)", "<div id='set-costs-body'><div class='empty'>Loading costs…</div></div>", "What this site costs to run: AI calls metered per request, plus fixed monthly plans. Only admins see this.");
@@ -469,7 +469,7 @@
     });
     document.querySelectorAll("#set-layout [data-preset]").forEach(function (b) { b.onclick = function () { applyPreset(b.getAttribute("data-tab"), b.getAttribute("data-preset")); renderSettings(); }; });
     var imp = el("set-impsave");
-    if (imp) imp.onclick = function () { LS("importpass", el("set-imppass").value.trim()); try { localStorage.setItem("ptpub.v1.importpass", el("set-imppass").value.trim()); } catch (e) {} imp.textContent = "Saved"; };
+    if (imp) imp.onclick = function () {};
   }
 
   async function loadCosts() {
