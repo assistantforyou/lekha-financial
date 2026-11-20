@@ -48,13 +48,21 @@ const RESPONSE_SCHEMA = {
           currency: { type: "STRING", nullable: true },
           evidence: { type: "STRING", nullable: true },
         },
-        required: ["kind"],
+        required: ["kind", "ticker", "name", "quantity", "market_value", "price", "total_cost", "avg_cost", "unrealized_pl", "currency", "evidence"],
       },
     },
     warnings: { type: "ARRAY", items: { type: "STRING" } },
   },
   required: ["positions"],
 };
+
+// A reading is "sparse" when most lines carry neither a quantity nor a market value (a lazy model returning bare tickers).
+function isSparse(raw) {
+  const items = Array.isArray(raw && raw.positions) ? raw.positions.filter((p) => p && p.kind !== "cash") : [];
+  if (!items.length) return false;
+  const useful = items.filter((p) => num(p.quantity) != null || num(p.market_value) != null).length;
+  return useful < items.length / 2;
+}
 
 function checkUpload({ mime, size }) {
   if (!MIME.has(String(mime || "").toLowerCase())) return "Unsupported file type. Use PDF, PNG, JPG, WEBP, CSV or text.";
@@ -105,7 +113,7 @@ function normalizeResult(raw) {
     const evidence = clean(p.evidence, 100);
     if (!evidence) flags.push("no source quote");
     // the line's own arithmetic: quantity x price should equal the printed market value (catches misread digits)
-    if (qty != null && qty > 0 && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) / mv > 0.02) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
+    if (qty != null && qty > 0 && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) > Math.max(mv * 0.02, 0.02)) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
     const key = tk + "|" + cur;
     const prev = merged.get(key);
     if (prev && prev.qty != null && qty != null) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; if (mv != null) prev.mv = (prev.mv || 0) + mv; prev.flags.push("duplicate lines combined"); warn(`${tk}: duplicate lines were combined.`); continue; }
@@ -181,4 +189,4 @@ async function fillQuantities(out, getQuotes) {
   return out;
 }
 
-module.exports = { fillQuantities, crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };
+module.exports = { isSparse, fillQuantities, crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };

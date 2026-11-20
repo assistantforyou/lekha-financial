@@ -8,7 +8,7 @@
 //   LLM_OCR          "1" to OCR images/PDFs with glm-ocr first (needs a Z.ai balance)
 //   NEWS_MODEL       default glm-4.6v-flash   news briefing (fastest free model in tests)
 //   GEMINI_API_KEY, GEMINI_MODEL (default gemini-3.5-flash-lite)   fallback
-const { SYSTEM_PROMPT, RESPONSE_SCHEMA } = require("./_import");
+const { SYSTEM_PROMPT, RESPONSE_SCHEMA, isSparse } = require("./_import");
 const { logUsage } = require("./_costs");
 
 const ZAI = "https://api.z.ai/api/paas/v4";
@@ -99,12 +99,21 @@ async function geminiJson({ job, model, system, parts, schema, temperature = 0.1
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw err("not_configured", 503);
   const m = model || geminiModel();
-  const r = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }],
-      generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema, ...(maxTokens ? { maxOutputTokens: maxTokens } : {}) } }),
-  }, timeoutMs);
+  const deadline = Date.now() + timeoutMs;
+  let r;
+  for (let attempt = 0; ; attempt++) {
+    const left = deadline - Date.now();
+    if (left < 3000) throw err("aborted", 502);
+    r = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }],
+        generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema, ...(maxTokens ? { maxOutputTokens: maxTokens } : {}) } }),
+    }, left);
+    // overloaded / rate-limited bursts are common on the free tier: wait and retry (twice) instead of failing the file
+    if ((r.status === 429 || r.status === 500 || r.status === 503) && attempt < 2) { await sleep(2000 * (attempt + 1)); continue; }
+    break;
+  }
   if (!r.ok) throw err("upstream_" + r.status, r.status === 429 ? 429 : 502);
   const j = await r.json();
   const u = j.usageMetadata || {};
@@ -151,7 +160,7 @@ function importTries(input) {
 
 async function extractStatement(input) {
   let last;
-  for (const t of importTries(input)) { try { return await t.run(); } catch (e) { last = e; } }
+  for (const t of importTries(input)) { try { const raw = await t.run(); if (isSparse(raw)) throw err("sparse", 502); return raw; } catch (e) { last = e; } }
   throw last;
 }
 
@@ -160,7 +169,7 @@ async function extractStatement(input) {
 async function extractVerified(input) {
   const tries = importTries(input);
   if (tries.length < 2 || input.text != null) return { raw: await extractStatement(input), second: null };
-  const [a, b] = await Promise.allSettled(tries.map((t) => t.run()));
+  const [a, b] = (await Promise.allSettled(tries.map((t) => t.run()))).map((r) => (r.status === "fulfilled" && isSparse(r.value) ? { status: "rejected", reason: err("sparse", 502) } : r));
   if (a.status === "fulfilled") return { raw: a.value, second: b.status === "fulfilled" ? b.value : null };
   if (b.status === "fulfilled") return { raw: b.value, second: null };
   throw a.reason;

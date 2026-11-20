@@ -196,6 +196,16 @@
       (r.cash || []).forEach(function (c) { c.acct = acct; out.cash.push(c); });
       (r.warnings || []).forEach(function (w) { out.warnings.push((results.length > 1 ? (r.file || "A file") + ": " : "") + w); });
     });
+    // a share count that was only estimated from today's price becomes exact when the same ticker shows a price at the
+    // same time on another screenshot (e.g. the same stock held at two brokers)
+    out.positions.forEach(function (p) {
+      if (!p.mv || !(p.flags || []).some(function (f) { return f.indexOf("ESTIMATED") >= 0; })) return;
+      var o = out.positions.filter(function (q) { return q !== p && q.tk === p.tk && q.cur === p.cur && q.px > 0 && !(q.flags || []).some(function (f) { return f.indexOf("ESTIMATED") >= 0; }); })[0];
+      if (!o) return;
+      p.qty = Math.round((p.mv / o.px) * 1e5) / 1e5; p.px = o.px;
+      p.flags = p.flags.filter(function (f) { return f.indexOf("ESTIMATED") < 0 && f.indexOf("no share count") < 0; });
+      p.flags.push("shares = value / " + o.px + " (" + p.tk + " price from your " + o.acct + " screenshot, same time)");
+    });
     accounts.forEach(function (a) {
       var n = Object.keys(found[a] || {}).length;
       if (counts[a] && n < counts[a]) out.warnings.unshift("MISSING? The app shows " + counts[a] + " holdings for " + a + " but only " + n + " were found. Add a screenshot of the rows you skipped (scroll with a little overlap).");
@@ -220,8 +230,10 @@
     async function worker() {
       while (next < fs.length) {
         var i = next++;
-        try { slots[i] = await readOne(fs[i]); }
-        catch (e) { failed.push({ name: fs[i].name, msg: e.message || "could not be read" }); }
+        try {
+          try { slots[i] = await readOne(fs[i]); }
+          catch (e) { if (e.status === 502 || e.status === 503 || e.status === 429) { await new Promise(function (r) { setTimeout(r, 2500); }); slots[i] = await readOne(fs[i]); } else throw e; } // one automatic retry for a busy AI service
+        } catch (e) { failed.push({ name: fs[i].name, msg: e.message || "could not be read" }); }
         done++; progress();
       }
     }

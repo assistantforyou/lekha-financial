@@ -47,11 +47,12 @@ module.exports = async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(out);
   } catch (e) {
-    console.error("parse-positions failed:", /^(upstream_\w+|blocked|empty|not_configured|bad_json|aborted|network|pdf_needs_text)$/.test(e.message) ? e.message : "other"); // fixed codes only, never statement content
+    const code = /^(upstream_\w+|blocked|empty|not_configured|bad_json|aborted|network|pdf_needs_text|sparse)$/.test(e.message) ? e.message : "other"; // fixed codes only, never statement content
+    console.error("parse-positions failed:", code);
     const msg = e.status === 429 ? "The AI service is rate-limited right now. Try again in a minute."
       : e.status === 503 ? "Statement import is not configured on this site."
       : "The AI service could not read this file. Try a clearer PDF or a CSV export.";
-    return fail(res, e.status === 429 || e.status === 503 ? e.status : 502, msg);
+    return fail(res, e.status === 429 || e.status === 503 ? e.status : 502, msg + " (reason: " + code + ")");
   }
 };
 module.exports.config = { api: { bodyParser: { sizeLimit: "4.4mb" } } };
