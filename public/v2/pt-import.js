@@ -214,7 +214,7 @@
       }
     }
     try {
-      await Promise.all(new Array(Math.min(3, fs.length)).fill(0).map(worker));
+      await Promise.all(new Array(fs.length).fill(0).map(worker));
     } finally {
       $("imp-go").disabled = false;
     }
