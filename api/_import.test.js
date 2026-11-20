@@ -87,7 +87,7 @@ assert.ok(!dime.warnings.some((w) => w.includes("skipped")), "value-only lines a
 (async () => {
   await fillQuantities(dime, async () => ({ data: { HACK: { price: 60, currency: "USD" }, AVAV: { price: 0 } } }));
   assert.strictEqual(dime.positions.find((p) => p.tk === "HACK").qty, Math.round((481.27 / 60) * 1e5) / 1e5);
-  assert.ok(dime.positions.find((p) => p.tk === "HACK").flags.some((f) => f.includes("ESTIMATED")));
+  assert.ok(dime.positions.find((p) => p.tk === "HACK").flags.some((f) => /estimated/i.test(f)));
   const av = dime.positions.find((p) => p.tk === "AVAV");
   assert.strictEqual(av.qty, null); assert.ok(dime.warnings.some((w) => w.includes("AVAV") && w.includes("enter the share count")));
   console.log("real-screenshot cases ok");

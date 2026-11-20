@@ -207,7 +207,7 @@
   }
 
   // A line seen twice (overlapping scroll screenshots, or two readings that disagree): keep the one whose numbers hold up.
-  function weak(p) { return (p.flags || []).filter(function (f) { return /ESTIMATED|but the line shows|no source quote|disagree|no share count/.test(f); }).length; }
+  function weak(p) { return (p.flags || []).filter(function (f) { return /estimated|but the line shows|no source quote|disagree|no share count/.test(f); }).length; }
 
   function mergeResults(results, failed) {
     var out = { account: "", asOf: "", positions: [], cash: [], warnings: [], notes: [] }, accounts = [], byKey = {}, counts = {}, found = {};
@@ -234,16 +234,16 @@
     // a share count that was only estimated from today's price becomes exact when the same ticker shows a price at the
     // same time on another screenshot (e.g. the same stock held at two brokers)
     out.positions.forEach(function (p) {
-      if (!p.mv || !(p.flags || []).some(function (f) { return f.indexOf("ESTIMATED") >= 0; })) return;
-      var o = out.positions.filter(function (q) { return q !== p && q.tk === p.tk && q.cur === p.cur && q.px > 0 && !(q.flags || []).some(function (f) { return f.indexOf("ESTIMATED") >= 0; }); })[0];
+      if (!p.mv || !(p.flags || []).some(function (f) { return /estimated/i.test(f); })) return;
+      var o = out.positions.filter(function (q) { return q !== p && q.tk === p.tk && q.cur === p.cur && q.px > 0 && !(q.flags || []).some(function (f) { return /estimated/i.test(f); }); })[0];
       if (!o) return;
       p.qty = Math.round((p.mv / o.px) * 1e5) / 1e5; p.px = o.px;
-      p.flags = p.flags.filter(function (f) { return f.indexOf("ESTIMATED") < 0 && f.indexOf("no share count") < 0; });
+      p.flags = p.flags.filter(function (f) { return !/estimated/i.test(f) && f.indexOf("no share count") < 0; });
       p.flags.push("shares = value / " + o.px + " (" + p.tk + " price from your " + o.acct + " screenshot, same time)");
     });
     accounts.forEach(function (a) {
       var n = Object.keys(found[a] || {}).length;
-      if (counts[a] && n < counts[a]) out.warnings.unshift("MISSING? The app shows " + counts[a] + " holdings for " + a + " but only " + n + " were found. Add a screenshot of the rows you skipped (scroll with a little overlap).");
+      if (counts[a] && n < counts[a]) out.warnings.unshift("Holdings may be missing: the app lists " + counts[a] + " holdings for " + a + " but " + n + " were found. Add a screenshot of the remaining rows, scrolling with a small overlap.");
     });
     out.account = accounts[0] || "Imported";
     if (accounts.length > 1) out.notes.push("Files from different accounts stay under separate labels (" + accounts.join(", ") + "). Change the Account field on a row if needed.");
@@ -335,7 +335,7 @@
   var current = null;
   function review(res) {
     current = res;
-    var rows = res.positions.map(function (p) { return { sel: true, acct: p.acct || res.account || "Imported", tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, ev: ((p.flags || []).map(function (f) { return "\u26A0 " + f; }).join(" · ") + (p.flags && p.flags.length ? " · " : "")) + (p.evidence || p.name || "") }; })
+    var rows = res.positions.map(function (p) { return { sel: true, acct: p.acct || res.account || "Imported", tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, ev: ((p.flags || []).length ? "Review: " + p.flags.join("; ") + (p.evidence || p.name ? " | " : "") : "") + (p.evidence || p.name || "") }; })
       .concat(res.cash.map(function (c) { return { sel: true, acct: c.acct || res.account || "Imported", tk: "CASH", qty: c.qty, cost: null, px: null, cur: c.cur, ev: c.name || c.evidence || "Cash" }; }));
     current.rows = rows;
     var h = "<div class='imp-f' style='grid-template-columns:1fr 1fr'><label style='font-size:12px'>Account label<input type='text' id='imp-acct' maxlength='40' style='width:100%' value='" + esc(res.account || "Imported") + "'></label>" +
@@ -351,7 +351,7 @@
         "<td><input type='number' step='any' min='0' data-f='px' value='" + esc(r.px == null ? "" : r.px) + "'" + (cash ? " disabled" : "") + "></td>" +
         "<td><select data-f='cur'>" + ["USD", "THB", "HKD"].map(function (c) { return "<option" + (c === r.cur ? " selected" : "") + ">" + c + "</option>"; }).join("") + "</select></td>" +
         "<td><select data-f='theme'" + (cash ? " disabled" : "") + ">" + themeHtml + "</select></td>" +
-        "<td class='imp-ev" + (r.ev.indexOf("\u26A0") === 0 ? " imp-flag" : "") + "' title='" + esc(r.ev) + "'>" + esc(r.ev) + "</td></tr>";
+        "<td class='imp-ev" + (r.ev.indexOf("Review: ") === 0 ? " imp-flag" : "") + "' title='" + esc(r.ev) + "'>" + esc(r.ev) + "</td></tr>";
     });
     h += "</tbody></table></div><div class='imp-row'><span class='muted' style='font-size:12px;margin-right:auto'>Check quantities against your statement. Lines without a price are not valued, and lines without a total cost count as pure gain in P&amp;L, until you fill them in.</span><button class='btn' id='imp-add' type='button' style='border-color:var(--accent);color:var(--accent)'>Import selected</button></div>";
     var box = $("imp-review"); box.innerHTML = h; box.hidden = false; $("imp-go").hidden = true;

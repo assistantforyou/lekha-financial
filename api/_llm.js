@@ -42,6 +42,17 @@ function parseJsonLoose(t) {
   throw err("bad_json", 502);
 }
 
+// Professional output only: nothing a model writes may contain emoji or pictograph symbols. Every model call is told so, and
+// the parsed JSON is also scrubbed (belt and braces: models sometimes ignore style rules).
+const PRO_STYLE = "\n\nStyle: write plainly and professionally for an audience of financial professionals. Never use emojis, emoticons, pictograph symbols or decorative characters in any text you produce.";
+const PICTO = new RegExp("[" + [[0x1F000, 0x1FAFF], [0x2600, 0x27BF], [0x2B50, 0x2B50], [0x2B06, 0x2B06], [0xFE0F, 0xFE0F], [0x20E3, 0x20E3]].map(([a, b]) => String.fromCodePoint(a) + "-" + String.fromCodePoint(b)).join("") + "]", "gu"); // built from code points so this file itself holds no pictographs
+function stripPictographs(v) {
+  if (typeof v === "string") { const r = v.replace(PICTO, ""); return r === v ? v : r.replace(/ {2,}/g, " ").trim(); }
+  if (Array.isArray(v)) return v.map(stripPictographs);
+  if (v && typeof v === "object") { const o = {}; for (const k of Object.keys(v)) o[k] = stripPictographs(v[k]); return o; }
+  return v;
+}
+
 async function timed(url, init, timeoutMs) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
@@ -54,7 +65,7 @@ async function timed(url, init, timeoutMs) {
 async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000, maxTokens, info }) {
   const key = process.env.ZAI_API_KEY;
   if (!key) throw err("not_configured", 503);
-  const sys = system + "\n\nReply with ONE JSON object only, no prose, matching this JSON Schema:\n" + JSON.stringify(toJsonSchema(schema));
+  const sys = system + PRO_STYLE + "\n\nReply with ONE JSON object only, no prose, matching this JSON Schema:\n" + JSON.stringify(toJsonSchema(schema));
   const deadline = Date.now() + timeoutMs;
   for (let attempt = 0; ; attempt++) {
     const left = deadline - Date.now();
@@ -75,7 +86,7 @@ async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000,
     await logUsage({ service: "Z.ai", job, model, inTok: u.prompt_tokens, outTok: u.completion_tokens });
     const text = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
     if (!text) throw err("empty", 502);
-    return parseJsonLoose(text);
+    return stripPictographs(parseJsonLoose(text));
   }
 }
 
@@ -107,7 +118,7 @@ async function geminiJson({ job, model, system, parts, schema, temperature = 0.1
     r = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts }],
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system + PRO_STYLE }] }, contents: [{ role: "user", parts }],
         generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema, ...(maxTokens ? { maxOutputTokens: maxTokens } : {}) } }),
     }, left);
     // overloaded / rate-limited bursts are common on the free tier: wait and retry (twice) instead of failing the file
@@ -121,7 +132,7 @@ async function geminiJson({ job, model, system, parts, schema, temperature = 0.1
   const p = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
   const t = p && p[0] && p[0].text;
   if (!t) throw err(j.promptFeedback && j.promptFeedback.blockReason ? "blocked" : "empty", 502);
-  return parseJsonLoose(t);
+  return stripPictographs(parseJsonLoose(t));
 }
 
 const zaiReady = () => !!process.env.ZAI_API_KEY;
@@ -208,5 +219,5 @@ function describe() {
   };
 }
 
-module.exports = { extractStatement, extractVerified, generateJson, describe, toJsonSchema, parseJsonLoose,
+module.exports = { stripPictographs, extractStatement, extractVerified, generateJson, describe, toJsonSchema, parseJsonLoose,
   extractWithGemini: extractStatement /* old name kept for callers */ };
