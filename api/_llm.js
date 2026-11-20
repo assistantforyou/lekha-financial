@@ -142,6 +142,10 @@ async function extractStatement(input) {
         : (input.images || [{ mime: input.mime, base64: input.base64 }]).slice(0, 4).map((im) => ({ inline_data: { mime_type: im.mime, data: im.base64 } }))), { text: ask }] }));
   }
   if (!tries.length) throw err("not_configured", 503);
+  // Gemini Flash-Lite reads images in a few seconds; the free Z.ai vision model can take 30-60 s. With both configured,
+  // images go to Gemini first (Z.ai stays as the fallback). LLM_IMPORT_FIRST=zai|gemini overrides.
+  const first = process.env.LLM_IMPORT_FIRST || (input.text == null ? "gemini" : "zai");
+  if (tries.length === 2 && first === "gemini") tries.reverse();
   let last;
   for (const t of tries) { try { return await t(); } catch (e) { last = e; if (e.status === 503) continue; } }
   throw last;
