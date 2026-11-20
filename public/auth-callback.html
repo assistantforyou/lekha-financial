@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Account · LEKHA Financials</title>
+<style>
+  :root{--bg:#f4f6f8;--card:#fff;--fg:#14202b;--muted:#5b6b7a;--line:#d8e0e7;--accent:#0f766e;--accent-fg:#fff;--bad:#b42318;--ok:#0f766e}
+  @media (prefers-color-scheme:dark){:root{--bg:#0b1117;--card:#121a22;--fg:#e6edf3;--muted:#8b9aa8;--line:#243241;--accent:#2dd4bf;--accent-fg:#06201d;--bad:#f87171;--ok:#2dd4bf}}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px}
+  .brand{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+  h1{font-size:22px;line-height:1.25;margin:0 0 8px}
+  p{margin:0 0 16px;color:var(--muted)}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 12px}
+  input{display:block;width:100%;margin-top:4px;padding:11px 12px;font:inherit;color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:8px}
+  input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .btn{display:block;width:100%;padding:12px 14px;font:inherit;font-weight:600;text-align:center;text-decoration:none;color:var(--accent-fg);background:var(--accent);border:0;border-radius:8px;cursor:pointer}
+  .btn[disabled]{opacity:.6;cursor:default}
+  .btn.ghost{color:var(--fg);background:transparent;border:1px solid var(--line);margin-top:10px}
+  .msg{min-height:20px;margin:0 0 12px;font-size:14px}
+  .msg.bad{color:var(--bad)}
+</style>
+</head>
+<body>
+<main id="card" aria-live="polite"><p class="brand">LEKHA Financials</p><p>One moment…</p></main>
+<script>
+(function () {
+  var card = document.getElementById("card");
+  var h = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+  var q = new URLSearchParams(location.search);
+  var type = h.get("type") || q.get("type") || "";
+  var token = h.get("access_token") || "";
+  var failure = h.get("error_description") || h.get("error") || q.get("error_description") || q.get("error") || "";
+  // keep the one-time token out of the address bar and the browser history
+  try { history.replaceState(null, "", location.pathname); } catch (e) {}
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function show(title, text, extra) {
+    card.innerHTML = "<p class='brand'>LEKHA Financials</p><h1>" + esc(title) + "</h1>" + (text ? "<p>" + esc(text) + "</p>" : "") + (extra || "");
+  }
+  var toLogin = "<a class='btn' href='/login.html'>Go to sign in</a>";
+
+  if (failure) {
+    show("This link is no longer valid", "It has expired or has already been used. Return to sign in and request a new link.", toLogin);
+    return;
+  }
+  if (!token) { location.replace("/"); return; }
+
+  if (type === "recovery") {
+    card.innerHTML = "<p class='brand'>LEKHA Financials</p><h1>Choose a new password</h1><p>Use 8 to 72 characters.</p>" +
+      "<form id='f' novalidate><label>New password<input id='p1' type='password' autocomplete='new-password' minlength='8' maxlength='72' required></label>" +
+      "<label>Repeat it<input id='p2' type='password' autocomplete='new-password' minlength='8' maxlength='72' required></label>" +
+      "<div class='msg' id='m' role='status'></div><button class='btn' id='go' type='submit'>Save new password</button></form>";
+    var f = document.getElementById("f"), m = document.getElementById("m"), go = document.getElementById("go");
+    document.getElementById("p1").focus();
+    f.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var a = document.getElementById("p1").value, b = document.getElementById("p2").value;
+      m.className = "msg";
+      if (a.length < 8 || a.length > 72) { m.className = "msg bad"; m.textContent = "Passwords are 8 to 72 characters."; return; }
+      if (a !== b) { m.className = "msg bad"; m.textContent = "The two passwords do not match."; return; }
+      go.disabled = true; m.textContent = "Saving…";
+      fetch("/api/auth/password", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ password: a }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; }); })
+        .then(function (r) {
+          if (r.ok) { show("Password updated", "You can now sign in with your new password.", toLogin); return; }
+          go.disabled = false; m.className = "msg bad";
+          m.textContent = (r.j && r.j.error) || "The password could not be changed. The link may have expired; request a new one.";
+        })
+        .catch(function () { go.disabled = false; m.className = "msg bad"; m.textContent = "The server could not be reached. Please try again."; });
+    });
+    return;
+  }
+  if (type === "email_change") { show("Email address updated", "Sign in with your new email address.", toLogin); return; }
+  show("Email confirmed", "Your account is ready. Sign in to continue.", toLogin);
+})();
+</script>
+</body>
+</html>

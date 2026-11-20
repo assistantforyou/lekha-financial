@@ -8,6 +8,18 @@ const gotrue = (path, opts = {}) => fetch(`${process.env.SUPABASE_URL}/auth/v1/$
   headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, "Content-Type": "application/json", ...(opts.headers || {}) },
 });
 
+// Where account e-mail links (confirm sign-up, reset password, confirm new address) send people back to. GoTrue only honours it
+// if it is on the Supabase project's redirect allow-list, otherwise it uses the project's Site URL. Only our own hosts are
+// accepted from the request (never an arbitrary Host header); SITE_URL overrides.
+const callbackUrl = (req) => {
+  const base = String(process.env.SITE_URL || "").trim().replace(/\/+$/, "");
+  if (/^https?:\/\/[a-z0-9.:-]+$/i.test(base)) return base + "/auth-callback.html";
+  const host = String((req && req.headers && (req.headers["x-forwarded-host"] || req.headers.host)) || "").split(",")[0].trim().toLowerCase();
+  const ok = /^(www\.)?lekhafinancial\.com$/.test(host) || /^[a-z0-9-]+\.vercel\.app$/.test(host);
+  return ok ? `https://${host}/auth-callback.html` : null;
+};
+const withRedirect = (path, url) => (url ? `${path}${path.includes("?") ? "&" : "?"}redirect_to=${encodeURIComponent(url)}` : path);
+
 // GoTrue admin endpoints (create/list users) require the service role as a Bearer token, not just apikey.
 const admin = (path, opts = {}) => gotrue(path, { ...opts, headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, ...(opts.headers || {}) } });
 
@@ -102,4 +114,4 @@ const publicProfile = (p) => {
   };
 };
 
-module.exports = { gotrue, admin, userFrom, profile, updateProfile, requireUser, requireTier, requirePremium, requireAdmin, publicProfile, isAdmin, bearer };
+module.exports = { gotrue, admin, userFrom, profile, updateProfile, requireUser, requireTier, requirePremium, requireAdmin, publicProfile, isAdmin, bearer, callbackUrl, withRedirect };

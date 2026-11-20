@@ -180,7 +180,7 @@ async function fillQuantities(out, getQuotes) {
     const quote = q[p.tk], px = quote && Number(quote.price);
     if (px > 0 && p.mv > 0 && (!quote.currency || String(quote.currency).toUpperCase() === p.cur)) {
       p.qty = Math.round((p.mv / px) * 1e5) / 1e5; p.px = px;
-      p.flags.push(`shares ESTIMATED = ${p.mv} / current price ${px}; check against your broker`);
+      p.flags.push(`share count estimated: value ${p.mv} / current price ${px}; verify with your broker`);
     } else {
       p.flags.push("no share count and no live price: enter the quantity");
       out.warnings.push(`${p.tk}: the screen shows only a value (${p.mv} ${p.cur}); enter the share count.`);
