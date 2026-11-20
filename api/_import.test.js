@@ -1,6 +1,6 @@
 // Run: node api/_import.test.js
 const assert = require("assert");
-const { checkUpload, normalizeResult, maskDigits, RESPONSE_SCHEMA } = require("./_import");
+const { checkUpload, normalizeResult, crossCheck, maskDigits, RESPONSE_SCHEMA } = require("./_import");
 
 assert.ok(checkUpload({ mime: "application/x-msdownload", size: 10 }));
 assert.ok(checkUpload({ mime: "application/pdf", size: 0 }));
@@ -43,3 +43,21 @@ assert.ok(RESPONSE_SCHEMA.properties.positions.items.required.includes("quantity
 console.log("import ok");
 assert.strictEqual(normalizeResult({ account: "Demo Account 123456789012", positions: [] }).account, "Demo Account ********9012");
 console.log("account mask ok");
+
+// line arithmetic: a misread digit shows as qty x price != printed market value
+const bad = normalizeResult({ positions: [{ kind: "security", ticker: "AAPL", quantity: 10, price: 200, market_value: 2800, currency: "USD", evidence: "AAPL 10" }, { kind: "security", ticker: "MSFT", quantity: 5, price: 400, market_value: 2000, currency: "USD" }] });
+assert.ok(bad.positions.find((p) => p.tk === "AAPL").flags.some((f) => f.includes("line shows 2800")));
+assert.deepStrictEqual(bad.positions.find((p) => p.tk === "MSFT").flags, ["no source quote"]);
+// totals use printed line values when prices are missing, and unresolved lines count towards the total
+const mv = normalizeResult({ reported_total_value: 3000, total_currency: "USD", positions: [{ kind: "security", ticker: "FUND1", quantity: 100, market_value: 2000, currency: "USD", evidence: "x" }, { kind: "security", ticker: "", name: "Thai Fund", quantity: 50, market_value: 1000, currency: "USD", evidence: "y" }] });
+assert.ok(!mv.warnings.some((w) => w.includes("add up to")), mv.warnings.join("|"));
+assert.strictEqual(mv.unresolved.length, 1);
+assert.ok(mv.warnings.some((w) => w.includes("Thai Fund") && w.includes("quantity 50")), "unresolved line is reported with its numbers, not silently dropped");
+// cross-check: union, never drop
+const A = normalizeResult({ positions: [{ kind: "security", ticker: "X", quantity: 10, price: 5, currency: "USD", evidence: "x" }, { kind: "cash", quantity: 100, currency: "USD" }] });
+const B = normalizeResult({ positions: [{ kind: "security", ticker: "X", quantity: 10, price: 5.2, currency: "USD", evidence: "x" }, { kind: "security", ticker: "Y", quantity: 2, currency: "USD", evidence: "y" }, { kind: "cash", quantity: 90, currency: "USD" }] });
+crossCheck(A, B);
+assert.ok(A.positions.find((p) => p.tk === "X").flags.some((f) => f.includes("price")));
+assert.ok(A.positions.some((p) => p.tk === "Y"));
+assert.ok(A.warnings.some((w) => w.includes("Cash in USD")));
+console.log("verification checks ok");
