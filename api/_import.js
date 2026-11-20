@@ -13,7 +13,11 @@ const SYSTEM_PROMPT = [
   "total_cost: total cost basis in the position's currency if printed, otherwise null. price: latest price per unit if printed, otherwise null.",
   "currency: ISO code of the position (USD, THB, HKD, or the printed code).",
   "reported_total_value: the statement's printed total portfolio value, if any, with total_currency; otherwise null.",
-  "evidence: the short text snippet (max 100 chars) next to the number that supports the quantity.",
+  "market_value: the line's printed market value in the position's currency, if printed, otherwise null. Copy it exactly; never compute it.",
+  "evidence: REQUIRED for every line: the short text snippet (max 100 chars), copied exactly as printed, that contains the quantity.",
+  "The statement may be in any language (English, Thai, Chinese, Japanese, Korean, Spanish, French, Hindi, Vietnamese...). Keep tickers and numbers exactly as printed.",
+  "Numbers: handle thousands separators and decimal commas (1.234,56 = 1234.56), parentheses or a minus sign for negatives, and currency symbols. Output plain numbers.",
+  "Read EVERY page and EVERY row, including the last row of each table and rows split across pages. Never summarise, skip or merge lines. If a line is hard to read, still include it and say so in warnings.",
   "If the document is not a holdings statement, return empty arrays and explain in warnings.",
 ].join("\n");
 
@@ -33,7 +37,7 @@ const RESPONSE_SCHEMA = {
           kind: { type: "STRING", enum: ["security", "cash"] },
           ticker: { type: "STRING", nullable: true },
           name: { type: "STRING", nullable: true },
-          quantity: NUM, total_cost: NUM, price: NUM,
+          quantity: NUM, total_cost: NUM, price: NUM, market_value: NUM,
           currency: { type: "STRING", nullable: true },
           evidence: { type: "STRING", nullable: true },
         },
@@ -59,7 +63,7 @@ const clean = (s, n) => String(s == null ? "" : s).replace(/[\u0000-\u001f]/g, "
 
 // Re-validate whatever the model returned into holdings items {tk, cur, qty, cost, px, name, evidence}.
 function normalizeResult(raw) {
-  const out = { account: maskDigits(clean(raw && raw.account, 40)), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], warnings: [] };
+  const out = { account: maskDigits(clean(raw && raw.account, 40)), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], unresolved: [], warnings: [] };
   const warn = (w) => { if (out.warnings.length < 30) out.warnings.push(clean(w, 200)); };
   for (const w of Array.isArray(raw && raw.warnings) ? raw.warnings.slice(0, 10) : []) warn(w);
   const items = Array.isArray(raw && raw.positions) ? raw.positions.slice(0, 300) : [];
@@ -68,27 +72,37 @@ function normalizeResult(raw) {
     if (!p || typeof p !== "object") continue;
     const qty = num(p.quantity);
     let cur = clean(p.currency, 5).toUpperCase();
-    if (!CURRENCIES.has(cur)) { if (cur) warn(`Currency ${cur} is not supported by the page; set to USD, check the amounts.`); cur = "USD"; }
+    const flags = [];
+    if (!CURRENCIES.has(cur)) { if (cur) { warn(`Currency ${cur} is not supported by the page; set to USD, check the amounts.`); flags.push(`printed currency ${cur}, saved as USD`); } cur = "USD"; }
     if (p.kind === "cash") {
       if (qty === null || qty < 0) { warn("A cash line had no valid amount and was skipped."); continue; }
       out.cash.push({ tk: "CASH", cur, qty, name: clean(p.name, 60), evidence: clean(p.evidence, 100) });
       continue;
     }
     const tk = clean(p.ticker, 16).toUpperCase().replace(/[^A-Z0-9.\-:]/g, "");
-    if (!tk) { warn(`"${clean(p.name, 50) || "A holding"}" has no ticker symbol; add it manually.`); continue; }
+    if (!tk) {
+      warn(`"${clean(p.name, 50) || "A holding"}" has no ticker symbol (quantity ${qty == null ? "?" : qty}${num(p.market_value) != null ? ", value " + num(p.market_value) : ""}); add it manually.`);
+      out.unresolved.push({ name: clean(p.name, 60), qty, mv: num(p.market_value), cur, evidence: clean(p.evidence, 100) });
+      continue;
+    }
     if (qty === null || qty < 0) { warn(`${tk}: no valid quantity; skipped.`); continue; }
-    const cost = num(p.total_cost), px = num(p.price);
+    const cost = num(p.total_cost), px = num(p.price), mv = num(p.market_value);
+    const evidence = clean(p.evidence, 100);
+    if (!evidence) flags.push("no source quote");
+    // the line's own arithmetic: quantity x price should equal the printed market value (catches misread digits)
+    if (qty != null && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) / mv > 0.02) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
     const key = tk + "|" + cur;
     const prev = merged.get(key);
-    if (prev) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; warn(`${tk}: duplicate lines were combined.`); continue; }
-    merged.set(key, { tk, cur, qty, cost: cost != null && cost >= 0 ? cost : null, px: px != null && px > 0 ? px : null, name: clean(p.name, 60), evidence: clean(p.evidence, 100) });
+    if (prev) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; if (mv != null) prev.mv = (prev.mv || 0) + mv; prev.flags.push("duplicate lines combined"); warn(`${tk}: duplicate lines were combined.`); continue; }
+    merged.set(key, { tk, cur, qty, cost: cost != null && cost >= 0 ? cost : null, px: px != null && px > 0 ? px : null, mv: mv != null && mv >= 0 ? mv : null, name: clean(p.name, 60), evidence, flags });
   }
   out.positions = [...merged.values()];
   // cross-check against the statement's own total when the currencies line up
   const total = num(raw && raw.reported_total_value), tcur = clean(raw && raw.total_currency, 5).toUpperCase() || "USD";
   if (total && total > 0) {
     let sum = 0, complete = true;
-    for (const p of out.positions) { if (p.cur !== tcur) { complete = false; continue; } if (p.px == null) { complete = false; continue; } sum += p.qty * p.px; }
+    for (const p of out.positions) { if (p.cur !== tcur) { complete = false; continue; } const v = p.mv != null ? p.mv : p.px != null ? p.qty * p.px : null; if (v == null) { complete = false; continue; } sum += v; }
+    for (const u of out.unresolved) { if (u.mv != null && u.cur === tcur) sum += u.mv; else complete = false; }
     for (const c of out.cash) { if (c.cur === tcur) sum += c.qty; else complete = false; }
     if (complete && sum > 0 && Math.abs(sum - total) / total > 0.02) warn(`Extracted holdings add up to ${Math.round(sum).toLocaleString("en-US")} but the statement total is ${Math.round(total).toLocaleString("en-US")} ${tcur}: check for missing or wrong lines.`);
     else if (!complete) warn("The statement total could not be fully cross-checked (missing prices or mixed currencies).");
@@ -99,4 +113,32 @@ function normalizeResult(raw) {
 }
 
 
-module.exports = { MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };
+// Compare two independent readings of the same file. Anything one reader saw and the other did not is ADDED (never dropped)
+// and flagged; quantity/price disagreements are flagged on the row. `a` is mutated and returned.
+function crossCheck(a, b) {
+  const push = (w) => { if (a.warnings.length < 40) a.warnings.push(clean(w, 220)); };
+  const ib = new Map(b.positions.map((p) => [p.tk + "|" + p.cur, p])), seen = new Set();
+  let diffs = 0;
+  for (const p of a.positions) {
+    const k = p.tk + "|" + p.cur, q = ib.get(k); seen.add(k);
+    if (!q) { p.flags.push("second reader did not find this line"); diffs++; continue; }
+    if (Math.abs(p.qty - q.qty) > Math.max(1e-6, Math.abs(p.qty) * 0.001)) { p.flags.push(`readers disagree on quantity (${p.qty} vs ${q.qty})`); diffs++; }
+    if (p.px != null && q.px != null && Math.abs(p.px - q.px) / p.px > 0.01) { p.flags.push(`readers disagree on price (${p.px} vs ${q.px})`); diffs++; }
+  }
+  for (const [k, q] of ib) {
+    if (seen.has(k)) continue;
+    a.positions.push({ ...q, flags: [...(q.flags || []), "found by the second reader only"] }); diffs++;
+    push(`${q.tk} (${q.qty}) was found by only one of two readers; it is added for you to check.`);
+  }
+  const cash = (r) => r.cash.reduce((m, c) => (m[c.cur] = (m[c.cur] || 0) + c.qty, m), {});
+  const ca = cash(a), cb = cash(b);
+  for (const cur of new Set([...Object.keys(ca), ...Object.keys(cb)])) {
+    const x = ca[cur] || 0, y = cb[cur] || 0;
+    if (Math.abs(x - y) > Math.max(0.01, Math.abs(x) * 0.001)) { diffs++; push(`Cash in ${cur}: the two readers disagree (${x} vs ${y}). Check the cash line.`); }
+  }
+  if (diffs) push(`Two independent readers disagreed on ${diffs} item${diffs > 1 ? "s" : ""}; rows marked with a warning need a look.`);
+  a.crossChecked = true;
+  return a;
+}
+
+module.exports = { crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };

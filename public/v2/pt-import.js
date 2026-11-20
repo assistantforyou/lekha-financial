@@ -32,7 +32,7 @@
     "#imp-dlg .imp-files{display:grid;gap:2px;font-size:12px;color:var(--muted);margin-top:-2px}" +
     "#imp-dlg .imp-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}" +
     "#imp-dlg .imp-tbl{overflow:auto;max-height:42vh;margin-top:10px;-webkit-overflow-scrolling:touch}#imp-dlg table{width:100%;border-collapse:collapse;font-size:12px}#imp-dlg td,#imp-dlg th{padding:3px 4px;text-align:left;vertical-align:middle}" +
-    "#imp-dlg td input[type=number]{width:92px}#imp-dlg td input[type=text]{width:84px}#imp-dlg .imp-ev{color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    "#imp-dlg td input[type=number]{width:92px}#imp-dlg td input[type=text]{width:84px}#imp-dlg .imp-ev{color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#imp-dlg .imp-ev.imp-flag{color:var(--warn,#e0a030);white-space:normal;min-width:180px}" +
     "#imp-dlg .imp-row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;align-items:center}#imp-msg{font-size:12px;min-height:18px;margin-top:8px;color:var(--muted)}" +
     "#imp-dlg ul.imp-warn{margin:8px 0 0;padding-left:18px;font-size:12px;color:var(--warn)}" +
     "@media (max-width:520px){#imp-dlg{padding:12px}#imp-dlg .imp-row{justify-content:stretch}#imp-dlg .imp-row .btn{flex:1 1 auto}}";
@@ -226,7 +226,7 @@
   var current = null;
   function review(res) {
     current = res;
-    var rows = res.positions.map(function (p) { return { sel: true, tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, ev: p.evidence || p.name || "" }; })
+    var rows = res.positions.map(function (p) { return { sel: true, tk: p.tk, qty: p.qty, cost: p.cost, px: p.px, cur: p.cur, ev: ((p.flags || []).map(function (f) { return "\u26A0 " + f; }).join(" · ") + (p.flags && p.flags.length ? " · " : "")) + (p.evidence || p.name || "") }; })
       .concat(res.cash.map(function (c) { return { sel: true, tk: "CASH", qty: c.qty, cost: null, px: null, cur: c.cur, ev: c.name || c.evidence || "Cash" }; }));
     current.rows = rows;
     var h = "<div class='imp-f' style='grid-template-columns:1fr 1fr'><label style='font-size:12px'>Account label<input type='text' id='imp-acct' maxlength='40' style='width:100%' value='" + esc(res.account || "Imported") + "'></label>" +
@@ -241,7 +241,7 @@
         "<td><input type='number' step='any' min='0' data-f='px' value='" + esc(r.px == null ? "" : r.px) + "'" + (cash ? " disabled" : "") + "></td>" +
         "<td><select data-f='cur'>" + ["USD", "THB", "HKD"].map(function (c) { return "<option" + (c === r.cur ? " selected" : "") + ">" + c + "</option>"; }).join("") + "</select></td>" +
         "<td><select data-f='theme'" + (cash ? " disabled" : "") + ">" + themeHtml + "</select></td>" +
-        "<td class='imp-ev' title='" + esc(r.ev) + "'>" + esc(r.ev) + "</td></tr>";
+        "<td class='imp-ev" + (r.ev.indexOf("\u26A0") === 0 ? " imp-flag" : "") + "' title='" + esc(r.ev) + "'>" + esc(r.ev) + "</td></tr>";
     });
     h += "</tbody></table></div><div class='imp-row'><span class='muted' style='font-size:12px;margin-right:auto'>Check quantities against your statement. Lines without a price are not valued, and lines without a total cost count as pure gain in P&amp;L, until you fill them in.</span><button class='btn' id='imp-add' type='button' style='border-color:var(--accent);color:var(--accent)'>Import selected</button></div>";
     var box = $("imp-review"); box.innerHTML = h; box.hidden = false; $("imp-go").hidden = true;

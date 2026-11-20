@@ -119,11 +119,11 @@ const zaiReady = () => !!process.env.ZAI_API_KEY;
 const geminiReady = () => !!process.env.GEMINI_API_KEY;
 
 // Statement -> raw JSON (validated later by normalizeResult). Input: {text} or {mime, base64}.
-async function extractStatement(input) {
+function importTries(input) {
   const ask = "Extract the holdings and cash from this statement as JSON.";
   const tries = [];
   if (zaiReady()) {
-    tries.push(async () => {
+    tries.push({ name: "zai", run: async () => {
       let text = input.text;
       if (text == null && process.env.LLM_OCR === "1") { try { text = await zaiOcr(input); } catch (e) { text = null; } }
       if (text != null) {
@@ -134,21 +134,36 @@ async function extractStatement(input) {
       if (!imgs) throw err("pdf_needs_text", 502);
       return zaiJson({ job: "import", model: process.env.LLM_VISION_MODEL || "glm-4.6v-flash", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA,
         content: [...imgs.slice(0, 4).map((im) => ({ type: "image_url", image_url: { url: `data:${im.mime};base64,${im.base64}` } })), { type: "text", text: ask }] });
-    });
+    } });
   }
   if (geminiReady()) {
-    tries.push(() => geminiJson({ job: "import", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, temperature: 0,
+    tries.push({ name: "gemini", run: () => geminiJson({ job: "import", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, temperature: 0,
       parts: [...(input.text != null ? [{ text: "Statement text:\n" + input.text }]
-        : (input.images || [{ mime: input.mime, base64: input.base64 }]).slice(0, 4).map((im) => ({ inline_data: { mime_type: im.mime, data: im.base64 } }))), { text: ask }] }));
+        : (input.images || [{ mime: input.mime, base64: input.base64 }]).slice(0, 4).map((im) => ({ inline_data: { mime_type: im.mime, data: im.base64 } }))), { text: ask }] }) });
   }
   if (!tries.length) throw err("not_configured", 503);
   // Gemini Flash-Lite reads images in a few seconds; the free Z.ai vision model can take 30-60 s. With both configured,
   // images go to Gemini first (Z.ai stays as the fallback). LLM_IMPORT_FIRST=zai|gemini overrides.
   const first = process.env.LLM_IMPORT_FIRST || (input.text == null ? "gemini" : "zai");
   if (tries.length === 2 && first === "gemini") tries.reverse();
+  return tries;
+}
+
+async function extractStatement(input) {
   let last;
-  for (const t of tries) { try { return await t(); } catch (e) { last = e; if (e.status === 503) continue; } }
+  for (const t of importTries(input)) { try { return await t.run(); } catch (e) { last = e; } }
   throw last;
+}
+
+// Image/PDF-scan statements are read by BOTH providers in parallel (when both are configured) so the caller can compare
+// them. Text/CSV is deterministic to read, so it uses one reader. Returns { raw, second|null }.
+async function extractVerified(input) {
+  const tries = importTries(input);
+  if (tries.length < 2 || input.text != null) return { raw: await extractStatement(input), second: null };
+  const [a, b] = await Promise.allSettled(tries.map((t) => t.run()));
+  if (a.status === "fulfilled") return { raw: a.value, second: b.status === "fulfilled" ? b.value : null };
+  if (b.status === "fulfilled") return { raw: b.value, second: null };
+  throw a.reason;
 }
 
 // Generic structured-JSON call for prompts whose facts are supplied inline (news briefing).
@@ -184,5 +199,5 @@ function describe() {
   };
 }
 
-module.exports = { extractStatement, generateJson, describe, toJsonSchema, parseJsonLoose,
+module.exports = { extractStatement, extractVerified, generateJson, describe, toJsonSchema, parseJsonLoose,
   extractWithGemini: extractStatement /* old name kept for callers */ };
