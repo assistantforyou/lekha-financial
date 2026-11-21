@@ -23,3 +23,15 @@ const al = c.portfolioAllocation([{ symbol: "A", value: 300 }, { symbol: "B", va
 const pr = c.portfolioReturn([{ quantity: 10, price: 12, costBasis: 100, previousClose: 11 }]); near(pr.pnl, 20); near(pr.returnFraction, 0.2); near(pr.dayChange, 10);
 near(c.ttm([{ period: "2025-03-31", x: 1 }, { period: "2025-06-30", x: 2 }, { period: "2025-09-30", x: 3 }, { period: "2025-12-31", x: 4 }, { period: "2024-12-31", x: 99 }], "x"), 10);
 console.log("_fincalc.test.js ok");
+const partial = c.portfolioReturn([{price:10, quantity:1, costBasis:10}, {price:100, quantity:1}]);
+assert.equal(partial.value, 110);
+for (const field of ["pnl", "cost", "returnFraction", "dayChange", "dayChangeFraction"]) assert.equal(partial[field], null);
+assert.equal(c.portfolioReturn([{quantity:1, price:7, costBasis:0}]).pnl, 7);
+for (const dates of [
+  ["2026-03-31", "2026-03-31", "2025-12-31", "2025-09-30"],
+  ["2026-03-31", "2025-09-30", "2025-06-30", "2025-03-31"]
+]) assert.equal(c.ttm(dates.map(period => ({period, eps:10})), "eps"), null);
+const bars = (entries) => entries.map(([date, close]) => [date, 0, 0, 0, close]);
+const stock = bars([["2025-01-01",100],["2025-01-02",120],["2025-01-04",96],["2025-01-05",96]]);
+const index = bars([["2025-01-01",100],["2025-01-02",110],["2025-01-03",115],["2025-01-04",99],["2025-01-05",99]]);
+near(c.betaFromBars(stock, index), 2);

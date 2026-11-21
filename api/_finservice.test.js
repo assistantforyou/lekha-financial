@@ -31,3 +31,10 @@ const qq = sec.buildStatements(f, "T", "quarterly"); assert.strictEqual(qq.lengt
   assert.throws(() => svc.sym("bad symbol!"), /bad_symbol/);
   console.log("_finservice.test.js ok");
 })();
+const original = sec.buildStatements(f, "T", "annual", "2025-03-01")[0];
+assert.equal(original.revenue, 100);
+assert.equal(original.filingDate, "2025-02-01");
+assert.equal(sec.buildStatements(f, "T", "annual", "2025-01-01").length, 0);
+assert.equal(S.quote({price:20,currency:"THB"}).meta.unit, "THB/share");
+assert.equal(S.statement({currency:"HKD"}).meta.unit, "HKD");
+assert.equal(S.quote({timestamp:null}).timestamp, null);

@@ -88,21 +88,24 @@ const INSTANT = {
 };
 const DAY = 864e5, dur = (f) => (Date.parse(f.end) - Date.parse(f.start)) / DAY;
 
-function series(facts, defs, unit) {
-  for (const [tax, concept] of defs) { const c = facts.facts && facts.facts[tax] && facts.facts[tax][concept]; const u = c && c.units && c.units[unit]; if (u && u.length) return u; }
+function series(facts, defs, unit, asOf) {
+  for (const [tax, concept] of defs) { const c = facts.facts && facts.facts[tax] && facts.facts[tax][concept]; const u = c && c.units && c.units[unit]; if (u && u.length) {
+    const available = asOf ? u.filter(f => f.filed && f.filed <= asOf && f.end <= asOf) : u;
+    if (available.length) return available;
+  } }
   return [];
 }
 // pick, for each period key, the most recently FILED fact (restatements win)
 function pick(rows, keyOf) { const m = new Map(); for (const f of rows) { const k = keyOf(f); if (k == null) continue; const o = m.get(k); if (!o || f.filed > o.filed) m.set(k, f); } return m; }
 
-function buildStatements(facts, symbol, type) {
+function buildStatements(facts, symbol, type, asOf) {
   const annual = type === "annual", lo = annual ? 340 : 80, hi = annual ? 390 : 100, forms = annual ? /^(10-K|10-K\/A)$/ : /^(10-Q|10-Q\/A)$/;
   const flows = {}, ps = {}, sh = {};
-  for (const [k, d] of Object.entries(FLOW)) flows[k] = pick(series(facts, d, "USD").filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
-  for (const [k, d] of Object.entries(PERSHARE)) ps[k] = pick(series(facts, d, "USD/shares").filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
-  for (const [k, d] of Object.entries(SHARES)) sh[k] = pick(series(facts, d, "shares").filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(FLOW)) flows[k] = pick(series(facts, d, "USD", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(PERSHARE)) ps[k] = pick(series(facts, d, "USD/shares", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(SHARES)) sh[k] = pick(series(facts, d, "shares", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   const inst = {};
-  for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, "USD").filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, "USD", asOf).filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
   const anchor = flows.revenue.size ? flows.revenue : flows.netIncome;
   const ends = [...anchor.keys()].sort().reverse().slice(0, annual ? 12 : 16), name = facts.entityName || null, cik = facts.cik ? String(facts.cik) : null, out = [];
   for (const end of ends) {
@@ -121,11 +124,11 @@ function buildStatements(facts, symbol, type) {
 }
 
 // Statements are cached by the latest accession number, so they live until a new filing appears.
-async function statements(symbol, { type = "annual" } = {}) {
+async function statements(symbol, { type = "annual", asOf } = {}) {
   const cik = await cikFor(symbol); if (!cik) return [];
   const sub = await submissions(cik).catch(() => null);
   const latest = sub && sub.filings && sub.filings.recent && (sub.filings.recent.accessionNumber || [])[0] || "na";
-  const { value } = await cacheFetch("statements", `${cik}/${type}/${latest}`, async () => buildStatements(await companyFacts(cik), String(symbol).toUpperCase(), type), { shared: true });
+  const { value } = await cacheFetch("statements", `${cik}/${type}/${latest}/${asOf || "latest"}`, async () => buildStatements(await companyFacts(cik), String(symbol).toUpperCase(), type, asOf), { shared: true });
   return value;
 }
 

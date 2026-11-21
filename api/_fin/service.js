@@ -84,18 +84,19 @@ async function getCompanyProfile(symbol) {
 }
 async function getFinancialStatements(symbol, { type = "annual", asOf } = {}) {
   const s = sym(symbol), t = type === "quarterly" ? "quarterly" : "annual";
-  if (asOf) { const r = await getFinancialStatements(s, { type: t }); // the SEC feed keeps the latest filing per period (restated figures), so a row's filing date can be after the cut-off even though the period was reported long before it;
-    // such a row is kept when its first report was due (10-K 75 days, 10-Q 50 days after the period end) and its date is shown as that due date
-    const due = (x) => shift(day(x.period), t === "annual" ? 75 : 50), rows = r.data.filter((x) => day(x.filingDate || due(x)) <= asOf || due(x) <= asOf).map((x) => (x.filingDate && day(x.filingDate) > asOf ? { ...x, filingDate: due(x) } : x));
-    return { data: rows, meta: { ...r.meta, asOf } }; }
+  if (asOf) {
+    // SEC companyfacts retains filing vintages. Apply the cutoff before selecting restatements.
+    const r = await cached("statements", `${s}/${t}/filed-by/${asOf}`,
+      () => chain("statements", [[P.sec, () => P.sec.statements(s, { type: t, asOf })]]));
+    return { data: r.data, meta: { ...r.meta, asOf } };
+  }
   return cached("statements", `${s}/${t}`, () => chain("statements", [[P.sec, () => P.sec.statements(s, { type: t })], [P.fmp, () => P.fmp.statements(s, { type: t })]]), { ttl: 6 * 36e5, shared: true });
 }
 async function getCompanyFacts(symbol, { asOf } = {}) {
-  if (asOf) { const r = await getCompanyFacts(symbol), so = r.data.sharesOutstanding; return { data: { ...r.data, sharesOutstanding: so && so.filed && day(so.filed) > asOf ? null : so }, meta: { ...r.meta, asOf } }; }
   const s = sym(symbol), cik = await P.sec.cikFor(s); if (!cik) throw Object.assign(new Error("no_cik"), { status: 404 });
-  return cached("facts", `facts/${s}`, async () => ({ data: await (async () => {
+  return cached("facts", `facts/${s}/${asOf || "latest"}`, async () => ({ data: await (async () => {
     const f = await P.sec.companyFacts(cik); if (!f) return null;
-    const dei = f.facts && f.facts.dei || {}, last = (c, u) => { const a = c && c.units && c.units[u]; return a && a.length ? a.slice().sort((x, y) => (x.end < y.end ? 1 : -1))[0] : null; };
+    const dei = f.facts && f.facts.dei || {}, last = (c, u) => { const a = c && c.units && c.units[u]; return (a || []).filter(x => !asOf || (x.filed && x.filed <= asOf && x.end <= asOf)).sort((x, y) => y.end.localeCompare(x.end) || String(y.filed).localeCompare(String(x.filed)))[0] || null; };
     const so = last(dei.EntityCommonStockSharesOutstanding, "shares"), pf = last(dei.EntityPublicFloat, "USD");
     return { cik, entityName: f.entityName, sharesOutstanding: so ? { value: so.val, asOf: so.end, form: so.form, filed: so.filed } : null, publicFloat: pf ? { value: pf.val, unit: "USD", asOf: pf.end } : null,
       concepts: Object.keys((f.facts && f.facts["us-gaap"]) || {}).length, source: "SEC EDGAR", meta: S.meta({ source: "SEC EDGAR", asOf: so && so.end, freshness: "historical" }) };
@@ -217,18 +218,22 @@ async function getRatios(symbol, { asOf } = {}) {
   const A = (ann && ann.data) || [], Q = (qtr && qtr.data) || [], quote = qt && qt.data, a0 = A[0] || {}, a1 = A[1] || {};
   const facts = await getCompanyFacts(s, { asOf }).then((r) => r.data).catch(() => null);
   const shares = (facts && facts.sharesOutstanding && facts.sharesOutstanding.value) || a0.dilutedShares || null, price = quote ? quote.price : null;
+  const quoteCurrency = quote?.currency, reportingCurrency = a0.currency || Q[0]?.currency;
+  const comparable = !!quoteCurrency && quoteCurrency === reportingCurrency;
   const marketCap = price != null && shares ? price * shares : null;
-  const ttm = (f) => (Q.length >= 4 ? C.ttm(Q.map((x) => ({ period: x.period, [f]: x[f] })), f) : null);
-  const epsTtm = ttm("eps") != null ? ttm("eps") : a0.eps, fcfTtm = ttm("freeCashFlow") != null ? ttm("freeCashFlow") : a0.freeCashFlow, ebitdaTtm = ttm("ebitda") != null ? ttm("ebitda") : a0.ebitda, revTtm = ttm("revenue") != null ? ttm("revenue") : a0.revenue;
-  const ev = C.enterpriseValue(marketCap, a0.totalDebt, (a0.cash || 0) + (a0.shortTermInvestments || 0));
+  const comparableCap = comparable ? marketCap : null, comparablePrice = comparable ? price : null;
+  const ttm = field => Q.slice(0, 4).every(row => row.currency === reportingCurrency) ? C.ttm(Q, field) : null;
+  const epsTtm = ttm("eps") ?? a0.eps, fcfTtm = ttm("freeCashFlow") ?? a0.freeCashFlow;
+  const quarterlyEbitda = ttm("ebitda"), ebitdaTtm = quarterlyEbitda ?? a0.ebitda, revTtm = ttm("revenue") ?? a0.revenue;
+  const ev = C.enterpriseValue(comparableCap, a0.totalDebt, (a0.cash || 0) + (a0.shortTermInvestments || 0));
   const taxRate = a0.incomeTax != null && a0.netIncome != null && a0.netIncome + a0.incomeTax > 0 ? a0.incomeTax / (a0.netIncome + a0.incomeTax) : 0.21;
   const basis = ttm("eps") != null ? "trailing four quarters" : "latest fiscal year", per = a0.period;
   const metrics = [
-    m("marketCap", "Market cap", marketCap, "USD", "price × shares outstanding", { price, shares }),
-    m("ev", "Enterprise value", ev, "USD", "market cap + total debt − cash and short-term investments", { marketCap, debt: a0.totalDebt, cash: a0.cash }),
-    m("pe", "P/E", C.pe(price, epsTtm), "x", `price ÷ diluted EPS (${basis})`, { price, eps: epsTtm }), m("earningsYield", "Earnings yield", C.earningsYield(epsTtm, price), "fraction", "EPS ÷ price", { eps: epsTtm, price }),
-    m("evEbitda", "EV/EBITDA", C.evToEbitda(ev, ebitdaTtm), "x", `EV ÷ EBITDA (${basis}; EBITDA = operating income + D&A)`, { ev, ebitda: ebitdaTtm }), m("fcfYield", "FCF yield", C.fcfYield(fcfTtm, marketCap), "fraction", "free cash flow ÷ market cap", { fcf: fcfTtm, marketCap }),
-    m("ps", "Price/Sales", C.priceToSales(marketCap, revTtm), "x", "market cap ÷ revenue", { marketCap, revenue: revTtm }), m("pb", "Price/Book", C.priceToBook(marketCap, a0.shareholdersEquity), "x", "market cap ÷ shareholders' equity", { marketCap, equity: a0.shareholdersEquity }),
+    m("marketCap", "Market cap", marketCap, quoteCurrency, "price × shares outstanding", { price, shares }),
+    m("ev", "Enterprise value", ev, reportingCurrency, "market cap + total debt − cash and short-term investments", { marketCap, debt: a0.totalDebt, cash: a0.cash }),
+    m("pe", "P/E", C.pe(comparablePrice, epsTtm), "x", `price ÷ diluted EPS (${basis})`, { price, eps: epsTtm }), m("earningsYield", "Earnings yield", C.earningsYield(epsTtm, comparablePrice), "fraction", "EPS ÷ price", { eps: epsTtm, price }),
+    m("evEbitda", "EV/EBITDA", C.evToEbitda(ev, ebitdaTtm), "x", `EV ÷ EBITDA (${quarterlyEbitda != null ? "trailing four quarters" : "latest fiscal year"}; EBITDA = operating income + D&A)`, { ev, ebitda: ebitdaTtm }), m("fcfYield", "FCF yield", C.fcfYield(fcfTtm, comparableCap), "fraction", "free cash flow ÷ market cap", { fcf: fcfTtm, marketCap }),
+    m("ps", "Price/Sales", C.priceToSales(comparableCap, revTtm), "x", "market cap ÷ revenue", { marketCap, revenue: revTtm }), m("pb", "Price/Book", C.priceToBook(comparableCap, a0.shareholdersEquity), "x", "market cap ÷ shareholders' equity", { marketCap, equity: a0.shareholdersEquity }),
     m("grossMargin", "Gross margin", C.margin(a0.grossProfit, a0.revenue), "fraction", "gross profit ÷ revenue", { grossProfit: a0.grossProfit, revenue: a0.revenue }, { period: per }),
     m("operatingMargin", "Operating margin", C.margin(a0.operatingIncome, a0.revenue), "fraction", "operating income ÷ revenue", { operatingIncome: a0.operatingIncome, revenue: a0.revenue }, { period: per }),
     m("netMargin", "Net margin", C.margin(a0.netIncome, a0.revenue), "fraction", "net income ÷ revenue", { netIncome: a0.netIncome, revenue: a0.revenue }, { period: per }),
@@ -245,26 +250,28 @@ async function getRatios(symbol, { asOf } = {}) {
       m(f + "Cagr", `${label} CAGR (${yearsBack}y)`, yearsBack >= 2 ? C.cagr(old[f], a0[f], yearsBack) : null, "fraction", "(end ÷ start)^(1 ÷ years) − 1", { start: old[f], end: a0[f], years: yearsBack }, { period: per })];
   });
   const qgrowth = Q.length >= 2 ? [m("revenueQoq", "Revenue growth (QoQ)", C.qoq(Q[0].revenue, Q[1].revenue), "fraction", "latest quarter revenue ÷ prior quarter − 1", { current: Q[0].revenue, prior: Q[1].revenue }, { period: Q[0].period })] : [];
-  const pegV = C.peg(C.pe(price, epsTtm), C.yoy(a0.eps, a1.eps)); metrics.push(m("peg", "PEG", pegV, "x", "P/E ÷ (EPS growth % )", { pe: C.pe(price, epsTtm), epsGrowth: C.yoy(a0.eps, a1.eps) }));
-  return { data: { symbol: s, price, asOf: quote ? quote.timestamp : null, metrics, growth: [...growth, ...qgrowth], sources: { quote: qt && qt.meta.source, statements: ann && ann.meta.source }, units: "money in USD; ratios in x; rates as fractions" }, meta: { source: "calculated", attempts: [] } };
+  const pegV = C.peg(C.pe(comparablePrice, epsTtm), C.yoy(a0.eps, a1.eps)); metrics.push(m("peg", "PEG", pegV, "x", "P/E ÷ (EPS growth % )", { pe: C.pe(comparablePrice, epsTtm), epsGrowth: C.yoy(a0.eps, a1.eps) }));
+  return { data: { symbol: s, price, asOf: quote ? quote.timestamp : null, metrics, growth: [...growth, ...qgrowth], sources: { quote: qt && qt.meta.source, statements: ann && ann.meta.source }, units: "money in the indicated currency; ratios in x; rates as fractions" }, meta: { source: "calculated", attempts: [] } };
 }
 async function getValuation(symbol, overrides = {}) {
   const s = sym(symbol), asOf = overrides.asOf || undefined;
   const [ann, qt, rf, hist, mkt] = await Promise.all([getFinancialStatements(s, { asOf }).catch(() => null), getQuote(s, { asOf }).catch(() => null), getMacroSeries("DGS10", { years: 1, asOf }).catch(() => null), getHistoricalPrices(s, { days: 380, asOf }).catch(() => null), getHistoricalPrices("SPY", { days: 380, asOf }).catch(() => null)]);
   const A = (ann && ann.data) || [], a0 = A[0] || {}, facts = await getCompanyFacts(s, { asOf }).then((r) => r.data).catch(() => null);
   const shares = (facts && facts.sharesOutstanding && facts.sharesOutstanding.value) || a0.dilutedShares, price = qt && qt.data.price;
+  const currency = a0.currency, quoteCurrency = qt?.data?.currency;
+  const comparable = !!currency && currency === quoteCurrency;
   const rfRate = rf && rf.data.latest ? rf.data.latest.value / 100 : 0.04;
-  let b = null; if (hist && mkt) { const closes = (r) => r.data.map((x) => x[4]); b = C.beta(C.returnsFrom(closes(hist)), C.returnsFrom(closes(mkt))); }
+  const b = hist && mkt ? C.betaFromBars(hist.data, mkt.data) : null;
   const fcf = overrides.fcf != null ? overrides.fcf : a0.freeCashFlow;
   const hg = A.length >= 4 ? C.cagr(A[Math.min(4, A.length - 1)].freeCashFlow, a0.freeCashFlow, Math.min(4, A.length - 1)) : null;
   const g = overrides.growth != null ? overrides.growth : Math.max(0, Math.min(0.15, hg != null ? hg : 0.05));
-  const ke = C.costOfEquity(rfRate, b != null ? Math.max(0.6, Math.min(2, b)) : 1, overrides.erp != null ? overrides.erp : 0.05), debt = a0.totalDebt || 0, mc = price && shares ? price * shares : null;
+  const ke = C.costOfEquity(rfRate, b != null ? Math.max(0.6, Math.min(2, b)) : 1, overrides.erp != null ? overrides.erp : 0.05), debt = a0.totalDebt || 0, mc = comparable && price && shares ? price * shares : null;
   const kd = a0.interestExpense && debt ? Math.min(0.12, Math.abs(a0.interestExpense) / debt) : 0.05;
   const w = overrides.discount != null ? overrides.discount : (mc && ke != null ? C.wacc({ equity: mc, debt, costEquity: ke, costDebt: kd }) : ke);
   const netDebt = (a0.totalDebt || 0) - (a0.cash || 0) - (a0.shortTermInvestments || 0);
   const out = w != null ? C.dcf({ fcf, growth: g, years: overrides.years || 10, terminalGrowth: overrides.terminalGrowth != null ? overrides.terminalGrowth : 0.025, discount: w, netDebt, shares }) : null;
   const assumptions = { freeCashFlow: fcf, growth: g, growthBasis: overrides.growth != null ? "user override" : hg != null ? "historical FCF CAGR, capped 0–15%" : "default 5% (history unavailable)", terminalGrowth: overrides.terminalGrowth != null ? overrides.terminalGrowth : 0.025, discount: w, riskFree: rfRate, beta: b, costOfEquity: ke, costOfDebt: kd, netDebt, shares, years: overrides.years || 10 };
-  return { data: { symbol: s, price, intrinsicPerShare: out && out.perShare, marginOfSafety: out && out.perShare && price ? 1 - price / out.perShare : null, dcf: out, assumptions, kind: "calculated", note: "Model output, not a price target. Every assumption is listed and editable; free cash flow and shares come from SEC filings.", meta: S.meta({ source: "calculated from SEC EDGAR + market data", kind: "calculated", freshness: "delayed" }) }, meta: { source: "calculated", attempts: [] } };
+  return { data: { symbol: s, price, currency, quoteCurrency, intrinsicPerShare: out && out.perShare, marginOfSafety: comparable && out && out.perShare > 0 && price ? 1 - price / out.perShare : null, dcf: out, assumptions, kind: "calculated", note: "Model output, not a price target. Every assumption is listed and editable; free cash flow and shares come from SEC filings.", meta: S.meta({ source: "calculated from SEC EDGAR + market data", kind: "calculated", freshness: "delayed" }) }, meta: { source: "calculated", attempts: [] } };
 }
 
 // ---------------- the whole company workspace in one round trip ----------------
