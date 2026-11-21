@@ -11,12 +11,12 @@ export const STEPS = [
   { id: "welcome", hash: "portfolio/overview", ready: () => !!byId("kpis") },
   { id: "search", hash: "portfolio/overview", target: [sel('[data-tour="search"]'), sel('[data-tour="search-icon"]')] },
   { id: "nav", hash: "portfolio/overview", target: [sel('[data-tour="nav"]'), sel('[data-tour="menu"]')], prefer: ["right"] },
-  { id: "summary", hash: "portfolio/overview", target: [() => byId("kpis")] },
-  { id: "performance", hash: "portfolio/overview", target: [panelOf("pf-chart")] },
-  { id: "holdings", hash: "portfolio/holdings", target: [panelOf("tbl"), panelOf("ph-form")] },
-  { id: "company", hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-head"]')] },
-  { id: "tabs", hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-tabs"]')] },
-  { id: "discover", hash: "sector/now", target: [() => byId("rot-sum")] },
+  { id: "summary", where: true, hash: "portfolio/overview", target: [() => byId("kpis")] },
+  { id: "performance", where: true, hash: "portfolio/overview", target: [panelOf("pf-chart")] },
+  { id: "holdings", where: true, hash: "portfolio/holdings", target: [panelOf("tbl"), panelOf("ph-form")] },
+  { id: "company", where: true, hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-head"]')] },
+  { id: "tabs", where: true, hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-tabs"]')] },
+  { id: "discover", where: true, hash: "sector/now", target: [() => byId("rot-sum")] },
   { id: "finish", hash: "portfolio/overview", ready: () => !!byId("kpis") },
 ]
 

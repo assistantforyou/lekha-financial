@@ -3,18 +3,33 @@
 .tour-root { position: fixed; inset: 0; z-index: 2000; font-family: var(--f-body); font-size: 14px; line-height: 1.5; color: var(--fg); -webkit-font-smoothing: antialiased; animation: tour-fade .25s ease-out both; }
 /* swallows clicks on the app underneath; wheel and touch scrolling still reach the page */
 .tour-block { position: fixed; inset: 0; }
-.tour-spot { position: fixed; left: 0; top: 0; border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(4, 8, 14, .66), 0 0 0 2px var(--accent), 0 0 24px color-mix(in srgb, var(--accent) 35%, transparent);
-  transition: transform .4s cubic-bezier(.4, 0, .2, 1), width .4s cubic-bezier(.4, 0, .2, 1), height .4s cubic-bezier(.4, 0, .2, 1), box-shadow .3s; }
-.tour-spot.void { border-radius: 0; box-shadow: 0 0 0 9999px rgba(4, 8, 14, .66), 0 0 0 0 transparent; }
+.tour-dim { position: fixed; inset: 0; background: rgba(4, 8, 14, .68); pointer-events: none; mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat;
+  transition: mask-position .4s cubic-bezier(.4, 0, .2, 1), mask-size .4s cubic-bezier(.4, 0, .2, 1), -webkit-mask-position .4s cubic-bezier(.4, 0, .2, 1), -webkit-mask-size .4s cubic-bezier(.4, 0, .2, 1); }
+.tour-spot { position: fixed; left: 0; top: 0; border-radius: 7px; pointer-events: none; box-shadow: 0 0 0 2px var(--accent), 0 0 22px color-mix(in srgb, var(--accent) 38%, transparent);
+  transition: transform .4s cubic-bezier(.4, 0, .2, 1), width .4s cubic-bezier(.4, 0, .2, 1), height .4s cubic-bezier(.4, 0, .2, 1), opacity .25s; }
+.tour-spot.two { border-radius: 6px; box-shadow: 0 0 0 1.5px var(--accent), 0 0 14px color-mix(in srgb, var(--accent) 30%, transparent); }
 .tour-card { position: fixed; left: 0; top: 0; width: 360px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow: auto; padding: 16px 18px 14px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 14px;
   box-shadow: 0 20px 56px rgba(0, 0, 0, .5), 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); outline: none; transition: transform .4s cubic-bezier(.4, 0, .2, 1), width .3s; }
 .tour-card[data-sheet="1"] { transform: none !important; left: 12px; right: 12px; top: auto; bottom: max(12px, env(safe-area-inset-bottom)); width: auto; max-width: 520px; margin: 0 auto; padding-bottom: 14px; border-radius: 16px; transition: none; }
-[data-instant="1"] .tour-spot, [data-instant="1"] .tour-card { transition: none; }
+[data-instant="1"] .tour-dim, [data-instant="1"] .tour-spot, [data-instant="1"] .tour-card { transition: none; }
 .tour-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .tour-count { font: 600 11px/1 var(--f-mono); letter-spacing: .06em; color: var(--accent); white-space: nowrap; }
 .tour-track { flex: 1; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .tour-track > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s cubic-bezier(.4, 0, .2, 1); }
 .tour-card[aria-busy="true"] .tour-track > i { animation: tour-pulse 1s ease-in-out infinite; }
+.tour-lang { position: relative; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.tour-lang svg { width: 14px; height: 14px; flex: none; pointer-events: none; }
+.tour-lang select { appearance: none; -webkit-appearance: none; font: 600 11.5px/1 var(--f-body); color: var(--fg); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; cursor: pointer; max-width: 112px; }
+.tour-lang select:hover { border-color: var(--accent); }
+.tour-lang select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tour-where { display: flex; align-items: center; gap: 5px; margin: -2px 0 8px; font-size: 11.5px; color: var(--muted); }
+.tour-where svg { width: 12px; height: 12px; flex: none; color: var(--accent); }
+.tour-where b { font-weight: 600; color: var(--fg); }
+.tour-pts { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.tour-pts li { display: grid; grid-template-columns: minmax(0, 118px) 1fr; gap: 10px; align-items: baseline; padding-top: 7px; border-top: 1px solid var(--line); font-size: 12.5px; line-height: 1.45; }
+.tour-pts b { font-weight: 600; color: var(--fg); overflow-wrap: anywhere; }
+.tour-pts span { color: color-mix(in srgb, var(--fg) 78%, var(--muted)); }
+@media (max-height: 640px) { .tour-where { display: none; } }
 .tour-body { animation: tour-in .28s ease-out both; }
 .tour-title { margin: 0 0 6px; font: 600 17px/1.3 var(--f-display, var(--f-body)); letter-spacing: -.005em; color: var(--fg); }
 .tour-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: color-mix(in srgb, var(--fg) 82%, var(--muted)); }

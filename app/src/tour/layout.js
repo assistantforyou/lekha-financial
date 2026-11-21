@@ -30,12 +30,13 @@ export function place({ rect, vw, vh, card, top = 0, prefer = ["bottom", "top", 
   return { spot: sp, card: { x: Math.round(cx), y: cy, w: cw }, side: "edge-top" }
 }
 
-/* How far to scroll so the target (or the top of a tall one) lands inside the free band. null = leave it. */
-export function scrollDelta({ rect, top, bottom }) {
+/* How far to scroll so the target (or the top of a tall one) lands inside the free band; `need` = room wanted below it for the card. null = leave it. */
+export function scrollDelta({ rect, top, bottom, need = 0 }) {
   const band = bottom - top
   if (rect.height <= band) {
-    if (rect.top >= top && rect.bottom <= bottom) return null
-    return rect.top - (top + Math.min(24, Math.max(0, (band - rect.height) / 2)))
+    if (rect.top >= top && rect.bottom + need <= bottom) return null
+    const want = need ? top : top + Math.min(24, Math.max(0, (band - rect.height) / 2))   // with a card to fit below, give it the room: target to the top of the band
+    const d = rect.top - want; return Math.abs(d) < 2 ? null : d
   }
   if (rect.top >= top - 2 && rect.top <= top + 80) return null
   return rect.top - top

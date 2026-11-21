@@ -17,6 +17,8 @@ import { isDemo, useMe, useSession } from "@/lib/engine"
 import PAGES from "@/pages"
 
 const START = "ptpub.v1.v3.start"
+/* demo visitors see real market data as of a fixed past date (the server enforces it); say so */
+const demoAsOf = () => { try { const d = window.PT_DEMO && window.PT_DEMO.DEMO_DATE; return d ? "Market data as of " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) + " close" : "" } catch (e) { return "" } }
 function initialHash() {
   if (location.hash && location.hash.length > 2) return
   let k = DEFAULT_ROUTE; try { const s = JSON.parse(localStorage.getItem(START) || "null"); if (s === "macro") k = "macro/dashboard"; else { const last = JSON.parse(localStorage.getItem("ptpub.v1.app.route") || "null"); if (last && BY_KEY[last]) k = last } } catch (e) {}
@@ -52,7 +54,7 @@ export default function App() {
     <TooltipProvider>
       <div className="shell min-h-dvh bg-background text-foreground">
         <Banner onMenu={() => setMenu(true)} onSearch={() => setSearch(true)} onTheme={() => setTheme(true)} onLang={() => setLang(true)} navigate={navigate} customizable={isPane && !item.analyst && !["tab-sim", "tab-sim-proj", "tab-an-deep", "tab-an-council", "lekha-reports", "v3-ai-host"].some((p) => item.panes.includes(p))} />
-        {demo && <div className="border-b border-[color-mix(in_srgb,var(--warn)_40%,var(--border))] bg-[color-mix(in_srgb,var(--warn)_10%,var(--background))] px-3 py-1 text-[12px]"><div className="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-3 gap-y-1"><FlaskConical className="size-3.5 text-[var(--warn)]" /><b className="font-mono text-[11px] tracking-wider text-[var(--warn)]">DEMO</b>{signedIn ? <a className="ml-auto text-primary hover:underline" href={location.pathname}>Exit demo</a> : <a className="ml-auto text-primary hover:underline" href="/login.html">Create a free account to save your own holdings</a>}</div></div>}
+        {demo && <div className="border-b border-[color-mix(in_srgb,var(--warn)_40%,var(--border))] bg-[color-mix(in_srgb,var(--warn)_10%,var(--background))] px-3 py-1 text-[12px]"><div className="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-3 gap-y-1"><FlaskConical className="size-3.5 text-[var(--warn)]" /><b className="font-mono text-[11px] tracking-wider text-[var(--warn)]">DEMO</b><span className="text-muted-foreground">{demoAsOf()}</span>{signedIn ? <a className="ml-auto text-primary hover:underline" href={location.pathname}>Exit demo</a> : <a className="ml-auto text-primary hover:underline" href="/login.html">Create a free account to save your own holdings</a>}</div></div>}
         <div className="mx-auto flex max-w-[1700px]">
           <aside data-tour="nav" className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border lg:block">{side}</aside>
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">
