@@ -55,6 +55,7 @@ export const DEFAULT_ROUTE = "portfolio/overview"
 const ALIAS = { "sector/rrg": "sector/now", "account/security": "account/profile", "account/legal": "account/profile", "account/about": "account/profile" }
 export function parseHash(h) {
   const m = /^#\/?([^?]*)(?:\?(.*))?$/.exec(h || ""), parts = (m && m[1] ? m[1] : "").split("/").filter(Boolean), q = new URLSearchParams((m && m[2]) || "")
+  if (parts[0] === "research" && parts[1] === "company" && parts[2]) parts.splice(0, 2)   // research/company/AAPL is the same page as company/AAPL
   if (parts[0] === "company") return { key: "research/company", param: parts[1] ? decodeURIComponent(parts[1]) : null, query: q, t: "company", s: parts[1] || "" }
   const raw = parts.length >= 2 ? `${parts[0]}/${parts[1]}` : parts.length === 1 ? (FLAT.find((i) => i.group === parts[0]) || {}).key : null
   const key = ALIAS[raw] || raw

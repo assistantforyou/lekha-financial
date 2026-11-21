@@ -17,7 +17,7 @@ export function useData(route, params, { enabled = true, refresh = 0 } = {}) {
     data(route, params).then((j) => !dead && set({ status: "ok", data: j.data, meta: j.meta })).catch((e) => !dead && set({ status: "error", error: e.message, attempts: e.attempts, code: e.code }))
     return () => { dead = true }
   }, [key, enabled, n])
-  useEffect(() => { if (!refresh) return; const i = setInterval(() => setN((x) => x + 1), refresh); return () => clearInterval(i) }, [refresh])
+  useEffect(() => { if (!refresh) return; const tickF = () => { if (!document.hidden) setN((x) => x + 1) }, i = setInterval(tickF, refresh); document.addEventListener("visibilitychange", tickF); return () => { clearInterval(i); document.removeEventListener("visibilitychange", tickF) } }, [refresh])
   const reload = useCallback(() => setN((x) => x + 1), [])
   return { ...s, reload }
 }

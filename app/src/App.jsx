@@ -46,7 +46,7 @@ export default function App() {
     window.scrollTo(0, 0); setMenu(false)
     if (!isPane && window.LEKHA_SHELL) window.LEKHA_SHELL._setRoute({ t: route.t, s: route.s }, false)
   }, [route.key, route.param])
-  const r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param])
+  const qs = route.query ? route.query.toString() : "", r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param, qs])   // query (?tab=…) must be a dependency or tab links never switch
   const admin = !!(me && me.is_admin), demo = isDemo(), signedIn = !!(sess && sess.access_token)
   const group = BY_KEY[route.key] ? BY_KEY[route.key].groupTitle : ""
   const side = <Sidebar routeKey={route.key} isAdmin={admin} onNavigate={() => setMenu(false)} />
