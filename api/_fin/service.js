@@ -80,6 +80,19 @@ async function getIntradayPrices(symbol, { days = 1, asOf } = {}) {
   });
 }
 
+// ---------------- movers: biggest moves among liquid large caps (one batched quote call, as-of aware) ----------------
+const LARGE_CAPS = "AAPL MSFT NVDA GOOGL AMZN META TSLA AVGO JPM V MA UNH XOM LLY WMT COST HD PG JNJ BAC ORCL NFLX CRM AMD ADBE KO PEP MRK ABBV CVX TMO CSCO ACN MCD QCOM INTC TXN GS CAT BA DIS".split(" ");
+async function getMovers({ asOf } = {}) {
+  return cached("movers", asOf || "live", async () => {
+    const { data: q, meta } = await getQuotes(LARGE_CAPS, { asOf }), rows = Object.values(q).filter((x) => x && x.price > 0 && Number.isFinite(x.changePercent));
+    if (rows.length < 8) { const e = new Error("no_provider_for_movers"); e.status = 502; throw e; }
+    let names = {}; try { for (const d of await P.sec.directory()) names[d.ticker] = d.name === d.name.toUpperCase() ? d.name.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(Inc|Corp|Co|Ltd)\b(?!\.)/g, "$1.").replace(/\b(Llc|Plc|Ag|Nv|Sa|Lp)\b/g, (m) => m.toUpperCase()) : d.name; } catch (e) { /* names are decoration */ }
+    const out = (x) => ({ symbol: x.symbol, name: names[x.symbol] || null, price: x.price, changePercent: x.changePercent, volume: x.volume || null, currency: x.currency || "USD" }), by = (f) => [...rows].sort(f).slice(0, 6).map(out);
+    return { data: { universe: `${rows.length} large caps`, gainers: by((a, b) => b.changePercent - a.changePercent), losers: by((a, b) => a.changePercent - b.changePercent), actives: by((a, b) => (b.volume || 0) * b.price - (a.volume || 0) * a.price),
+      breadth: { up: rows.filter((x) => x.changePercent > 0).length, down: rows.filter((x) => x.changePercent < 0).length }, asOf: asOf || null, meta: S.meta({ source: "calculated from quotes", kind: "calculated", freshness: asOf ? "historical" : "delayed" }) }, source: "calculated", attempts: [] };
+  }, { ttl: 60e3 });
+}
+
 // ---------------- company ----------------
 async function getCompanyProfile(symbol) {
   const s = sym(symbol);
@@ -295,5 +308,5 @@ function status() {
   return Object.values(P).map((p) => ({ name: p.name, configured: p.configured(), license: p.license || null }));
 }
 
-module.exports = { getQuote, getQuotes, getHistoricalPrices, getIntradayPrices, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, getRatios, getValuation, getCompanyBundle,
+module.exports = { getQuote, getQuotes, getHistoricalPrices, getIntradayPrices, getMovers, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, getRatios, getValuation, getCompanyBundle,
   status, providers: P, dedupe, norm, chain, sym, CONCEPTS };

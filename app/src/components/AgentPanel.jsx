@@ -8,10 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { SourceTag } from "@/components/common"
 import { api } from "@/lib/api"
+import { useSuggestions } from "@/lib/suggest"
 import { cn } from "@/lib/utils"
 
 const TYPE = { fact: { label: "Fact", v: "up", hint: "Retrieved from a cited source" }, calculated: { label: "Calculated", v: "secondary", hint: "Computed by the app's deterministic calculation engine" }, interpretation: { label: "Interpretation", v: "warn", hint: "The model's reading of the evidence" }, speculation: { label: "Speculation", v: "down", hint: "A guess beyond the evidence" } }
-const STEPS = ["Choosing tools", "Retrieving quotes, filings, news and macro data", "Writing an answer from the evidence", "Verifying every figure against its source"]
 
 /* Source-aware answer: summary, typed claims with evidence chips, the evidence list (source, as-of, kind), tools that failed, what is missing. */
 export function AnswerView({ a }) {
@@ -36,26 +36,26 @@ export function AnswerView({ a }) {
 }
 
 export default function AgentPanel({ symbol, initial, suggestions }) {
-  const [q, setQ] = useState(initial || ""), [busy, setBusy] = useState(false), [step, setStep] = useState(0), [ans, setAns] = useState(null), [err, setErr] = useState(null)
-  useEffect(() => { if (!busy) return; const t = setInterval(() => setStep((s) => Math.min(STEPS.length - 1, s + 1)), 6000); return () => clearInterval(t) }, [busy])
+  const [q, setQ] = useState(initial || ""), [busy, setBusy] = useState(false), [secs, setSecs] = useState(0), [ans, setAns] = useState(null), [err, setErr] = useState(null), dyn = useSuggestions(symbol ? "company" : "agent", { symbol })
+  useEffect(() => { if (!busy) return; const t0 = Date.now(), t = setInterval(() => setSecs(Math.floor((Date.now() - t0) / 1000)), 1000); return () => clearInterval(t) }, [busy])
   const ask = async (text) => {
     const question = (text || q).trim(); if (question.length < 3) return toast.error("Ask a question first.")
-    setBusy(true); setStep(0); setErr(null); setAns(null)
+    setBusy(true); setSecs(0); setErr(null); setAns(null)
     try { setAns(await api("/api/data/agent", { method: "POST", auth: true, body: { question, symbol: symbol || undefined, lang: window.PT_I18N ? PT_I18N.lang : "en" } })) }
     catch (e) { setErr(e.status === 429 ? e.message : e.status === 402 ? "This plan does not include the research agent yet." : "The research agent could not complete this request. Try again in a moment.") }
     finally { setBusy(false) }
   }
   useEffect(() => { if (initial && initial.length > 2) ask(initial) }, [])
-  const sug = suggestions || [symbol ? `Why did ${symbol} move today?` : "Why did NVDA fall today?", symbol ? `Is ${symbol} cheap or expensive versus its own fundamentals?` : "Is AAPL overvalued?", symbol ? `Summarise ${symbol}'s latest earnings and filings.` : "What do rising yields mean for tech stocks?", "What is the macro backdrop: rates, inflation and jobs?"]
+  const sug = suggestions ? suggestions.map((t) => ({ text: t })) : dyn
   return (
     <div className="space-y-4">
       <Card><CardContent className="space-y-3 pt-5">
         <div className="flex items-start gap-2"><Bot className="mt-2 size-5 shrink-0 text-primary" /><Textarea value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") ask() }} placeholder={symbol ? `Ask anything about ${symbol}…` : "Ask about a company, a filing, the market or the economy…"} maxLength={600} aria-label="Question" /></div>
-        <div className="flex flex-wrap items-center gap-2">{sug.map((s) => <button key={s} onClick={() => { setQ(s); ask(s) }} disabled={busy} className="rounded-full border border-border px-3 py-1 text-[12px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50">{s}</button>)}
+        <div className="flex flex-wrap items-center gap-2">{sug.map((s) => <button key={s.text} title={s.tag ? `Based on live data · ${s.tag}` : undefined} onClick={() => { setQ(s.text); ask(s.text) }} disabled={busy} className="rounded-full border border-border px-3 py-1 text-left text-[12px] text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50">{s.tag && <span className="mr-1.5 text-[10px] font-medium uppercase tracking-wide text-primary">{s.tag}</span>}{s.text}</button>)}
           <Button className="ml-auto" onClick={() => ask()} disabled={busy}>{busy ? <Loader2 className="animate-spin" /> : <Send />}Ask</Button></div>
         <p className="text-[11.5px] text-muted-foreground">The agent fetches data first (quotes, filings, news, macro) and only then writes. Every claim is labelled fact, calculated, interpretation or speculation and linked to its source. ⌘/Ctrl+Enter to send.</p>
       </CardContent></Card>
-      {busy && <Card><CardContent className="space-y-2 pt-5" aria-live="polite">{STEPS.map((s, i) => <div key={s} className={cn("flex items-center gap-2 text-sm", i > step && "opacity-40")}>{i < step ? <CheckCircle2 className="size-4 text-[var(--up)]" /> : i === step ? <Loader2 className="size-4 animate-spin" /> : <span className="size-4" />}{s}</div>)}</CardContent></Card>}
+      {busy && <Card><CardContent className="flex items-center gap-3 pt-5 text-sm" aria-live="polite"><Loader2 className="size-4 animate-spin" /><span>Retrieving data and writing a cited answer… {secs}s <span className="text-muted-foreground">(usually 10 to 30 seconds; figures are checked against the sources before you see them)</span></span></CardContent></Card>}
       {err && <Alert variant="destructive"><TriangleAlert /><div><AlertTitle>No answer</AlertTitle><AlertDescription>{err}</AlertDescription></div></Alert>}
       {ans && <AnswerView a={ans} />}
     </div>)

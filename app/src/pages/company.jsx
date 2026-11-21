@@ -12,21 +12,38 @@ import { Bars, DataState, EmptyBox, ErrorBox, FreshBadge, PageHeader, SourceTag,
 import AgentPanel from "@/components/AgentPanel"
 import PriceChart from "@/components/PriceChart"
 import { keyStats } from "@/lib/chartmath"
-import { remember } from "@/components/CommandPalette"
+import { recent, remember } from "@/components/CommandPalette"
+import { usePortfolioFacts } from "@/lib/suggest"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/watchlist"
 import { api, data as fetchData, prefetch, useData } from "@/lib/api"
 import { compact, date, dateTime, metric, mult, num, pct, price, tone } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
 
-const POPULAR = [["AAPL", "Apple"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"], ["GOOGL", "Alphabet"], ["AMZN", "Amazon"], ["META", "Meta Platforms"], ["TSLA", "Tesla"], ["JPM", "JPMorgan Chase"], ["XOM", "Exxon Mobil"], ["SPY", "S&P 500 ETF"], ["QQQ", "Nasdaq 100 ETF"], ["BTC-USD", "Bitcoin"]]
 const unwrap = (p) => (p && p.ok ? p.data : null)
 
+/* One tile: symbol, name, live price and today's move. Everything on the home screen comes from live data or from the user's own lists; nothing is a fixed list. */
+function Tile({ symbol, name, price: px, chg, ccy, navigate }) {
+  return <button onClick={() => navigate("company/" + encodeURIComponent(symbol))} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary">
+    <div className="min-w-0"><div className="font-mono text-sm font-semibold">{symbol}</div><div className="truncate text-xs text-muted-foreground">{name || " "}</div></div>
+    {px != null && <div className="shrink-0 text-right"><div className="num text-sm">{price(px, ccy)}</div>{chg != null && <div className={cn("num text-xs", tone(chg))}>{pct(chg, 2, true)}</div>}</div>}</button>
+}
+function Section({ title, sub, children }) { return <div><div className="mb-2 flex flex-wrap items-baseline gap-x-2"><h2 className="text-sm font-semibold">{title}</h2>{sub && <span className="text-xs text-muted-foreground">{sub}</span>}</div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div></div> }
 function Home({ navigate }) {
-  const [q, setQ] = useState(""), wl = useWatchlist()
-  return (<div className="space-y-5">
+  const [q, setQ] = useState(""), wl = useWatchlist(), pf = usePortfolioFacts(), mv = useData("movers", {}, { refresh: 180000 }), rc = recent()
+  const m = mv.status === "ok" ? mv.data : null
+  return (<div className="space-y-6">
     <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) navigate("company/" + encodeURIComponent(q.trim().toUpperCase())) }} className="flex max-w-xl gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ticker, e.g. AAPL, SPY, BTC-USD (or press ⌘K to search by name)" className="pl-9" aria-label="Ticker" /></div><Button type="submit">Open</Button></form>
-    {wl.length > 0 && <div><h2 className="mb-2 text-sm font-semibold">Your watchlist</h2><div className="flex flex-wrap gap-2">{wl.map((w) => <Button key={w.symbol} variant="outline" size="sm" onClick={() => navigate("company/" + w.symbol)}><Star className="fill-current text-[var(--warn)]" />{w.symbol}</Button>)}</div></div>}
-    <div><h2 className="mb-2 text-sm font-semibold">Popular</h2><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{POPULAR.map(([s, n]) => <button key={s} onClick={() => navigate("company/" + s)} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary"><Building2 className="size-4 text-muted-foreground" /><div><div className="font-mono text-sm font-semibold">{s}</div><div className="text-xs text-muted-foreground">{n}</div></div></button>)}</div></div>
+    {pf.rows.length > 0 && <Section title="Your holdings" sub="live prices, largest first">{pf.rows.slice(0, 8).map((r) => <Tile key={r.tk} symbol={r.tk} chg={r.day} price={r.price} navigate={navigate} />)}</Section>}
+    {wl.length > 0 && <Section title="Your watchlist">{wl.slice(0, 12).map((w) => <Tile key={w.symbol} symbol={w.symbol} name={w.name} navigate={navigate} />)}</Section>}
+    {rc.length > 0 && <Section title="Recently viewed">{rc.map((r) => <Tile key={r.symbol} symbol={r.symbol} name={r.name} navigate={navigate} />)}</Section>}
+    {mv.status === "loading" && <div className="space-y-2" aria-busy="true"><Skeleton className="h-5 w-64" /><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div></div>}
+    {mv.status === "error" && <ErrorBox message={mv.error} attempts={mv.attempts} onRetry={mv.reload} />}
+    {m && <>
+      <Section title="Biggest gainers" sub={`among ${m.universe}${m.asOf ? `, as of ${date(m.asOf)}` : " today"} · ${m.breadth.up} up, ${m.breadth.down} down`}>{m.gainers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
+      <Section title="Biggest decliners">{m.losers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
+      <Section title="Most traded" sub="by dollar volume">{m.actives.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
+      <p className="text-[11.5px] text-muted-foreground">Computed from live quotes of {m.universe} (the most liquid US stocks), not a full-market screener. Any ticker, ETF, index or crypto symbol can be opened from the box above.</p></>}
   </div>)
 }
 
