@@ -209,8 +209,8 @@ module.exports = async (req, res) => {
 
     const info = {};
     const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-council-v3", noFallback: true,
-      /* Gemini only when Z.ai is overloaded / rate-limited (429, 1305, 1302); budgets keep the total under 60 s */
-      fallbackOn: (e) => e && (e.status === 429 || /1305|1302/.test(String(e.code || e.message || ""))), fallbackDeadlineMs: 24000,
+      /* Gemini when Z.ai is overloaded, rate-limited, unreachable or timing out (429, network, aborted, 1305, 1302); a malformed answer (bad_json) deliberately does not fall back; budgets keep the total under 60 s */
+      fallbackOn: (e) => e && (e.status === 429 || /^(network|aborted)$/.test(String(e.message || "")) || /1305|1302/.test(String(e.code || e.message || ""))), fallbackDeadlineMs: 24000,
       maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 2400, 256, 16000), deadlineMs: 30000, info });
     const v = validateCouncil(ai);
     if (v.empty) throw Object.assign(new Error("empty"), { status: 502 });
@@ -230,7 +230,7 @@ module.exports = async (req, res) => {
     await cacheSet(key, out).catch(() => {});
     return res.status(200).json(out);
   } catch (e) {
-    console.error("council-v3 failed:", e && e.status, String((e && e.message) || e).slice(0, 160));
+    console.error("council-v3 failed:", e && e.status, String((e && e.message) || e).slice(0, 160), e && e.cause ? "cause: " + String(e.cause).slice(0, 120) : "");
     if (e && e.status === 503) return res.status(503).json({ error: "The research council is not configured on this site yet.", code: "not_configured" });
     return res.status(502).json({ error: "The council could not answer right now. Try again in a moment.", code: "upstream" });
   }

@@ -57,7 +57,7 @@ async function timed(url, init, timeoutMs) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try { return await fetch(url, { ...init, signal: ctl.signal }); }
-  catch (e) { throw err(e && e.name === "AbortError" ? "aborted" : "network", 502); }
+  catch (e) { throw Object.assign(err(e && e.name === "AbortError" ? "aborted" : "network", 502), { cause: e && (e.cause && (e.cause.code || e.cause.message) || e.message) }); }
   finally { clearTimeout(timer); }
 }
 
