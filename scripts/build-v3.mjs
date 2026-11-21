@@ -51,6 +51,15 @@ main = patch(main, `try{b.innerHTML=\`<span class="sm-lbl">Market &amp; macro</s
 main = patch(main, `window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(),`,
   `window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(),
   lekha:{lineChart,multiChart,fx,esc,money,pct,positions,aggregate,computeVal,drawTicker,ldDetail,renderRRG,renderSummary},`, "expose helpers");
+/* Holdings ledger: edit a lot, never lose fields on update, confirm destructive clear */
+main = patch(main, `if(i>=0)st.items[i]=h;else st.items.push(h);phSave(st);form.reset();phApply()});`,
+  `if(i>=0){const o=st.items[i];if(h.theme==="Other"&&o.theme)h.theme=o.theme;if(h.cur==="USD"&&o.cur)h.cur=o.cur;if(h.px==null&&o.px!=null)h.px=o.px;st.items[i]=h}else st.items.push(h);phSave(st);form.reset();$("ph-msg").textContent="";phApply()});`, "ledger update keeps theme/currency/price");
+main = patch(main, `<td><button class="btn" data-del="\${i}" type="button">Remove</button></td></tr>`,
+  `<td style="white-space:nowrap"><button class="btn" data-edit="\${i}" type="button" aria-label="Edit \${esc(h.tk)}">Edit</button> <button class="btn" data-del="\${i}" type="button" aria-label="Remove \${esc(h.tk)}">Remove</button></td></tr>`, "ledger edit button");
+main = patch(main, `$("ph-table").addEventListener("click",e=>{const b=e.target.closest("button[data-del]");if(!b)return;`,
+  `$("ph-table").addEventListener("click",e=>{const ed=e.target.closest("button[data-edit]");if(ed){const h=phLoad().items[Number(ed.dataset.edit)];if(h){const f=form.elements;if(h.theme&&![...f.theme.options].some(o=>o.value===h.theme))f.theme.add(new Option(h.theme,h.theme));f.acct.value=h.acct||"";f.tk.value=h.tk;f.theme.value=h.theme||"Other";f.cur.value=h.cur||"USD";f.qty.value=h.qty;f.cost.value=h.cost==null?"":h.cost;f.px.value=h.px==null?"":h.px;f.qty.focus();form.scrollIntoView({block:"center",behavior:"smooth"});$("ph-msg").textContent="Editing "+h.tk+": change the values, then press Add / update."}return}const b=e.target.closest("button[data-del]");if(!b)return;`, "ledger edit handler");
+main = patch(main, `$("ph-clear").onclick=()=>{phSave(`, `$("ph-clear").onclick=()=>{if(!confirm("Remove ALL holdings? This cannot be undone."))return;phSave(`, "confirm clear holdings");
+
 writeFileSync(P("v3", "lekha-engine.js"), HDR("public/v2/index.html (adapter + main script)") + adapter + "\n" + main);
 
 /* ---------- account / banner painter ---------- */

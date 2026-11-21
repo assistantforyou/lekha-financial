@@ -1769,7 +1769,7 @@ function phRender(){const st=phLoad();const tb=document.querySelector("#ph-table
   if($("ph-usdthb")&&document.activeElement!==$("ph-usdthb"))$("ph-usdthb").value=st.usdthb||"";
   if($("ph-hkdusd")&&document.activeElement!==$("ph-hkdusd"))$("ph-hkdusd").value=st.hkdusd||"";
   const f=v=>v==null||v===""?"–":Number(v).toLocaleString("en-US",{maximumFractionDigits:4});
-  tb.innerHTML=st.items.map((h,i)=>`<tr><td class="l">${esc(h.acct||"Account")}</td><td class="l"><span class="tk">${esc(h.tk)}</span></td><td class="l muted">${esc(h.tk==="CASH"?"Cash":h.theme)}</td><td>${esc(h.cur)}</td><td>${f(h.qty)}</td><td>${f(h.cost)}</td><td>${h.tk==="CASH"?"–":f(h.px)}</td><td>${f(h.tk==="CASH"?h.qty:(h.px>0?h.qty*h.px:null))}</td><td><button class="btn" data-del="${i}" type="button">Remove</button></td></tr>`).join("");
+  tb.innerHTML=st.items.map((h,i)=>`<tr><td class="l">${esc(h.acct||"Account")}</td><td class="l"><span class="tk">${esc(h.tk)}</span></td><td class="l muted">${esc(h.tk==="CASH"?"Cash":h.theme)}</td><td>${esc(h.cur)}</td><td>${f(h.qty)}</td><td>${f(h.cost)}</td><td>${h.tk==="CASH"?"–":f(h.px)}</td><td>${f(h.tk==="CASH"?h.qty:(h.px>0?h.qty*h.px:null))}</td><td style="white-space:nowrap"><button class="btn" data-edit="${i}" type="button" aria-label="Edit ${esc(h.tk)}">Edit</button> <button class="btn" data-del="${i}" type="button" aria-label="Remove ${esc(h.tk)}">Remove</button></td></tr>`).join("");
   const missFx=st.items.some(h=>phFx(h.cur,st)==null),missPx=st.items.some(h=>h.tk!=="CASH"&&!(h.px>0)&&!(window.PT_LIVE&&window.PT_LIVE[h.tk]));
   const R=phRates(st),fx=window.PT_FX;
   if($("ph-usdthb"))$("ph-usdthb").placeholder=fx&&fx.usdthb?"auto "+fx.usdthb:"";if($("ph-hkdusd"))$("ph-hkdusd").placeholder=fx&&fx.hkdusd?"auto "+fx.hkdusd:"";
@@ -1783,9 +1783,9 @@ function phApply(){const csv=ptHoldingsCsv();phRender();if(window.PT_ONHOLD)wind
     if(!tk||!(qty>=0)){$("ph-msg").textContent="Ticker and quantity are required.";return}
     const cost=d.get("cost")===""?null:parseFloat(d.get("cost")),px=d.get("px")===""?null:parseFloat(d.get("px"));
     const h={acct:String(d.get("acct")||"").trim().slice(0,40),tk,theme:String(d.get("theme")||"Other"),cur:String(d.get("cur")||"USD"),qty,cost:isFinite(cost)?cost:null,px:isFinite(px)?px:null};
-    const i=st.items.findIndex(x=>x.tk===h.tk&&(x.acct||"")===h.acct);if(i>=0)st.items[i]=h;else st.items.push(h);phSave(st);form.reset();phApply()});
-  $("ph-table").addEventListener("click",e=>{const b=e.target.closest("button[data-del]");if(!b)return;const st=phLoad();st.items.splice(Number(b.dataset.del),1);phSave(st);phApply()});
-  $("ph-clear").onclick=()=>{phSave({items:[],usdthb:phLoad().usdthb,hkdusd:phLoad().hkdusd});phApply()};
+    const i=st.items.findIndex(x=>x.tk===h.tk&&(x.acct||"")===h.acct);if(i>=0){const o=st.items[i];if(h.theme==="Other"&&o.theme)h.theme=o.theme;if(h.cur==="USD"&&o.cur)h.cur=o.cur;if(h.px==null&&o.px!=null)h.px=o.px;st.items[i]=h}else st.items.push(h);phSave(st);form.reset();$("ph-msg").textContent="";phApply()});
+  $("ph-table").addEventListener("click",e=>{const ed=e.target.closest("button[data-edit]");if(ed){const h=phLoad().items[Number(ed.dataset.edit)];if(h){const f=form.elements;if(h.theme&&![...f.theme.options].some(o=>o.value===h.theme))f.theme.add(new Option(h.theme,h.theme));f.acct.value=h.acct||"";f.tk.value=h.tk;f.theme.value=h.theme||"Other";f.cur.value=h.cur||"USD";f.qty.value=h.qty;f.cost.value=h.cost==null?"":h.cost;f.px.value=h.px==null?"":h.px;f.qty.focus();form.scrollIntoView({block:"center",behavior:"smooth"});$("ph-msg").textContent="Editing "+h.tk+": change the values, then press Add / update."}return}const b=e.target.closest("button[data-del]");if(!b)return;const st=phLoad();st.items.splice(Number(b.dataset.del),1);phSave(st);phApply()});
+  $("ph-clear").onclick=()=>{if(!confirm("Remove ALL holdings? This cannot be undone."))return;phSave({items:[],usdthb:phLoad().usdthb,hkdusd:phLoad().hkdusd});phApply()};
   for(const [id,k] of [["ph-usdthb","usdthb"],["ph-hkdusd","hkdusd"]])$(id).addEventListener("change",e=>{const st=phLoad();const v=parseFloat(e.target.value);st[k]=v>0?v:null;phSave(st);phApply()});
   phRender()})();
 
