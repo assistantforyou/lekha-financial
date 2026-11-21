@@ -29,5 +29,13 @@ const qq = sec.buildStatements(f, "T", "quarterly"); assert.strictEqual(qq.lengt
   assert.strictEqual(r.data, 42); assert.strictEqual(r.source, "c"); assert.deepStrictEqual(r.attempts.map((x) => x.status), ["skipped", "error", "ok"]);
   await assert.rejects(() => svc.chain("y", [[{ name: "a", configured: () => true }, async () => null]]), /no_provider_for_y/);
   assert.throws(() => svc.sym("bad symbol!"), /bad_symbol/);
-  console.log("_finservice.test.js ok");
+  
+// news text: typographic/numeric/double-encoded entities, embedded markup and teaser labels are cleaned
+{ const { decode } = require("./_fin/providers/news");
+  assert.strictEqual(decode("Key Points A manager couldn&rsquo;t beat the S&amp;P 500"), "A manager couldn\u2019t beat the S&P 500");
+  assert.strictEqual(decode("Fed &amp;amp; markets &#8212; what&#x27;s next"), "Fed & markets \u2014 what's next");
+  assert.strictEqual(decode("&lt;p&gt;Stocks &lt;b&gt;fall&lt;/b&gt;&lt;/p&gt;"), "Stocks fall");
+  assert.strictEqual(decode("<![CDATA[Oil &amp; gas]]>"), "Oil & gas");
+  assert.strictEqual(decode("Key Points of the plan"), "Key Points of the plan", "only a label, not a sentence, is removed"); }
+console.log("_finservice.test.js ok");
 })();

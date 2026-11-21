@@ -22,7 +22,7 @@ function fail(res, e) {
 
 const GET = {
   search: (q) => svc.search(q.q || q.query || "", { limit: num(q.limit, 12) }),
-  quote: (q, asOf) => svc.getQuote(q.symbol, { asOf }), history: (q, asOf) => svc.getHistoricalPrices(q.symbol, { days: num(q.days, 365), asOf }),
+  quote: (q, asOf) => svc.getQuote(q.symbol, { asOf }), history: (q, asOf) => svc.getHistoricalPrices(q.symbol, { days: num(q.days, 365), asOf }), intraday: (q, asOf) => svc.getIntradayPrices(q.symbol, { days: num(q.days, 1), asOf }),
   company: async (q, asOf) => ({ data: await svc.getCompanyBundle(q.symbol, { asOf }), meta: { source: "bundle", asOf: asOf || null } }),
   profile: (q) => svc.getCompanyProfile(q.symbol), statements: (q, asOf) => svc.getFinancialStatements(q.symbol, { type: q.type, asOf }), facts: (q, asOf) => svc.getCompanyFacts(q.symbol, { asOf }),
   filings: (q, asOf) => svc.getSecFilings(q.symbol, { forms: list(q.forms), limit: num(q.limit, 40), asOf }), news: (q, asOf) => svc.getNews({ symbol: q.symbol || null, category: q.category || null, query: q.q || null, limit: num(q.limit, 25), asOf }),

@@ -35,4 +35,21 @@ async function history(symbol, { days = 365 } = {}) {
     return rows;
   });
 }
-module.exports = { name, configured, license: "Free IEX feed for personal/dev use; redistribution requires an Alpaca data agreement.", quotes, history };
+// Intraday IEX bars. The regular session is 13:30-21:00 UTC in every season, so the UTC date identifies the session.
+async function intraday(symbol, { days = 1 } = {}) {
+  if (!configured()) throw notConfigured(name);
+  const one = days <= 1, tf = one ? "5Min" : "15Min", sessions = one ? 1 : 5;
+  return obs.timed(name, "intraday", async () => {
+    const start = new Date(Date.now() - (one ? 6 : 10) * 864e5).toISOString(), rows = []; let token = null;
+    for (let i = 0; i < 5; i++) {
+      const qs = new URLSearchParams({ timeframe: tf, start, limit: "10000", feed: "iex", adjustment: "split" }); if (token) qs.set("page_token", token);
+      const j = await request(name, `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars?${qs}`, { headers: H() });
+      for (const b of (j && j.bars) || []) rows.push([b.t, b.o, b.h, b.l, b.c, b.v]);
+      token = j && j.next_page_token; if (!token) break;
+    }
+    const dates = [...new Set(rows.map((r) => r[0].slice(0, 10)))].sort().slice(-sessions), keep = rows.filter((r) => dates.includes(r[0].slice(0, 10)));
+    if (!keep.length) throw new Error("alpaca_empty");
+    return keep.map((r) => S.bar(r[0].slice(0, 16) + ":00Z", r[1], r[2], r[3], r[4], r[5]));
+  });
+}
+module.exports = { name, configured, license: "Free IEX feed for personal/dev use; redistribution requires an Alpaca data agreement.", quotes, history, intraday };

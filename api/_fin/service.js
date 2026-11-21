@@ -72,6 +72,16 @@ async function getHistoricalPrices(symbol, { days = 365, asOf } = {}) {
   });
 }
 
+async function getIntradayPrices(symbol, { days = 1, asOf } = {}) {
+  const s = sym(symbol), d = +days <= 1 ? 1 : 5;
+  // intraday bars are only served for the latest sessions: a demo date pinned further back than a long weekend has none, so say so instead of showing today's session
+  if (asOf && gapDays(asOf) > 4) { const e = new Error("no_provider_for_intraday"); e.status = 502; e.attempts = [{ provider: "demo date", status: "not archived" }]; throw e; }
+  return cached("intraday", `${s}/${d}`, () => {
+    if (isCrypto(s) || isIntl(s)) return chain("intraday", [[P.yahoo, () => P.yahoo.intraday(s, { days: d })]]);
+    return chain("intraday", [[P.alpaca, () => P.alpaca.intraday(s, { days: d })], [P.yahoo, () => P.yahoo.intraday(s, { days: d })]]);
+  });
+}
+
 // ---------------- company ----------------
 async function getCompanyProfile(symbol) {
   const s = sym(symbol);
@@ -118,9 +128,16 @@ function dedupe(items) {
   }
   return out;
 }
-async function getNews({ symbol = null, category = null, limit = 25, query = null, asOf = null } = {}) {
-  if (asOf) { const r = await getNews({ symbol, category, query, limit: 100 }); return { data: r.data.filter((n) => day(n.publishedAt) <= asOf).slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines are not archived for the demo date." } }; }
-  const s = symbol ? sym(symbol) : null, key = `${s || "market"}/${category || "all"}/${limit}/${query || ""}`;
+// text is cleaned on the way out as well as on the way in, so rows already sitting in the shared cache are fixed too
+const cleanText = (t) => (t == null ? t : P.news.decode(t));
+async function getNews(opts = {}) {
+  const { asOf = null } = opts, limit = Math.max(1, Math.min(60, +opts.limit || 25));
+  if (asOf) { const r = await getNews({ symbol: opts.symbol, category: opts.category, query: opts.query, limit: 60 }); return { data: r.data.filter((n) => day(n.publishedAt) <= asOf).slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines are not archived for the demo date." } }; }
+  const r = await getNewsCached(opts);
+  return { ...r, data: (r.data || []).slice(0, limit).map((n) => ({ ...n, headline: cleanText(n.headline), summary: cleanText(n.summary) })) };
+}
+async function getNewsCached({ symbol = null, category = null, query = null } = {}) {
+  const s = symbol ? sym(symbol) : null, key = `${s || "market"}/${category || "all"}/${query || ""}`;   // limit is applied after the cache so every caller shares one upstream fetch
   return cached("news", key, async () => {
     const parts = [], attempts = [];
     const add = async (prov, run) => { if (prov.configured && !prov.configured()) { attempts.push({ provider: prov.name, status: "skipped" }); return; } try { const r = await run(); parts.push(...r); attempts.push({ provider: prov.name, status: r.length ? "ok" : "empty" }); } catch (e) { attempts.push({ provider: prov.name, status: "error", error: String(e.message).slice(0, 80) }); } };
@@ -128,7 +145,7 @@ async function getNews({ symbol = null, category = null, limit = 25, query = nul
     else await Promise.all([add(P.finnhub, () => P.finnhub.marketNews("general")), add(P.news, () => P.news.market())]);
     if (!parts.length) { const e = new Error("no_provider_for_news"); e.attempts = attempts; e.status = 502; throw e; }
     let items = dedupe(parts); if (category) items = items.filter((n) => n.category === category); if (query) { const q = query.toLowerCase(); items = items.filter((n) => (n.headline + " " + (n.summary || "")).toLowerCase().includes(q)); }
-    return { data: items.slice(0, limit), source: "merged", attempts };
+    return { data: items.slice(0, 60), source: "merged", attempts };
   }, { ttl: 10 * 6e4 });
 }
 
@@ -280,5 +297,5 @@ function status() {
   return Object.values(P).map((p) => ({ name: p.name, configured: p.configured(), license: p.license || null }));
 }
 
-module.exports = { getQuote, getQuotes, getHistoricalPrices, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, getRatios, getValuation, getCompanyBundle,
+module.exports = { getQuote, getQuotes, getHistoricalPrices, getIntradayPrices, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, getRatios, getValuation, getCompanyBundle,
   status, providers: P, dedupe, norm, chain, sym, CONCEPTS };

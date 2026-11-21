@@ -12,8 +12,10 @@ const FEEDS = [
   { name: "BBC Business", url: "https://feeds.bbci.co.uk/news/business/rss.xml", category: "market" },
   { name: "Nasdaq", url: "https://www.nasdaq.com/feed/rssoutbound?category=Markets", category: "market" },
 ];
-const ENT = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&#x27;": "'", "&apos;": "'", "&nbsp;": " " };
-const decode = (s) => String(s || "").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]+>/g, " ").replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39|#x27);/g, (m) => ENT[m]).replace(/\s+/g, " ").trim();
+const NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "\u2019", lsquo: "\u2018", rdquo: "\u201d", ldquo: "\u201c", ndash: "\u2013", mdash: "\u2014", hellip: "\u2026", pound: "\u00a3", euro: "\u20ac", copy: "\u00a9", reg: "\u00ae", trade: "\u2122" };
+const entities = (s) => String(s).replace(/&(?:#(\d{1,6})|#x([0-9a-f]{1,5})|([a-z]{2,8}));/gi, (m, d, h, n) => { try { return d ? String.fromCodePoint(+d) : h ? String.fromCodePoint(parseInt(h, 16)) : Object.prototype.hasOwnProperty.call(NAMED, n.toLowerCase()) ? NAMED[n.toLowerCase()] : m; } catch (e) { return m; } });
+// feeds often double-encode (&amp;rsquo;) and prefix teasers with a label such as "Key Points": decode twice, drop tags, drop the label
+const decode = (s) => entities(entities(String(s || "").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")).replace(/<[^>]+>/g, " ")).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").replace(/^Key Points\s*(?=[A-Z0-9"\u201c])/, "").trim();
 const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); };
 
 // topic classifier (keyword rules: explainable, not AI)
@@ -40,4 +42,4 @@ async function market() {
   const all = await Promise.all(FEEDS.map((f) => obs.timed(name, "feed:" + f.name, async () => parse(await request(name, f.url, { text: true, headers: { "User-Agent": BROWSER_UA }, timeoutMs: 8000 }), f.name, [], f.category)).catch(() => [])));
   return all.flat();
 }
-module.exports = { name, configured: () => true, license: "Headlines and links only, each linking to the publisher. Do not reproduce article bodies.", company, market, categorize, parse };
+module.exports = { name, configured: () => true, license: "Headlines and links only, each linking to the publisher. Do not reproduce article bodies.", company, market, categorize, parse, decode };

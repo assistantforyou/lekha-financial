@@ -25,6 +25,17 @@ async function history(sym, { days = 365 } = {}) {
     return out;
   });
 }
+// Intraday bars: 5-minute for the latest session (days<=1) or 15-minute for the latest 5 sessions. Timestamps are full UTC ISO strings.
+async function intraday(sym, { days = 1 } = {}) {
+  const one = days <= 1;
+  return obs.timed(name, "intraday", async () => {
+    const j = await chart(sym, one ? "1d" : "5d", one ? "5m" : "15m"), r = j && j.chart && j.chart.result && j.chart.result[0]; if (!r || !Array.isArray(r.timestamp)) throw new Error("yahoo_empty");
+    const q = r.indicators.quote[0], out = [];
+    r.timestamp.forEach((t, i) => { if (q.close[i] > 0) out.push(S.bar(new Date(t * 1000).toISOString().slice(0, 16) + ":00Z", q.open[i], q.high[i], q.low[i], q.close[i], q.volume[i])); });
+    if (!out.length) throw new Error("yahoo_empty");
+    return out;
+  });
+}
 const KIND = { EQUITY: "equity", ETF: "etf", INDEX: "index", CRYPTOCURRENCY: "crypto", MUTUALFUND: "fund", CURRENCY: "fx", FUTURE: "future" };
 async function search(q, limit = 8) {
   return obs.timed(name, "search", async () => {
@@ -32,4 +43,4 @@ async function search(q, limit = 8) {
     return ((j && j.quotes) || []).filter((x) => x.symbol && KIND[x.quoteType]).map((x) => ({ symbol: x.symbol, name: x.longname || x.shortname || x.symbol, exchange: x.exchDisp || x.exchange || null, type: KIND[x.quoteType], source: "Yahoo Finance" }));
   });
 }
-module.exports = { name, configured: () => true, license: "Unofficial, personal-use. Not licensed for commercial redistribution.", quote, history, search };
+module.exports = { name, configured: () => true, license: "Unofficial, personal-use. Not licensed for commercial redistribution.", quote, history, intraday, search };
