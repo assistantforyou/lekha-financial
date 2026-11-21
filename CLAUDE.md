@@ -28,7 +28,7 @@ The old modular "main" skin (`public/app.js`, `views/`, `core/ui` etc.) was **re
 
 ## Quick Tour (first-run onboarding, `app/src/tour/`)
 * `Tour.jsx` (mounted in `App.jsx`) spotlights real DOM, navigates real routes and waits for each target; `steps.js` lists the ten steps and their targets (selector functions, with `data-tour` hooks in `Banner.jsx`, `App.jsx` aside and `pages/company.jsx`); `layout.js` is the pure placement maths (tested in `api/_tour.test.js`); `copy.js` carries the copy in all ten languages (the React shell is outside the classic dictionary pipeline, so the tour has its own; keep every language in step, the test enforces it); `store.js` holds the state.
-* State `not_started | in_progress | completed | skipped` in `ptpub.v1.app.tour`; finishing also writes `prefs.tour` through `PT_UI.setPref`, so it syncs with the account. Auto-start only for a browser that never opened the app (no `ptpub.v1.app.route`) or an interrupted tour. Replay: sidebar footer, command palette, Account -> Preferences.
+* State `not_started | in_progress | completed | skipped` in `ptpub.v1.app.tour`; finishing also writes `prefs.tour` through `PT_UI.setPref`, so it syncs with the account. Auto-starts for anyone who has not completed or skipped it (existing users included) and resumes if interrupted. Replay: sidebar footer, command palette, Account -> Preferences.
 * Adding a step: add it to `STEPS`, add its copy to every language in `copy.js`. A step whose target is missing is skipped, never shown broken.
 
 ## Financial data layer (`api/_fin/`, served at `/api/data/*`)
