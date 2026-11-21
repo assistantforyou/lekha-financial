@@ -6,7 +6,7 @@ const { pathToFileURL } = require("url");
 const load = (f) => import(pathToFileURL(path.join(__dirname, "..", "app", "src", "tour", f)).href);
 
 (async () => {
-  const { COPY } = await load("copy.js"), { place, scrollDelta } = await load("layout.js");
+  const { COPY, PTS, LANG_LABEL, LANG_NATIVE } = await load("copy.js"), { place, scrollDelta } = await load("layout.js");
   const I = require("../public/v2/pt-i18n.js");
   const codes = I.LANGS.map((l) => l.code);
   assert.deepStrictEqual(Object.keys(COPY).sort(), codes.slice().sort(), "tour copy must cover exactly the languages the app ships");
@@ -19,6 +19,9 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, "..", "app", "src"
       for (const f of ["t", "b", "a"]) { if (e[f] == null) { assert.ok(s[f] == null, `${c} ${id}.${f} should not exist`); continue } assert.ok(s[f], `${c} ${id}.${f}`); assert.strictEqual(ph(s[f]), ph(e[f]), `${c} ${id}.${f} placeholders`) }
       if (e.wf) assert.strictEqual(s.wf.length, e.wf.length, `${c} workflow chips`);
     }
+    assert.ok(LANG_LABEL[c] && LANG_NATIVE[c], `${c} language switch labels`);
+    for (const [id, rows] of Object.entries(PTS.en)) { const r = PTS[c] && PTS[c][id]; assert.ok(r && r.length === rows.length && r.every((x) => x[0] && x[1]), `${c} bullets ${id}`) }
+    assert.ok(!PICTO.test(JSON.stringify(PTS[c])), `${c}: no pictographs in bullets`);
     assert.ok(!PICTO.test(JSON.stringify(COPY[c])), `${c}: no pictographs (house style)`);
     assert.ok(!/!/.test(JSON.stringify(COPY[c]).replace(/\\"/g, "")), `${c}: no exclamation marks (house style)`);
   }

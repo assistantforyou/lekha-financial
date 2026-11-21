@@ -5,6 +5,7 @@ const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { clientId } = require("../../_history");
 const agent = require("../../_fin/agent");
+const { DEMO_ASOF } = require("../../_fin/asof");
 const { langOf, withLang } = require("../ai/_lang");
 const DAY = 864e5;
 
@@ -28,6 +29,6 @@ module.exports = async (req, res) => {
     try { return res.status(200).json(await agent.expert({ question, context: String(b.context || "").slice(0, 14000), llm, langHint: langOf(b.lang) && langOf(b.lang) !== "en" ? "\n" + withLang("", langOf(b.lang)).trim() : "" })); }
     catch (e) { return res.status(e.status === 400 ? 400 : e.status === 503 ? 503 : 502).json({ error: e.message === "llm_not_configured" ? "AI is not configured on this deployment." : "The analyst could not answer right now.", code: e.message }); }
   }
-  try { const out = await agent.run({ question, symbol: b.symbol || null, llm, lang, owner, langHint: lang && lang !== "en" ? "\n" + withLang("", lang).trim() : "" }); return res.status(200).json(out); }
+  try { const out = await agent.run({ question, symbol: b.symbol || null, llm, lang, owner, asOf: p.demo ? DEMO_ASOF : null, langHint: lang && lang !== "en" ? "\n" + withLang("", lang).trim() : "" }); return res.status(200).json(out); }
   catch (e) { return res.status(e.status === 400 ? 400 : 502).json({ error: e.status === 400 ? "Ask a question first." : "The research agent could not complete this request.", code: e.message }); }
 };

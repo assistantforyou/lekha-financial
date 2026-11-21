@@ -157,11 +157,74 @@ export const COPY = {
   },
 }
 
-export const tourLang = () => { try { const l = window.PT_I18N && window.PT_I18N.lang; return COPY[l] ? l : "en" } catch (e) { return "en" } }
+/* The tour has its own language switch (instant, no reload); it starts in the app's language. */
+const LKEY = "ptpub.v1.app.tourlang"
+export const tourLang = () => {
+  try { const o = localStorage.getItem(LKEY); if (o && COPY[o]) return o } catch (e) {}
+  try { const l = window.PT_I18N && window.PT_I18N.lang; return COPY[l] ? l : "en" } catch (e) { return "en" }
+}
+export const setTourLang = (c) => { if (COPY[c]) { try { localStorage.setItem(LKEY, c) } catch (e) {} window.dispatchEvent(new Event("lekha:tourlang")) } }
 const fill = (s, v) => (v ? s.replace(/\{(\w+)\}/g, (m, k) => (v[k] != null ? v[k] : m)) : s)
 /* ui string, with English as the fallback for anything a language lacks */
 export const ui = (k, v) => fill((COPY[tourLang()].ui[k]) || COPY.en.ui[k], v)
 export const stepCopy = (id, v) => {
   const c = COPY[tourLang()].steps[id] || COPY.en.steps[id], e = COPY.en.steps[id]
-  return { t: c.t || e.t, b: fill(c.b || e.b, v), a: c.a ? fill(c.a, v) : e.a ? fill(e.a, v) : null, wf: c.wf || e.wf }
+  const pts = (PTS[tourLang()] && PTS[tourLang()][id]) || (PTS.en && PTS.en[id]) || null
+  return { t: c.t || e.t, b: fill(c.b || e.b, v), a: c.a ? fill(c.a, v) : e.a ? fill(e.a, v) : null, wf: c.wf || e.wf, pts }
 }
+
+/* Step bullets for the three portfolio steps: [term as it appears on screen, plain-language meaning]. Shown on desktop where there is room. */
+export const PTS = {
+  en: {
+    summary: [["Today", "Change since the last close."], ["Unrealized P&L", "Gain or loss on what you still hold, against what you paid."], ["From 1Y peak", "How far the portfolio sits below its best level of the past year."]],
+    performance: [["vs S&P 500 & Nasdaq", "Your return plotted against two market benchmarks."], ["Value", "Switches the chart to your portfolio's value over time."], ["1M · 3M · 6M · YTD · 1Y", "The window the chart covers."]],
+    holdings: [["Weight", "Each position's share of the whole portfolio."], ["P&L %", "Return on what you paid, from your average cost."], ["Column headings", "Click one to sort the table by it."]],
+  },
+  th: {
+    summary: [["วันนี้", "การเปลี่ยนแปลงนับจากราคาปิดล่าสุด"], ["กำไร/ขาดทุนที่ยังไม่รับรู้", "กำไรหรือขาดทุนของสิ่งที่ยังถืออยู่ เทียบกับต้นทุนที่จ่ายไป"], ["From 1Y peak", "พอร์ตอยู่ต่ำกว่าจุดสูงสุดในรอบปีมากแค่ไหน"]],
+    performance: [["vs S&P 500 & Nasdaq", "ผลตอบแทนของคุณเทียบกับดัชนีตลาดสองตัว"], ["มูลค่า", "สลับกราฟไปแสดงมูลค่าพอร์ตตามเวลา"], ["1M · 3M · 6M · YTD · 1Y", "ช่วงเวลาที่กราฟครอบคลุม"]],
+    holdings: [["น้ำหนัก", "สัดส่วนของแต่ละสถานะในพอร์ตทั้งหมด"], ["P&L %", "ผลตอบแทนเทียบกับต้นทุนเฉลี่ยที่จ่ายไป"], ["หัวคอลัมน์", "คลิกเพื่อเรียงตารางตามคอลัมน์นั้น"]],
+  },
+  "zh-Hans": {
+    summary: [["今日", "自上次收盘以来的变动。"], ["未实现盈亏", "仍持有部分相对买入成本的盈亏。"], ["From 1Y peak", "投资组合低于过去一年最高点的幅度。"]],
+    performance: [["vs S&P 500 & Nasdaq", "你的收益与两大市场基准的对比。"], ["价值", "将图表切换为投资组合价值走势。"], ["1M · 3M · 6M · YTD · 1Y", "图表覆盖的时间区间。"]],
+    holdings: [["权重", "每个持仓占整个投资组合的比例。"], ["P&L %", "相对平均成本的收益率。"], ["列标题", "点击即可按该列排序。"]],
+  },
+  "zh-Hant": {
+    summary: [["今日", "自上次收盤以來的變動。"], ["未實現損益", "仍持有部分相對買入成本的損益。"], ["From 1Y peak", "投資組合低於過去一年最高點的幅度。"]],
+    performance: [["vs S&P 500 & Nasdaq", "你的報酬與兩大市場基準的比較。"], ["價值", "將圖表切換為投資組合價值走勢。"], ["1M · 3M · 6M · YTD · 1Y", "圖表涵蓋的時間區間。"]],
+    holdings: [["權重", "每個持倉占整個投資組合的比例。"], ["P&L %", "相對平均成本的報酬率。"], ["欄位標題", "點擊即可依該欄排序。"]],
+  },
+  ja: {
+    summary: [["本日", "前回の終値からの変動。"], ["含み損益", "保有中の銘柄の、取得額に対する損益。"], ["From 1Y peak", "過去1年の最高値からどれだけ下にあるか。"]],
+    performance: [["vs S&P 500 & Nasdaq", "2つの市場指数と比べた収益率。"], ["評価額", "チャートを評価額の推移に切り替えます。"], ["1M · 3M · 6M · YTD · 1Y", "チャートが表示する期間。"]],
+    holdings: [["比率", "ポートフォリオ全体に占める各銘柄の割合。"], ["P&L %", "平均取得単価に対する収益率。"], ["列見出し", "クリックするとその列で並べ替えます。"]],
+  },
+  ko: {
+    summary: [["오늘", "직전 종가 이후의 변동."], ["미실현 손익", "보유 중인 종목의 매입 금액 대비 손익."], ["From 1Y peak", "최근 1년 최고점보다 얼마나 낮은지."]],
+    performance: [["vs S&P 500 & Nasdaq", "두 시장 지수와 비교한 내 수익률."], ["평가액", "차트를 포트폴리오 평가액 추이로 전환합니다."], ["1M · 3M · 6M · YTD · 1Y", "차트가 보여 주는 기간."]],
+    holdings: [["비중", "전체 포트폴리오에서 각 포지션이 차지하는 비율."], ["P&L %", "평균 매입 단가 대비 수익률."], ["열 제목", "클릭하면 해당 열 기준으로 정렬됩니다."]],
+  },
+  es: {
+    summary: [["Hoy", "Variación desde el último cierre."], ["G/P no realizadas", "Ganancia o pérdida de lo que aún tienes, frente a lo que pagaste."], ["From 1Y peak", "Cuánto está la cartera por debajo de su mejor nivel del último año."]],
+    performance: [["vs S&P 500 & Nasdaq", "Tu rentabilidad frente a dos referencias del mercado."], ["Valor", "Cambia el gráfico al valor de tu cartera en el tiempo."], ["1M · 3M · 6M · YTD · 1Y", "El periodo que cubre el gráfico."]],
+    holdings: [["Peso", "La parte de la cartera que representa cada posición."], ["P&L %", "Rentabilidad sobre lo que pagaste, según tu coste medio."], ["Encabezados de columna", "Haz clic en uno para ordenar la tabla por él."]],
+  },
+  hi: {
+    summary: [["आज", "पिछले क्लोज़ के बाद का बदलाव।"], ["अवास्तविक लाभ/हानि", "जो आप अभी भी रखते हैं, उस पर खरीद लागत के मुकाबले लाभ या हानि।"], ["From 1Y peak", "पोर्टफोलियो पिछले साल के सर्वोच्च स्तर से कितना नीचे है।"]],
+    performance: [["vs S&P 500 & Nasdaq", "दो बाज़ार बेंचमार्क के मुकाबले आपका रिटर्न।"], ["मूल्य", "चार्ट को समय के साथ पोर्टफोलियो मूल्य पर ले जाता है।"], ["1M · 3M · 6M · YTD · 1Y", "चार्ट जितनी अवधि दिखाता है।"]],
+    holdings: [["भार", "पूरे पोर्टफोलियो में हर पोज़िशन का हिस्सा।"], ["P&L %", "औसत लागत के मुकाबले रिटर्न।"], ["कॉलम शीर्षक", "उस कॉलम से तालिका क्रमबद्ध करने के लिए क्लिक करें।"]],
+  },
+  vi: {
+    summary: [["Hôm nay", "Biến động kể từ lần đóng cửa gần nhất."], ["Lãi/lỗ chưa thực hiện", "Lãi hoặc lỗ của phần bạn còn nắm giữ so với giá bạn đã trả."], ["From 1Y peak", "Danh mục đang thấp hơn mức cao nhất trong năm qua bao nhiêu."]],
+    performance: [["vs S&P 500 & Nasdaq", "Lợi suất của bạn so với hai chỉ số tham chiếu của thị trường."], ["Giá trị", "Chuyển biểu đồ sang giá trị danh mục theo thời gian."], ["1M · 3M · 6M · YTD · 1Y", "Khoảng thời gian mà biểu đồ bao phủ."]],
+    holdings: [["Tỷ trọng", "Phần mà mỗi vị thế chiếm trong toàn danh mục."], ["P&L %", "Lợi suất so với giá vốn trung bình."], ["Tiêu đề cột", "Nhấp để sắp xếp bảng theo cột đó."]],
+  },
+  fr: {
+    summary: [["Aujourd’hui", "Variation depuis la dernière clôture."], ["Plus/moins-values latentes", "Gain ou perte sur ce que vous détenez encore, par rapport à ce que vous avez payé."], ["From 1Y peak", "De combien le portefeuille est sous son meilleur niveau de l'année."]],
+    performance: [["vs S&P 500 & Nasdaq", "Votre rendement face à deux indices de référence."], ["Valeur", "Bascule le graphique sur la valeur de votre portefeuille dans le temps."], ["1M · 3M · 6M · YTD · 1Y", "La période couverte par le graphique."]],
+    holdings: [["Poids", "La part de chaque position dans l'ensemble du portefeuille."], ["P&L %", "Rendement par rapport à votre coût moyen."], ["En-têtes de colonne", "Cliquez sur l'un d'eux pour trier le tableau."]],
+  },
+}
+export const LANG_LABEL = { en: "Tour language", th: "ภาษาของทัวร์", "zh-Hans": "导览语言", "zh-Hant": "導覽語言", ja: "ツアーの言語", ko: "둘러보기 언어", es: "Idioma del recorrido", hi: "टूर की भाषा", vi: "Ngôn ngữ giới thiệu", fr: "Langue de la visite" }
+export const LANG_NATIVE = { en: "English", th: "ไทย", "zh-Hans": "简体中文", "zh-Hant": "繁體中文", ja: "日本語", ko: "한국어", es: "Español", hi: "हिन्दी", vi: "Tiếng Việt", fr: "Français" }

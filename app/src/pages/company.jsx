@@ -12,7 +12,7 @@ import { Bars, DataState, EmptyBox, ErrorBox, FreshBadge, LineChart, PageHeader,
 import AgentPanel from "@/components/AgentPanel"
 import { remember } from "@/components/CommandPalette"
 import { useWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/watchlist"
-import { data as fetchData, useData } from "@/lib/api"
+import { api, data as fetchData, useData } from "@/lib/api"
 import { compact, date, dateTime, metric, mult, num, pct, price, tone } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
 
@@ -110,7 +110,7 @@ function Earnings({ b }) { if (!b.earnings.ok) return <ErrorBox message={b.earni
 
 function Peers({ b, navigate }) {
   const peers = b.peers.ok ? b.peers.data : [], [q, setQ] = useState({})
-  useEffect(() => { if (!peers.length) return; fetch("/api/data/quotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: peers.slice(0, 10) }) }).then((r) => r.json()).then((j) => setQ((j.data) || {})).catch(() => {}) }, [peers.join()])
+  useEffect(() => { if (!peers.length) return; api("/api/data/quotes", { method: "POST", auth: true, body: { symbols: peers.slice(0, 10) } }).then((j) => setQ((j.data) || {})).catch(() => {}) }, [peers.join()])
   if (!b.peers.ok) return <ErrorBox message={b.peers.error} attempts={b.peers.attempts} />
   return <Card><CardHeader><CardTitle>Comparable companies</CardTitle><CardDescription><SourceTag meta={b.peers.meta} /> · peers come from the provider, or the same S&P 500 sector when no provider is configured</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Symbol</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Today</TableHead><TableHead /></TableRow></TableHeader><TableBody>{peers.slice(0, 10).map((p) => { const x = q[p]; return <TableRow key={p} className="cursor-pointer" onClick={() => navigate("company/" + p)}><TableCell className="font-mono font-semibold">{p}</TableCell><TableCell className="num text-right">{x ? price(x.price, x.currency) : "…"}</TableCell><TableCell className={cn("num text-right", x && tone(x.changePercent))}>{x ? pct(x.changePercent, 2, true) : ""}</TableCell><TableCell className="text-right text-primary">Open →</TableCell></TableRow> })}</TableBody></Table></CardContent></Card>
 }

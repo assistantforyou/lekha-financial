@@ -13,7 +13,7 @@ export default function Watchlist({ item, navigate }) {
   const wl = useWatchlist(), [q, setQ] = useState({}), [add, setAdd] = useState(""), syms = wl.map((w) => w.symbol).join(",")
   useEffect(() => {
     if (!wl.length) return; let dead = false
-    const pull = () => fetch("/api/data/quotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: wl.map((w) => w.symbol) }) }).then((r) => r.json()).then((j) => !dead && setQ(j.data || {})).catch(() => {})
+    const pull = () => api("/api/data/quotes", { method: "POST", auth: true, body: { symbols: wl.map((w) => w.symbol) } }).then((j) => !dead && setQ(j.data || {})).catch(() => {})
     pull(); const t = setInterval(pull, 20000); return () => { dead = true; clearInterval(t) }
   }, [syms])
   return (<div><PageHeader title={item.title} description={item.desc} />

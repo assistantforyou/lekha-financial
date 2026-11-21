@@ -20,6 +20,8 @@ const { cacheFetch } = require("./cache");
 const SP = Object.fromEntries(require("../_data/sp500.json").stocks);
 const isCrypto = (s) => /-USD$/i.test(s) || /^(BTC|ETH|SOL|XRP|DOGE|ADA)$/i.test(s);
 const isIntl = (s) => /\.(HK|BK|T|L|TO|AX|SI|KS|KQ|SS|SZ|NS|BO|DE|PA|AS|SW|MI|MC|TW)$/i.test(s) || /^\^/.test(s);
+// As-of mode (demo): every datum is cut off at a past date, so a demo visitor never sees live data. See _fin/asof.js.
+const DAYMS = 864e5, gapDays = (a) => Math.max(0, Math.ceil((Date.now() - Date.parse(a + "T00:00:00Z")) / DAYMS)), shift = (d, n) => new Date(Date.parse(d + "T00:00:00Z") + n * DAYMS).toISOString().slice(0, 10), day = (x) => String(x == null ? "" : x).slice(0, 10);
 const clean = (s) => String(s || "").trim().toUpperCase();
 const sym = (s) => { const v = clean(s); if (!/^[A-Z0-9^][A-Z0-9.\-^=]{0,14}$/.test(v)) throw Object.assign(new Error("bad_symbol"), { status: 400 }); return v; };
 
@@ -37,7 +39,14 @@ const wrap = (r, c) => ({ data: r.data, meta: { source: r.source, attempts: r.at
 async function cached(cls, key, producer, opts) { const c = await cacheFetch(cls, key, producer, opts); return wrap(c.value, c); }
 
 // ---------------- market data ----------------
-async function getQuote(symbol) {
+async function quoteAsOf(symbol, asOf) {
+  const s = sym(symbol), [h, live] = await Promise.all([getHistoricalPrices(s, { days: 12, asOf }), getQuote(s).catch(() => null)]);
+  const bars = h.data; if (!bars.length) throw Object.assign(new Error("no_history_at_date"), { status: 404, attempts: h.meta.attempts });
+  const b = bars[bars.length - 1], p = bars[bars.length - 2], l = live && live.data;
+  return { data: S.quote({ symbol: s, name: l && l.name, price: b[4], previousClose: p ? p[4] : null, open: b[1], high: b[2], low: b[3], volume: b[5], currency: l && l.currency, exchange: l && l.exchange, timestamp: day(b[0]) + "T20:00:00Z", source: h.meta.source, freshness: "historical" }), meta: { ...h.meta, asOf } };
+}
+async function getQuote(symbol, { asOf } = {}) {
+  if (asOf) return quoteAsOf(symbol, asOf);
   const s = sym(symbol);
   return cached("quote", s, () => {
     if (isCrypto(s)) return chain("quote", [[P.coingecko, () => P.coingecko.quote(s)], [P.alphavantage, () => P.alphavantage.cryptoQuote(s)]]);
@@ -45,15 +54,17 @@ async function getQuote(symbol) {
     return chain("quote", [[P.alpaca, async () => (await P.alpaca.quotes([s]))[s]], [P.finnhub, () => P.finnhub.quote(s)], [P.fmp, () => P.fmp.quote(s)], [P.yahoo, () => P.yahoo.quote(s)], [P.twelvedata, () => P.twelvedata.quote(s)], [P.alphavantage, () => P.alphavantage.quote(s)]]);
   });
 }
-async function getQuotes(symbols) {
+async function getQuotes(symbols, { asOf } = {}) {
   const list = [...new Set(symbols.map(sym))].slice(0, 40), out = {}, meta = {};
+  if (asOf) { await Promise.all(list.map(async (s) => { try { const r = await quoteAsOf(s, asOf); out[s] = r.data; meta[s] = r.meta; } catch (e) { meta[s] = { error: e.message }; } })); return { data: out, meta: { source: "mixed", asOf, perSymbol: meta } }; }
   const us = list.filter((s) => !isCrypto(s) && !isIntl(s));
   if (us.length && P.alpaca.configured()) { try { const q = await obs.timed("alpaca", "batch", () => P.alpaca.quotes(us)); Object.assign(out, q); } catch (e) { /* individual fallbacks below */ } }
   await Promise.all(list.filter((s) => !out[s]).map(async (s) => { try { const r = await getQuote(s); out[s] = r.data; meta[s] = r.meta; } catch (e) { meta[s] = { error: e.message }; } }));
   return { data: out, meta: { source: "mixed", perSymbol: meta } };
 }
-async function getHistoricalPrices(symbol, { days = 365 } = {}) {
+async function getHistoricalPrices(symbol, { days = 365, asOf } = {}) {
   const s = sym(symbol), d = Math.max(5, Math.min(3650, +days || 365));
+  if (asOf) { const r = await getHistoricalPrices(s, { days: Math.min(3650, d + gapDays(asOf) + 7) }), from = shift(asOf, -d); return { data: r.data.filter((b) => day(b[0]) <= asOf && day(b[0]) >= from), meta: { ...r.meta, asOf } }; }
   return cached("history", `${s}/${d}`, () => {
     if (isCrypto(s)) return chain("history", [[P.coingecko, () => P.coingecko.history(s, { days: d })]]);
     if (isIntl(s)) return chain("history", [[P.yahoo, () => P.yahoo.history(s, { days: d })], [P.twelvedata, () => P.twelvedata.history(s, { days: d })]]);
@@ -71,11 +82,16 @@ async function getCompanyProfile(symbol) {
     return r;
   });
 }
-async function getFinancialStatements(symbol, { type = "annual" } = {}) {
+async function getFinancialStatements(symbol, { type = "annual", asOf } = {}) {
   const s = sym(symbol), t = type === "quarterly" ? "quarterly" : "annual";
+  if (asOf) { const r = await getFinancialStatements(s, { type: t }); // the SEC feed keeps the latest filing per period (restated figures), so a row's filing date can be after the cut-off even though the period was reported long before it;
+    // such a row is kept when its first report was due (10-K 75 days, 10-Q 50 days after the period end) and its date is shown as that due date
+    const due = (x) => shift(day(x.period), t === "annual" ? 75 : 50), rows = r.data.filter((x) => day(x.filingDate || due(x)) <= asOf || due(x) <= asOf).map((x) => (x.filingDate && day(x.filingDate) > asOf ? { ...x, filingDate: due(x) } : x));
+    return { data: rows, meta: { ...r.meta, asOf } }; }
   return cached("statements", `${s}/${t}`, () => chain("statements", [[P.sec, () => P.sec.statements(s, { type: t })], [P.fmp, () => P.fmp.statements(s, { type: t })]]), { ttl: 6 * 36e5, shared: true });
 }
-async function getCompanyFacts(symbol) {
+async function getCompanyFacts(symbol, { asOf } = {}) {
+  if (asOf) { const r = await getCompanyFacts(symbol), so = r.data.sharesOutstanding; return { data: { ...r.data, sharesOutstanding: so && so.filed && day(so.filed) > asOf ? null : so }, meta: { ...r.meta, asOf } }; }
   const s = sym(symbol), cik = await P.sec.cikFor(s); if (!cik) throw Object.assign(new Error("no_cik"), { status: 404 });
   return cached("facts", `facts/${s}`, async () => ({ data: await (async () => {
     const f = await P.sec.companyFacts(cik); if (!f) return null;
@@ -85,7 +101,10 @@ async function getCompanyFacts(symbol) {
       concepts: Object.keys((f.facts && f.facts["us-gaap"]) || {}).length, source: "SEC EDGAR", meta: S.meta({ source: "SEC EDGAR", asOf: so && so.end, freshness: "historical" }) };
   })(), source: "sec", attempts: [{ provider: "sec", status: "ok" }] }));
 }
-async function getSecFilings(symbol, opts = {}) { const s = sym(symbol); return cached("filings", `${s}/${(opts.forms || []).join(",")}/${opts.limit || 40}`, () => chain("filings", [[P.sec, () => P.sec.filings(s, opts)]])); }
+async function getSecFilings(symbol, opts = {}) {
+  const s = sym(symbol);
+  if (opts.asOf) { const r = await getSecFilings(s, { ...opts, asOf: undefined, limit: Math.max(150, opts.limit || 40) }); return { data: r.data.filter((f) => day(f.filingDate) <= opts.asOf).slice(0, opts.limit || 40), meta: { ...r.meta, asOf: opts.asOf } }; }
+  return cached("filings", `${s}/${(opts.forms || []).join(",")}/${opts.limit || 40}`, () => chain("filings", [[P.sec, () => P.sec.filings(s, opts)]])); }
 
 // ---------------- news ----------------
 const norm = (h) => String(h).toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 70);
@@ -99,7 +118,8 @@ function dedupe(items) {
   }
   return out;
 }
-async function getNews({ symbol = null, category = null, limit = 25, query = null } = {}) {
+async function getNews({ symbol = null, category = null, limit = 25, query = null, asOf = null } = {}) {
+  if (asOf) { const r = await getNews({ symbol, category, query, limit: 100 }); return { data: r.data.filter((n) => day(n.publishedAt) <= asOf).slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines are not archived for the demo date." } }; }
   const s = symbol ? sym(symbol) : null, key = `${s || "market"}/${category || "all"}/${limit}/${query || ""}`;
   return cached("news", key, async () => {
     const parts = [], attempts = [];
@@ -113,8 +133,9 @@ async function getNews({ symbol = null, category = null, limit = 25, query = nul
 }
 
 // ---------------- earnings / estimates / peers ----------------
-async function getEarnings(symbol) {
+async function getEarnings(symbol, { asOf } = {}) {
   const s = sym(symbol);
+  if (asOf) { const r = await getEarnings(s); return { data: r.data.filter((x) => day(x.date) <= asOf), meta: { ...r.meta, asOf } }; }
   return cached("earnings", s, async () => {
     const r = await chain("earnings", [[P.fmp, () => P.fmp.earnings(s)], [P.finnhub, () => P.finnhub.earnings(s)], [P.sec, async () => {
       const q = await P.sec.statements(s, { type: "quarterly" });   // reported EPS only: no estimates are available from SEC
@@ -123,8 +144,9 @@ async function getEarnings(symbol) {
     return r;
   });
 }
-async function getEstimates(symbol) {
+async function getEstimates(symbol, { asOf } = {}) {
   const s = sym(symbol);
+  if (asOf) throw Object.assign(new Error("not_available_in_demo"), { status: 404 });
   return cached("estimates", s, async () => {
     const r = await chain("estimates", [[P.fmp, async () => ({ annual: await P.fmp.estimates(s), priceTarget: await P.fmp.priceTarget(s).catch(() => null) })],
       [P.finnhub, async () => { const rec = await P.finnhub.recommendations(s); return rec ? { annual: [], recommendations: rec } : null; }]]);
@@ -140,16 +162,23 @@ async function getPeers(symbol) {
 }
 
 // ---------------- macro / fx / crypto ----------------
-async function getMacroSeries(id, { years = 10 } = {}) { const key = String(id).toUpperCase(); if (!P.fred.CATALOG[key]) throw Object.assign(new Error("unknown_series"), { status: 404 }); return cached("macro", `${key}/${years}`, () => chain("macro", [[P.fred, () => P.fred.series(key, { years })]])); }
-async function getMacroDashboard() {
-  return cached("macro", "dashboard", async () => {
-    const ids = Object.keys(P.fred.CATALOG), res = await Promise.all(ids.map((id) => getMacroSeries(id, { years: 6 }).then((r) => r.data).catch(() => null))), series = res.filter(Boolean);
+async function getMacroSeries(id, { years = 10, asOf } = {}) {
+  const key = String(id).toUpperCase(); if (!P.fred.CATALOG[key]) throw Object.assign(new Error("unknown_series"), { status: 404 });
+  if (asOf) {   // only observations that had been published by the date: monthly data lands about six weeks after its period
+    const r = await getMacroSeries(key, { years: years + Math.ceil(gapDays(asOf) / 365) + 1 }), lag = { daily: 3, weekly: 10, monthly: 45, quarterly: 100 }[r.data.frequency] || 45, hi = shift(asOf, -lag), lo = shift(asOf, -Math.round(years * 366));
+    return { data: S.macroSeries({ ...r.data, points: r.data.points.filter((p) => p[0] <= hi && p[0] >= lo) }), meta: { ...r.meta, asOf } };
+  }
+  return cached("macro", `${key}/${years}`, () => chain("macro", [[P.fred, () => P.fred.series(key, { years })]])); }
+async function getMacroDashboard({ asOf } = {}) {
+  const run = (build) => (asOf ? build().then((r) => ({ data: r.data, meta: { source: r.source, asOf, attempts: r.attempts } })) : cached("macro", "dashboard", build, { ttl: 6 * 36e5 }));
+  return run(async () => {
+    const ids = Object.keys(P.fred.CATALOG), res = await Promise.all(ids.map((id) => getMacroSeries(id, { years: 6, asOf }).then((r) => r.data).catch(() => null))), series = res.filter(Boolean);
     const by = Object.fromEntries(series.map((x) => [x.id, x])), v = (id) => by[id] && by[id].latest ? by[id].latest.value : null;
     const curve = v("T10Y2Y"); const regime = { inverted: curve != null ? curve < 0 : null, realFedFunds: v("FEDFUNDS") != null && v("CPIAUCSL") != null ? v("FEDFUNDS") / 100 - v("CPIAUCSL") : null };
     return { data: { series, groups: [...new Set(series.map((x) => x.group))], derived: { ...regime, note: "Real fed funds = effective rate minus CPI year over year (calculated)." } }, source: "fred", attempts: [{ provider: "fred", status: "ok" }] };
-  }, { ttl: 6 * 36e5 });
+  });
 }
-async function getFX(base = "USD") { return cached("fx", base, () => chain("fx", [[P.fx, () => P.fx.rates(base)]])); }
+async function getFX(base = "USD", { asOf } = {}) { if (asOf) return cached("fx", `${base}@${asOf}`, () => chain("fx", [[P.fx, () => P.fx.rates(base, undefined, asOf)]]), { ttl: 36e5 }); return cached("fx", base, () => chain("fx", [[P.fx, () => P.fx.rates(base)]])); }
 
 // ---------------- search ----------------
 const ETFS = [["SPY", "SPDR S&P 500 ETF Trust"], ["QQQ", "Invesco QQQ Trust"], ["IWM", "iShares Russell 2000 ETF"], ["DIA", "SPDR Dow Jones Industrial Average ETF"], ["VTI", "Vanguard Total Stock Market ETF"], ["VOO", "Vanguard S&P 500 ETF"], ["XLK", "Technology Select Sector SPDR"], ["XLF", "Financial Select Sector SPDR"], ["XLE", "Energy Select Sector SPDR"], ["XLV", "Health Care Select Sector SPDR"], ["SMH", "VanEck Semiconductor ETF"], ["TLT", "iShares 20+ Year Treasury Bond ETF"], ["GLD", "SPDR Gold Shares"], ["ARKK", "ARK Innovation ETF"]];
@@ -182,11 +211,11 @@ async function search(query, { limit = 12 } = {}) {
 
 // ---------------- derived: ratios, growth, valuation (all deterministic, via calc.js) ----------------
 const m = (id, label, value, unit, formula, inputs, extra = {}) => ({ id, label, ...C.result(label, value, unit, formula, inputs), ...extra });
-async function getRatios(symbol) {
+async function getRatios(symbol, { asOf } = {}) {
   const s = sym(symbol);
-  const [ann, qtr, qt] = await Promise.all([getFinancialStatements(s, { type: "annual" }).catch(() => null), getFinancialStatements(s, { type: "quarterly" }).catch(() => null), getQuote(s).catch(() => null)]);
+  const [ann, qtr, qt] = await Promise.all([getFinancialStatements(s, { type: "annual", asOf }).catch(() => null), getFinancialStatements(s, { type: "quarterly", asOf }).catch(() => null), getQuote(s, { asOf }).catch(() => null)]);
   const A = (ann && ann.data) || [], Q = (qtr && qtr.data) || [], quote = qt && qt.data, a0 = A[0] || {}, a1 = A[1] || {};
-  const facts = await getCompanyFacts(s).then((r) => r.data).catch(() => null);
+  const facts = await getCompanyFacts(s, { asOf }).then((r) => r.data).catch(() => null);
   const shares = (facts && facts.sharesOutstanding && facts.sharesOutstanding.value) || a0.dilutedShares || null, price = quote ? quote.price : null;
   const marketCap = price != null && shares ? price * shares : null;
   const ttm = (f) => (Q.length >= 4 ? C.ttm(Q.map((x) => ({ period: x.period, [f]: x[f] })), f) : null);
@@ -220,9 +249,9 @@ async function getRatios(symbol) {
   return { data: { symbol: s, price, asOf: quote ? quote.timestamp : null, metrics, growth: [...growth, ...qgrowth], sources: { quote: qt && qt.meta.source, statements: ann && ann.meta.source }, units: "money in USD; ratios in x; rates as fractions" }, meta: { source: "calculated", attempts: [] } };
 }
 async function getValuation(symbol, overrides = {}) {
-  const s = sym(symbol);
-  const [ann, qt, rf, hist, mkt] = await Promise.all([getFinancialStatements(s).catch(() => null), getQuote(s).catch(() => null), getMacroSeries("DGS10", { years: 1 }).catch(() => null), getHistoricalPrices(s, { days: 380 }).catch(() => null), getHistoricalPrices("SPY", { days: 380 }).catch(() => null)]);
-  const A = (ann && ann.data) || [], a0 = A[0] || {}, facts = await getCompanyFacts(s).then((r) => r.data).catch(() => null);
+  const s = sym(symbol), asOf = overrides.asOf || undefined;
+  const [ann, qt, rf, hist, mkt] = await Promise.all([getFinancialStatements(s, { asOf }).catch(() => null), getQuote(s, { asOf }).catch(() => null), getMacroSeries("DGS10", { years: 1, asOf }).catch(() => null), getHistoricalPrices(s, { days: 380, asOf }).catch(() => null), getHistoricalPrices("SPY", { days: 380, asOf }).catch(() => null)]);
+  const A = (ann && ann.data) || [], a0 = A[0] || {}, facts = await getCompanyFacts(s, { asOf }).then((r) => r.data).catch(() => null);
   const shares = (facts && facts.sharesOutstanding && facts.sharesOutstanding.value) || a0.dilutedShares, price = qt && qt.data.price;
   const rfRate = rf && rf.data.latest ? rf.data.latest.value / 100 : 0.04;
   let b = null; if (hist && mkt) { const closes = (r) => r.data.map((x) => x[4]); b = C.beta(C.returnsFrom(closes(hist)), C.returnsFrom(closes(mkt))); }
@@ -239,12 +268,12 @@ async function getValuation(symbol, overrides = {}) {
 }
 
 // ---------------- the whole company workspace in one round trip ----------------
-async function getCompanyBundle(symbol) {
+async function getCompanyBundle(symbol, { asOf } = {}) {
   const s = sym(symbol), safe = async (fn) => { try { const r = await fn(); return { ok: true, data: r.data, meta: r.meta }; } catch (e) { return { ok: false, error: e.message, attempts: e.attempts }; } };
   const [quote, profile, annual, quarterly, ratios, filings, news, earnings, peers, history] = await Promise.all([
-    safe(() => getQuote(s)), safe(() => getCompanyProfile(s)), safe(() => getFinancialStatements(s, { type: "annual" })), safe(() => getFinancialStatements(s, { type: "quarterly" })), safe(() => getRatios(s)),
-    safe(() => getSecFilings(s, { limit: 25 })), safe(() => getNews({ symbol: s, limit: 20 })), safe(() => getEarnings(s)), safe(() => getPeers(s)), safe(() => getHistoricalPrices(s, { days: 730 })) ]);
-  return { symbol: s, generatedAt: new Date().toISOString(), quote, profile, annual, quarterly, ratios, filings, news, earnings, peers, history };
+    safe(() => getQuote(s, { asOf })), safe(() => getCompanyProfile(s)), safe(() => getFinancialStatements(s, { type: "annual", asOf })), safe(() => getFinancialStatements(s, { type: "quarterly", asOf })), safe(() => getRatios(s, { asOf })),
+    safe(() => getSecFilings(s, { limit: 25, asOf })), safe(() => getNews({ symbol: s, limit: 20, asOf })), safe(() => getEarnings(s, { asOf })), safe(() => getPeers(s)), safe(() => getHistoricalPrices(s, { days: 730, asOf })) ]);
+  return { symbol: s, generatedAt: asOf ? asOf + "T20:00:00Z" : new Date().toISOString(), asOf: asOf || null, quote, profile, annual, quarterly, ratios, filings, news, earnings, peers, history };
 }
 
 function status() {
