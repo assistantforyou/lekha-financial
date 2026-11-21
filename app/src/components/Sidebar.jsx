@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
-import { ChevronRight, ChevronsDownUp, ChevronsUpDown, Search, Lock } from "lucide-react"
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Search, Lock } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { TREE } from "@/nav"
+import { ui } from "@/tour/copy"
+import { startTour } from "@/tour/store"
 
 const KEY = "ptpub.v1.app.tree"
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null") } catch (e) { return null } }
@@ -42,6 +44,6 @@ export default function Sidebar({ routeKey, isAdmin, onNavigate, className }) {
             </Collapsible>) })}
         {!groups.length && <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">No pages match “{q}”.</p>}
       </div>
-      <div className="border-t border-border p-3 text-[11px] text-muted-foreground"><div className="flex items-center justify-between"><span>Classic terminals</span><span className="flex gap-1"><a className="underline-offset-2 hover:underline" href="/v2">V2</a>·<a className="underline-offset-2 hover:underline" href="/v3">V3</a></span></div></div>
+      <div className="space-y-2 border-t border-border p-3 text-[11px] text-muted-foreground"><button type="button" onClick={() => { onNavigate && onNavigate(); startTour(300) }} className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-[12px] outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40" translate="no"><CircleHelp className="size-3.5" />{ui("replayHead")}</button><div className="flex items-center justify-between"><span>Classic terminals</span><span className="flex gap-1"><a className="underline-offset-2 hover:underline" href="/v2">V2</a>·<a className="underline-offset-2 hover:underline" href="/v3">V3</a></span></div></div>
     </nav>)
 }

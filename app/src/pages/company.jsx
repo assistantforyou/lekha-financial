@@ -125,12 +125,12 @@ function Workspace({ symbol, route, navigate }) {
   if (s.status === "error") return <ErrorBox message={s.error} attempts={s.attempts} onRetry={s.reload} />
   const nothing = !q && !prof && !b.annual.ok
   return (<div className="space-y-4">
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div data-tour="company-head" className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{(prof && prof.name) || (q && q.name) || symbol}</h1><Badge variant="secondary" className="font-mono">{symbol}</Badge>{prof && prof.exchange && <Badge variant="outline">{prof.exchange}</Badge>}{prof && prof.sector && <Badge variant="outline">{prof.sector}</Badge>}</div>
         {q ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold">{price(q.price, q.currency)}</span><span className={cn("num text-base", tone(q.change))}>{q.change != null ? (q.change > 0 ? "+" : "") + num(q.change) : ""} ({pct(q.changePercent, 2, true)})</span><FreshBadge meta={q.meta} /><SourceTag source={q.source} asOf={q.timestamp} /></div> : <p className="mt-1 text-sm text-muted-foreground">No live quote available from any provider.</p>}</div>
       <div className="flex gap-2"><Button variant="outline" onClick={() => (watched ? removeFromWatchlist(symbol) : addToWatchlist(symbol, prof && prof.name))}>{watched ? <><StarOff />Unwatch</> : <><Star />Watch</>}</Button><Button onClick={() => setTab("ai")}><Bot />Ask AI</Button></div></div>
     {nothing && <Alert variant="warn"><AlertTitle>No data found for {symbol}</AlertTitle><AlertDescription>Check the ticker. US companies resolve through SEC EDGAR; ETFs, indices and crypto use market data providers (examples: SPY, ^GSPC, BTC-USD, 0700.HK).</AlertDescription></Alert>}
-    <Tabs value={tab} onValueChange={setTab}><TabsList>{TABS.map(([k, l]) => <TabsTrigger key={k} value={k}>{l}</TabsTrigger>)}</TabsList>
+    <Tabs value={tab} onValueChange={setTab}><TabsList data-tour="company-tabs">{TABS.map(([k, l]) => <TabsTrigger key={k} value={k}>{l}</TabsTrigger>)}</TabsList>
       <TabsContent value="overview"><Overview b={b} setTab={setTab} /></TabsContent><TabsContent value="financials"><Financials b={b} /></TabsContent>
       <TabsContent value="valuation"><Valuation symbol={symbol} b={b} /></TabsContent><TabsContent value="growth"><Growth b={b} /></TabsContent><TabsContent value="news"><News b={b} /></TabsContent>
       <TabsContent value="filings"><Filings b={b} symbol={symbol} /></TabsContent><TabsContent value="earnings"><Earnings b={b} /></TabsContent><TabsContent value="peers"><Peers b={b} navigate={navigate} /></TabsContent>

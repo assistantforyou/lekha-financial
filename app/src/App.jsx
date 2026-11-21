@@ -9,6 +9,7 @@ import Banner from "@/components/Banner"
 import Sidebar from "@/components/Sidebar"
 import PanelHost from "@/components/PanelHost"
 import CommandPalette from "@/components/CommandPalette"
+import Tour from "@/tour/Tour"
 import { ThemeDialog, LangDialog } from "@/components/Pickers"
 import { PageHeader } from "@/components/common"
 import { BY_KEY, DEFAULT_ROUTE, parseHash } from "@/nav"
@@ -53,7 +54,7 @@ export default function App() {
         <Banner onMenu={() => setMenu(true)} onSearch={() => setSearch(true)} onTheme={() => setTheme(true)} onLang={() => setLang(true)} navigate={navigate} customizable={isPane && !item.analyst && !["tab-sim", "tab-sim-proj", "tab-an-deep", "tab-an-council", "lekha-reports", "v3-ai-host"].some((p) => item.panes.includes(p))} />
         {demo && <div className="border-b border-[color-mix(in_srgb,var(--warn)_40%,var(--border))] bg-[color-mix(in_srgb,var(--warn)_10%,var(--background))] px-3 py-1 text-[12px]"><div className="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-3 gap-y-1"><FlaskConical className="size-3.5 text-[var(--warn)]" /><b className="font-mono text-[11px] tracking-wider text-[var(--warn)]">DEMO</b>{signedIn ? <a className="ml-auto text-primary hover:underline" href={location.pathname}>Exit demo</a> : <a className="ml-auto text-primary hover:underline" href="/login.html">Create a free account to save your own holdings</a>}</div></div>}
         <div className="mx-auto flex max-w-[1700px]">
-          <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border lg:block">{side}</aside>
+          <aside data-tour="nav" className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border lg:block">{side}</aside>
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">
             <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[12px] text-muted-foreground"><span>{group}</span><ChevronRight className="size-3" /><span className="text-foreground">{item.title}{route.param ? ` · ${route.param}` : ""}</span></nav>
             {isPane ? <><PageHeader title={item.title} description={item.desc} /><PanelHost ids={item.panes} analyst={item.analyst} route={r} /></> : Page ? <Page route={r} item={item} navigate={navigate} me={me} /> : null}
@@ -65,6 +66,7 @@ export default function App() {
         </div>
         <Sheet open={menu} onOpenChange={setMenu}><SheetContent side="left" className="p-0">{side}</SheetContent></Sheet>
         <CommandPalette open={search} onOpenChange={setSearch} navigate={navigate} />
+        <Tour navigate={navigate} />
         <ThemeDialog open={theme} onOpenChange={setTheme} />
         <LangDialog open={lang} onOpenChange={setLang} />
         <Toaster theme="system" position="bottom-right" toastOptions={{ style: { background: "var(--popover)", color: "var(--fg)", border: "1px solid var(--line)" } }} />

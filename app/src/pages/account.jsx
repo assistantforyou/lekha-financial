@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import { AlertTriangle, Check, Download, LogOut, RefreshCw, Upload } from "lucide-react"
+import { AlertTriangle, Check, CircleHelp, Download, LogOut, RefreshCw, Upload } from "lucide-react"
+import { ui } from "@/tour/copy"
+import { startTour } from "@/tour/store"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -73,6 +75,7 @@ export function Preferences({ item, navigate }) {
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">{(I ? I.LANGS : []).map((l) => <button key={l.code} translate="no" onClick={() => l.code !== I.lang && I.setLang(l.code)} aria-pressed={I.lang === l.code} className={cn("notranslate rounded-lg border px-3 py-2 text-left text-sm", I.lang === l.code ? "border-primary bg-accent font-semibold" : "border-border hover:bg-accent/50")}>{l.native}</button>)}</div></Field>
         <Field label="Show money in" id="cy" hint="Per-share prices stay in each stock's own currency."><Seg label="Currency" value={cur} onChange={setCurrency} options={[["USD", "USD $"], ["THB", "THB ฿"]]} /></Field>
         <Field label="Open the app on" id="st"><Seg label="Start screen" value={start} onChange={(v) => { setStart(v); localStorage.setItem("ptpub.v1.v3.start", JSON.stringify(v)); toast.success("Saved") }} options={[["portfolio", "My portfolio"], ["macro", "Macro dashboard"]]} /></Field></CardContent></Card>
+      <Card className="xl:col-span-2"><CardHeader><CardTitle translate="no">{ui("replayHead")}</CardTitle><CardDescription translate="no">{ui("replayText")}</CardDescription></CardHeader><CardFooter><Button variant="outline" translate="no" onClick={() => startTour(0)}><CircleHelp />{ui("replay")}</Button></CardFooter></Card>
       <Card className="xl:col-span-2"><CardHeader><CardTitle>Reset</CardTitle><CardDescription>Restores display preferences to their defaults. Your holdings and data are not touched.</CardDescription></CardHeader><CardFooter><Button variant="outline" onClick={() => { ["theme", "size", "density"].forEach((k) => A.setPref(k, k === "theme" ? "lekha-teal" : k === "size" ? "M" : "comfortable")); toast.success("Preferences reset"); setTimeout(() => location.reload(), 300) }}><RefreshCw />Reset display preferences</Button></CardFooter></Card>
     </div></div>)
 }

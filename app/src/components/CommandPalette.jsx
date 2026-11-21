@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
-import { Building2, Compass, FileText, Hash, Newspaper, Bot, Clock } from "lucide-react"
+import { Building2, Compass, FileText, Hash, Newspaper, Bot, Clock, CircleHelp } from "lucide-react"
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
 import { data } from "@/lib/api"
 import { FLAT } from "@/nav"
+import { ui } from "@/tour/copy"
+import { startTour } from "@/tour/store"
 
 const RK = "ptpub.v1.app.recent"
 export const recent = () => { try { return JSON.parse(localStorage.getItem(RK) || "[]") } catch (e) { return [] } }
@@ -28,6 +30,7 @@ export default function CommandPalette({ open, onOpenChange, navigate }) {
       <CommandList>
         {!ql && rc.length > 0 && <CommandGroup heading="Recent">{rc.map((r) => <CommandItem key={r.symbol} value={"r" + r.symbol} onSelect={() => go("company/" + r.symbol)}><Clock className="size-4 text-muted-foreground" /><b className="font-mono">{r.symbol}</b><span className="truncate text-muted-foreground">{r.name}</span></CommandItem>)}</CommandGroup>}
         {!ql && <CommandGroup heading="Jump to">{[["research/agent", "AI research agent", Bot], ["research/news", "News search", Newspaper], ["macro/dashboard", "Macro dashboard", Compass], ["analysis/value", "Intrinsic value", FileText], ["portfolio/watchlist", "Watchlist", Compass]].map(([k, t, I]) => <CommandItem key={k} value={k} onSelect={() => go(k)}><I className="size-4 text-muted-foreground" />{t}</CommandItem>)}</CommandGroup>}
+        {(!ql || /tour|help|guide|onboard|tutorial/.test(ql)) && <CommandGroup heading={ui("replayHead")}><CommandItem value="quick-tour" onSelect={() => { onOpenChange(false); startTour(300) }}><CircleHelp className="size-4 text-muted-foreground" /><span translate="no">{ui("palette")}</span></CommandItem></CommandGroup>}
         {res && res.intents && res.intents.length > 0 && <CommandGroup heading="Best match">{res.intents.map((i) => <CommandItem key={i.route} value={"i" + i.route} onSelect={() => go(i.route.replace("?tab=", "?tab="))}>{i.kind === "company" ? <Building2 className="size-4 text-primary" /> : i.kind === "filings" ? <FileText className="size-4 text-muted-foreground" /> : <Newspaper className="size-4 text-muted-foreground" />}<span className="truncate">{i.label}</span></CommandItem>)}</CommandGroup>}
         {res && res.results && res.results.length > 0 && <CommandGroup heading="Companies, ETFs, indices, crypto">{res.results.map((r) => { const I = ICON[r.type] || Building2; return <CommandItem key={r.symbol + r.type} value={"s" + r.symbol + r.type} onSelect={() => { remember({ symbol: r.symbol, name: r.name }); go("company/" + encodeURIComponent(r.symbol)) }}><I className="size-4 text-muted-foreground" /><b className="w-20 shrink-0 font-mono">{r.symbol}</b><span className="min-w-0 flex-1 truncate">{r.name}</span><Badge variant="outline">{r.type}</Badge></CommandItem> })}</CommandGroup>}
         {res && res.concepts && res.concepts.length > 0 && <CommandGroup heading="Concepts">{res.concepts.map((c) => <CommandItem key={c.id} value={"c" + c.id} onSelect={() => go(c.route === "company" ? "research/company" : c.route)}><Hash className="size-4 text-muted-foreground" /><div className="min-w-0"><div>{c.term}</div><div className="truncate text-xs text-muted-foreground">{c.text}</div></div></CommandItem>)}</CommandGroup>}
