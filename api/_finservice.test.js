@@ -37,5 +37,9 @@ const qq = sec.buildStatements(f, "T", "quarterly"); assert.strictEqual(qq.lengt
   assert.strictEqual(decode("&lt;p&gt;Stocks &lt;b&gt;fall&lt;/b&gt;&lt;/p&gt;"), "Stocks fall");
   assert.strictEqual(decode("<![CDATA[Oil &amp; gas]]>"), "Oil & gas");
   assert.strictEqual(decode("Key Points of the plan"), "Key Points of the plan", "only a label, not a sentence, is removed"); }
+
+// a very large feed is capped so it cannot drown the others
+{ const N = require("./_fin/providers/news"); const xml = "<rss>" + Array.from({ length: 300 }, (_, i) => `<item><title>Story ${i}</title><link>https://example.com/${i}</link><pubDate>Fri, 20 Nov 2026 10:00:00 GMT</pubDate><description>d</description></item>`).join("") + "</rss>";
+  assert.strictEqual(N.parse(xml, "Big Feed", [], "market").length, 20); assert.ok(N.FEEDS.length >= 25 && new Set(N.FEEDS.map((f) => f.name)).size === N.FEEDS.length, "outlet names are unique"); }
 console.log("_finservice.test.js ok");
 })();

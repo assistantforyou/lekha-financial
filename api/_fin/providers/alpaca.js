@@ -36,13 +36,14 @@ async function history(symbol, { days = 365 } = {}) {
   });
 }
 // Intraday IEX bars. The regular session is 13:30-21:00 UTC in every season, so the UTC date identifies the session.
-async function intraday(symbol, { days = 1 } = {}) {
+async function intraday(symbol, { days = 1, asOf = null } = {}) {
   if (!configured()) throw notConfigured(name);
   const one = days <= 1, tf = one ? "5Min" : "15Min", sessions = one ? 1 : 5;
   return obs.timed(name, "intraday", async () => {
-    const start = new Date(Date.now() - (one ? 6 : 10) * 864e5).toISOString(), rows = []; let token = null;
+    // asOf (a pinned demo date, YYYY-MM-DD): the window ends at the end of that day, so the latest session is the one on or before it
+    const endMs = asOf ? Date.parse(asOf + "T00:00:00Z") + 864e5 : Date.now(), start = new Date(endMs - (one ? 6 : 10) * 864e5).toISOString(), rows = []; let token = null;
     for (let i = 0; i < 5; i++) {
-      const qs = new URLSearchParams({ timeframe: tf, start, limit: "10000", feed: "iex", adjustment: "split" }); if (token) qs.set("page_token", token);
+      const qs = new URLSearchParams({ timeframe: tf, start, limit: "10000", feed: "iex", adjustment: "split" }); if (asOf) qs.set("end", new Date(endMs).toISOString()); if (token) qs.set("page_token", token);
       const j = await request(name, `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars?${qs}`, { headers: H() });
       for (const b of (j && j.bars) || []) rows.push([b.t, b.o, b.h, b.l, b.c, b.v]);
       token = j && j.next_page_token; if (!token) break;

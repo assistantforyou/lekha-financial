@@ -26,13 +26,15 @@ async function history(sym, { days = 365 } = {}) {
   });
 }
 // Intraday bars: 5-minute for the latest session (days<=1) or 15-minute for the latest 5 sessions. Timestamps are full UTC ISO strings.
-async function intraday(sym, { days = 1 } = {}) {
+async function intraday(sym, { days = 1, asOf = null } = {}) {
   const one = days <= 1;
+  if (asOf && Date.now() - Date.parse(asOf + "T00:00:00Z") > 58 * 864e5) throw new Error("yahoo_intraday_window");   // Yahoo only keeps about 60 days of 5/15-minute bars
   return obs.timed(name, "intraday", async () => {
-    const j = await chart(sym, one ? "1d" : "5d", one ? "5m" : "15m"), r = j && j.chart && j.chart.result && j.chart.result[0]; if (!r || !Array.isArray(r.timestamp)) throw new Error("yahoo_empty");
+    const j = asOf ? await request(name, `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${Math.floor((Date.parse(asOf + "T00:00:00Z") - (one ? 4 : 9) * 864e5) / 1000)}&period2=${Math.floor((Date.parse(asOf + "T00:00:00Z") + 864e5) / 1000)}&interval=${one ? "5m" : "15m"}`, { headers: H }) : await chart(sym, one ? "1d" : "5d", one ? "5m" : "15m"), r = j && j.chart && j.chart.result && j.chart.result[0]; if (!r || !Array.isArray(r.timestamp)) throw new Error("yahoo_empty");
     const q = r.indicators.quote[0], out = [];
     r.timestamp.forEach((t, i) => { if (q.close[i] > 0) out.push(S.bar(new Date(t * 1000).toISOString().slice(0, 16) + ":00Z", q.open[i], q.high[i], q.low[i], q.close[i], q.volume[i])); });
     if (!out.length) throw new Error("yahoo_empty");
+    if (asOf) { const ds = [...new Set(out.map((b) => b[0].slice(0, 10)))].sort().slice(-(one ? 1 : 5)); return out.filter((b) => ds.includes(b[0].slice(0, 10))); }
     return out;
   });
 }
