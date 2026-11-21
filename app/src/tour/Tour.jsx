@@ -16,6 +16,13 @@ const hashKey = (h) => (/^company\//.test(h) ? "research/company" : h)
 const where = (h) => { const i = FLAT.find((x) => x.key === hashKey(h)); return i ? [i.groupTitle, i.title] : null }
 /* the second highlight: where this page lives in the navigation (the active sidebar entry, or the breadcrumb where the sidebar is hidden) */
 const locator = () => { const a = document.querySelector('.shell aside a[aria-current="page"]'); if (visible(a)) return a; const b = document.querySelector('.shell nav[aria-label="Breadcrumb"]'); return visible(b) ? b : null }
+/* the sidebar scrolls on its own: bring the active entry into the middle of it, or the "where to find this" highlight would silently be skipped */
+const revealInNav = (a) => {
+  let sc = null; for (let e = a.parentElement; e && e !== document.body; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === "auto" || o === "scroll") && e.scrollHeight > e.clientHeight + 1) { sc = e; break } }
+  if (!sc) return
+  const s = sc.getBoundingClientRect(), r = a.getBoundingClientRect(); if (r.top >= s.top + 4 && r.bottom <= s.bottom - 4) return
+  sc.scrollTop += (r.top - s.top) - (s.height - r.height) / 2
+}
 const WAIT = { company: 14000, tabs: 14000 }
 const sameGeo = (a, b) => !!a && !!b && a.side === b.side && a.mobile === b.mobile && a.card.x === b.card.x && a.card.y === b.card.y && a.card.w === b.card.w && JSON.stringify(a.spot) === JSON.stringify(b.spot) && JSON.stringify(a.spot2) === JSON.stringify(b.spot2)
 const pinned = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const p = getComputedStyle(e).position; if (p === "sticky" || p === "fixed") return true } return false }
@@ -120,7 +127,7 @@ export default function Tour({ navigate }) {
     let rect = null, top = 0
     if (el) { const bb = el.getBoundingClientRect(), h = header(); rect = { left: bb.left, top: bb.top, right: bb.right, bottom: bb.bottom, height: bb.height }; top = h && !h.contains(el) ? h.getBoundingClientRect().bottom : 0 }
     const g = place({ rect, vw, vh, card: sz, top, prefer: step.prefer, mobile }); g.mobile = mobile; g.spot2 = null
-    if (step.where) { const l = locator(); if (l && !(el && l.contains(el))) { const lb = l.getBoundingClientRect(), hb = header() ? header().getBoundingClientRect().bottom : 0; if (lb.top >= hb - 1 && lb.bottom <= vh) g.spot2 = { x: Math.max(2, lb.left - 4), y: Math.max(2, lb.top - 3), w: Math.min(vw - 4, lb.right + 4) - Math.max(2, lb.left - 4), h: lb.height + 6 } } }
+    if (step.where) { const l = locator(); if (l && l.matches("aside a")) revealInNav(l); if (l && !(el && l.contains(el))) { const lb = l.getBoundingClientRect(), hb = header() ? header().getBoundingClientRect().bottom : 0; if (lb.top >= hb - 1 && lb.bottom <= vh) g.spot2 = { x: Math.max(2, lb.left - 4), y: Math.max(2, lb.top - 3), w: Math.min(vw - 4, lb.right + 4) - Math.max(2, lb.left - 4), h: lb.height + 6 } } }
     setGeo((p) => (sameGeo(p, g) ? p : g))
   }, [])
   const rafRef = useRef(0)
