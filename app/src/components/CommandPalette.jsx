@@ -11,17 +11,20 @@ import { startTour } from "@/tour/store"
 const RK = "ptpub.v1.app.recent"
 export const recent = () => { try { return JSON.parse(localStorage.getItem(RK) || "[]") } catch (e) { return [] } }
 export const remember = (r) => { try { const l = [r, ...recent().filter((x) => x.symbol !== r.symbol)].slice(0, 6); localStorage.setItem(RK, JSON.stringify(l)) } catch (e) {} }
+const CACHE = new Map() // query -> {t, res}; search results change slowly, so repeat keystrokes (backspace, reopen) cost nothing
 const ICON = { equity: Building2, etf: Building2, index: Hash, crypto: Hash, future: Hash, ticker: Hash }
 
 /* Universal search: companies, ETFs, indices, crypto (server-side, merged from SEC + built-in lists + optional providers), financial concepts, and every page in the app. */
 export default function CommandPalette({ open, onOpenChange, navigate }) {
   const [q, setQ] = useState(""), [res, setRes] = useState(null), [busy, setBusy] = useState(false)
   useEffect(() => { if (!open) { setQ(""); setRes(null) } }, [open])
+  const [retry, setRetry] = useState(0)
   useEffect(() => {
-    if (q.trim().length < 1) { setRes(null); return }
-    const t = setTimeout(() => { setBusy(true); data("search", { q }).then((j) => setRes({ ...j.data, q })).catch(() => setRes({ results: [], concepts: [], intents: [], failed: true })).finally(() => setBusy(false)) }, 90)
-    return () => clearTimeout(t)
-  }, [q])
+    const key = q.trim().toLowerCase(); if (!key) { setRes(null); setBusy(false); return }
+    const hit = CACHE.get(key); if (hit && Date.now() - hit.t < 5 * 60e3) { setRes({ ...hit.res, q }); setBusy(false); return }
+    let dead = false; const t = setTimeout(() => { setBusy(true); data("search", { q }).then((j) => { if (dead) return; CACHE.set(key, { t: Date.now(), res: j.data }); if (CACHE.size > 60) CACHE.delete(CACHE.keys().next().value); setRes({ ...j.data, q }) }).catch(() => { if (!dead) setRes({ results: [], concepts: [], intents: [], failed: true, q }) }).finally(() => { if (!dead) setBusy(false) }) }, 90)
+    return () => { dead = true; clearTimeout(t) }   // a slow response for an old query can never overwrite a newer one
+  }, [q, retry])
   const go = (path) => { onOpenChange(false); navigate(path) }
   const ql = q.trim().toLowerCase(), pages = FLAT.filter((p) => !p.admin && (ql ? p.title.toLowerCase().includes(ql) || p.groupTitle.toLowerCase().includes(ql) : false)).slice(0, 6)
   const rc = recent()
@@ -45,7 +48,8 @@ export default function CommandPalette({ open, onOpenChange, navigate }) {
         {res && res.q === q && res.concepts && res.concepts.length > 0 && <CommandGroup heading="Concepts">{res.concepts.map((c) => <CommandItem key={c.id} value={"c" + c.id} onSelect={() => go(c.route === "company" ? "research/company" : c.route)}><Hash className="size-4 text-muted-foreground" /><div className="min-w-0"><div>{c.term}</div><div className="truncate text-xs text-muted-foreground">{c.text}</div></div></CommandItem>)}</CommandGroup>}
         {pages.length > 0 && <CommandGroup heading="Pages">{pages.map((p) => <CommandItem key={p.key} value={"p" + p.key} onSelect={() => go(p.key)}><p.icon className="size-4 text-muted-foreground" /><span>{p.title}</span><span className="ml-auto text-xs text-muted-foreground">{p.groupTitle}</span></CommandItem>)}</CommandGroup>}
         {ql && <CommandGroup heading="Ask"><CommandItem value="ask" onSelect={() => { onOpenChange(false); navigate("research/agent?q=" + encodeURIComponent(q)) }}><Bot className="size-4 text-primary" />Ask the research agent: “{q}”</CommandItem><CommandItem value="newssearch" onSelect={() => go("research/news?q=" + encodeURIComponent(q))}><Newspaper className="size-4 text-muted-foreground" />Search news for “{q}”</CommandItem></CommandGroup>}
-        {ql && !busy && res && !merged.length && !pages.length && !(res.concepts || []).length && <CommandEmpty>No matches. Try a ticker (AAPL), a company name, or ask the agent.</CommandEmpty>}
+        {ql && !busy && res && res.q === q && res.failed && <div className="flex items-center justify-between gap-2 px-4 py-3 text-sm text-[var(--down)]" role="alert">Search is unavailable right now. Typed tickers and pages still work.<button className="rounded border border-border px-2 py-0.5 text-xs text-foreground" onClick={() => setRetry((n) => n + 1)}>Retry</button></div>}
+        {ql && !busy && res && !res.failed && !merged.length && !pages.length && !(res.concepts || []).length && <CommandEmpty>No matches. Try a ticker (AAPL), a company name, or ask the agent.</CommandEmpty>}
         {busy && <div className="px-4 py-3 text-xs text-muted-foreground">Searching…</div>}
       </CommandList>
     </CommandDialog>)
