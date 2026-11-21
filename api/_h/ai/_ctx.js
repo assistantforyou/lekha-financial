@@ -26,6 +26,7 @@ function demoContext() {
     const rate = cur === "THB" ? 1 / fx.usdthb : cur === "HKD" ? fx.hkdusd : 1;
     return { tk, cur, qty, theme, valUsd: +(qty * px * rate).toFixed(2), costUsd: +(qty * cost * rate).toFixed(2), px: px || null };
   });
+  for (const r of rows) if (r.tk === "CASH") r.priced = true;
   const invested = rows.filter((r) => r.tk !== "CASH").reduce((s, r) => s + r.valUsd, 0);
   const cash = rows.filter((r) => r.tk === "CASH").reduce((s, r) => s + r.valUsd, 0);
   const total = invested + cash;
@@ -43,6 +44,12 @@ async function userContext(userId) {
   const fx = { usdthb: num(hDoc.data.usdthb) || FX_DEF.usdthb, hkdusd: num(hDoc.data.hkdusd) || FX_DEF.hkdusd };
   const vh = docs.filter((d) => /^valhist\//.test(d.key) && d.data)
     .map((d) => d.data).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))[0] || null;
+  // live prices first: the saved valuation snapshot may not exist yet (new accounts) or may be days old
+  let live = {};
+  try {
+    const svc = require("../../_fin/service"), tks = [...new Set(items.map((i) => cleanTk(i.tk)).filter((t) => t && t !== "CASH"))].slice(0, 40);
+    if (tks.length) live = (await Promise.race([svc.getQuotes(tks), new Promise((_, rej) => setTimeout(() => rej(new Error("quote_timeout")), 7000))])).data || {};
+  } catch (e) { /* fall back to the snapshot; unknown prices are reported as unknown below, never replaced by cost */ }
   const px = {};
   if (vh && vh.items) for (const [t, v] of Object.entries(vh.items)) if (v && num(v.px) > 0) px[t] = v;
   const rows = [];
@@ -54,10 +61,10 @@ async function userContext(userId) {
     const qty = Number(it.qty) || 0;
     const cost = Number(it.cost) || 0;
     if (tk === "CASH") { rows.push({ tk, cur, theme: "Cash", valUsd: qty * rate, costUsd: qty * rate, qty }); continue; }
-    const p = px[tk] && num(px[tk].px);
-    const valUsd = p ? qty * p * rate : cost ? cost * rate : 0;
+    const lq = live[tk] && live[tk].price > 0 ? live[tk] : null, p = (lq && lq.price) || (px[tk] && num(px[tk].px));
+    const valUsd = p ? qty * p * rate : 0;   // no price = unknown value (NOT the cost basis: that made weights and P&L wrong)
     rows.push({
-      tk, cur, qty, theme: String(it.theme || "").slice(0, 40),
+      tk, cur, qty, theme: String(it.theme || "").slice(0, 40), priced: !!p, priceSource: lq ? "live quote" : p ? "valuation snapshot" : null, dayPct: lq && Number.isFinite(lq.changePercent) ? Math.round(lq.changePercent * 10000) / 100 : null,
       valUsd: Math.round(valUsd * 100) / 100, costUsd: Math.round(cost * rate * 100) / 100,
       base: px[tk] && num(px[tk].base), bear: px[tk] && num(px[tk].bear), bull: px[tk] && num(px[tk].bull),
       px,
@@ -75,7 +82,9 @@ async function userContext(userId) {
 function portfolioBlock(ctx) {
   const lines = [];
   for (const r of ctx.rows) {
-    let s = `${r.tk} — ${r.weightPct}% of portfolio, value $${Math.round(r.valUsd).toLocaleString("en-US")} (${r.cur}), theme ${r.theme || "n/a"}`;
+    let s = r.priced === false
+      ? `${r.tk} — value unknown (no price available right now; cost basis $${Math.round(r.costUsd).toLocaleString("en-US")}), theme ${r.theme || "n/a"}`
+      : `${r.tk} — ${r.weightPct}% of portfolio, value $${Math.round(r.valUsd).toLocaleString("en-US")} (${r.cur}${r.priceSource ? ", " + r.priceSource : ""}${r.dayPct != null ? `, ${r.dayPct >= 0 ? "+" : ""}${r.dayPct}% today` : ""}), cost basis $${Math.round(r.costUsd).toLocaleString("en-US")}, theme ${r.theme || "n/a"}`;
     if (r.base != null) {
       const mos = r.px ? Math.round(((r.base - r.px) / r.px) * 1000) / 10 : null;
       s += `, last valuation price ${r.px}, base-case intrinsic value ${r.base}, margin of safety ${mos != null ? mos + "%" : "n/a"}, range ${r.bear}–${r.bull}`;
@@ -84,6 +93,7 @@ function portfolioBlock(ctx) {
   }
   return [
     `Total portfolio value: ~$${Math.round(ctx.total).toLocaleString("en-US")} (invested $${Math.round(ctx.invested).toLocaleString("en-US")}, cash $${Math.round(ctx.cash).toLocaleString("en-US")}).`,
+    ctx.rows.some((r) => r.priced === false) ? "Some positions have no price right now: their value is unknown and they are left out of the total and the weights." : "All positions are priced from live quotes (or the saved valuation snapshot where noted).",
     ctx.valDate ? `Valuation snapshot date: ${ctx.valDate}.` : "No valuation snapshot saved yet.",
     lines.join("\n"),
   ].join("\n");
