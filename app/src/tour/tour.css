@@ -1,0 +1,41 @@
+/* Quick Tour. Lives outside .shell (portal on <body>), so it styles itself explicitly and uses the same theme tokens as the app. */
+.tour-root, .tour-root * { box-sizing: border-box; }
+.tour-root { position: fixed; inset: 0; z-index: 2000; font-family: var(--f-body); font-size: 14px; line-height: 1.5; color: var(--fg); -webkit-font-smoothing: antialiased; animation: tour-fade .25s ease-out both; }
+/* swallows clicks on the app underneath; wheel and touch scrolling still reach the page */
+.tour-block { position: fixed; inset: 0; }
+.tour-spot { position: fixed; left: 0; top: 0; border-radius: 12px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(4, 8, 14, .66), 0 0 0 2px var(--accent), 0 0 24px color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: transform .4s cubic-bezier(.4, 0, .2, 1), width .4s cubic-bezier(.4, 0, .2, 1), height .4s cubic-bezier(.4, 0, .2, 1), box-shadow .3s; }
+.tour-spot.void { border-radius: 0; box-shadow: 0 0 0 9999px rgba(4, 8, 14, .66), 0 0 0 0 transparent; }
+.tour-card { position: fixed; left: 0; top: 0; width: 360px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow: auto; padding: 16px 18px 14px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 20px 56px rgba(0, 0, 0, .5), 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent); outline: none; transition: transform .4s cubic-bezier(.4, 0, .2, 1), width .3s; }
+.tour-card[data-sheet="1"] { transform: none !important; left: 12px; right: 12px; top: auto; bottom: max(12px, env(safe-area-inset-bottom)); width: auto; max-width: 520px; margin: 0 auto; padding-bottom: 14px; border-radius: 16px; transition: none; }
+[data-instant="1"] .tour-spot, [data-instant="1"] .tour-card { transition: none; }
+.tour-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tour-count { font: 600 11px/1 var(--f-mono); letter-spacing: .06em; color: var(--accent); white-space: nowrap; }
+.tour-track { flex: 1; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.tour-track > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s cubic-bezier(.4, 0, .2, 1); }
+.tour-card[aria-busy="true"] .tour-track > i { animation: tour-pulse 1s ease-in-out infinite; }
+.tour-body { animation: tour-in .28s ease-out both; }
+.tour-title { margin: 0 0 6px; font: 600 17px/1.3 var(--f-display, var(--f-body)); letter-spacing: -.005em; color: var(--fg); }
+.tour-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: color-mix(in srgb, var(--fg) 82%, var(--muted)); }
+.tour-wf { display: flex; flex-wrap: wrap; row-gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+.tour-wf li { display: inline-flex; align-items: center; }
+.tour-wf li > span { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tour-wf svg { width: 13px; height: 13px; flex: none; color: var(--accent); }
+.tour-wf svg.sep { margin: 0 4px; color: var(--muted); }
+.tour-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.tour-foot .grow { flex: 1; }
+.tour-btn { font: 600 13px/1 var(--f-body); height: 34px; min-width: 34px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, opacity .15s; }
+.tour-btn:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.tour-btn.pri { background: var(--accent); border-color: var(--accent); color: color-mix(in srgb, var(--bg) 92%, black); }
+.tour-btn.pri:hover { background: color-mix(in srgb, var(--accent) 88%, white); }
+.tour-btn.ghost { border-color: transparent; color: var(--muted); padding: 0 8px; }
+.tour-btn.ghost:hover { color: var(--fg); background: transparent; border-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.tour-btn:disabled { opacity: .5; cursor: progress; }
+.tour-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tour-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 640px) { .tour-btn { height: 40px; } .tour-title { font-size: 16px; } .tour-card { padding: 14px 16px 12px; } }
+@keyframes tour-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tour-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@keyframes tour-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .tour-root, .tour-body { animation: none; } .tour-spot, .tour-card, .tour-track > i { transition: none; } }
