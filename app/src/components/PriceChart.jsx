@@ -37,7 +37,7 @@ export default function PriceChart({ symbol, bars, historyError, currency = "USD
 
   if (!all.length) {
     if (intra && tick.status === "loading") return <><RangeBar /><DataState s={tick} rows={5} /></>
-    if (intra && tick.status === "error") return <><RangeBar /><EmptyBox>No intraday data for {symbol} right now ({tick.code === "no_provider_for_intraday" ? "none of the connected providers has intraday bars for it, or the demo date is pinned further back than the latest session" : "the data provider did not respond"}). Try a longer range.</EmptyBox></>
+    if (intra && tick.status === "error") return <><RangeBar /><EmptyBox>Intraday bars for {symbol} could not be loaded ({(tick.attempts || []).some((a) => /window/.test(a.error || "")) ? "the free provider for this kind of symbol only keeps about 60 days of intraday history, and this date is older" : tick.code === "no_provider_for_intraday" ? "no connected provider returned bars for this session" : "the data provider did not respond"}). <button className="underline" onClick={tick.reload}>Retry</button> or pick a longer range.</EmptyBox></>
     if (longNeeded && long.status === "loading") return <DataState s={long} rows={5} />
     if (longNeeded && long.status === "error") return <ErrorBox message={long.error} attempts={long.attempts} onRetry={long.reload} />
     return historyError ? <ErrorBox message={historyError} /> : <EmptyBox>No price history is available for {symbol} from the connected providers.</EmptyBox>
