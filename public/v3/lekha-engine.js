@@ -1481,7 +1481,7 @@ function renderPortfolioChart(){
   $("pf-note").textContent="Today's holdings valued at each day's closing prices and today's exchange rates"+(S.snapshots.length?`; amber dots are the ${S.snapshots.length} recorded daily total${S.snapshots.length>1?"s":""}.`:".")}
 function renderMacro(){renderRegime();renderSummary();
   document.querySelectorAll("#mc-range button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.r===S.mcRange)));
-  const m=S.macro;const el=$("mc-chart");if(!m){el.innerHTML='<div class="empty">Rates and inflation: no market-data source connected.</div>';return}
+  const m=S.macro;const el=$("mc-chart");if(!m){el.innerHTML='<div class="empty">Rates and inflation data did not load. It retries automatically; reload the page if it is still empty after a minute.</div>';return}
   const toMs=a=>(a||[]).map(([d,v])=>[Date.parse(d+"T00:00:00Z"),v]);
   const cpi=toMs(m.cpiYoY),ff=toMs(m.fedFunds),ty=toMs(m.tenYear);
   if(S.tnx!=null&&ty.length)ty.push([ptNow(),S.tnx]);
@@ -1652,7 +1652,7 @@ function applyEngine(text,source,at){const p=parseEngine(text);if(!p.rows.length
   db.collection("fund").onSnapshot(sn=>{const m={},ms={};sn.docs.forEach(d=>{const v=d.data();if(v&&v.t){if(v.missing)ms[v.t]=v;else m[v.t]=v}});S.fund=m;S.fundMissing=ms;S.fundLoaded=true;S.fundErr=null;renderValAll()},e=>{S.fundErr=handleErr(e,"fundamentals");S.fundLoaded=true;renderValAll()});
   db.doc("val/settings").onSnapshot(d=>{if(d.exists){const v=d.data();S.vset={...S.vset,...v,mos:{...S.vset.mos,...(v.mos||{})}}}S.vsetLoaded=true;renderValAll()},()=>{S.vsetLoaded=true});
   db.collection("rev").onSnapshot(sn=>{S.revs=sn.docs.map(d=>d.data()).filter(r=>r&&r.date&&r.items).sort((a,b)=>a.date<b.date?1:-1);S.revsLoaded=true;S.rvM=null;renderLead()},()=>{S.revsLoaded=true});
-  db.doc("meta/fredhist").onSnapshot(d=>{if(d.exists){S.fred=d.data();S.fredErr=null}else S.fredErr="Macro history: no market-data source connected.";S.rgM=null;renderRegime()},()=>{S.fredErr="Macro history could not load.";renderRegime()});
+  db.doc("meta/fredhist").onSnapshot(d=>{if(d.exists){S.fred=d.data();S.fredErr=null}else S.fredErr="Macro history did not load. It retries automatically; reload the page if it is still empty after a minute.";S.rgM=null;renderRegime()},()=>{S.fredErr="Macro history could not load.";renderRegime()});
   db.doc("meta/regime_val").onSnapshot(d=>{S.rgVal=d.exists?d.data():null;renderRegime()},()=>{});
   db.doc("meta/factor_val").onSnapshot(d=>{S.factorVal=d.exists?d.data():null;renderLead()},()=>{});
   {const need=new Set(["etf","ins","f13","cftc","tic"]);const done=k=>{need.delete(k);if(!need.size&&!S.flowReady){S.flowReady=true}renderFlow()};

@@ -60,6 +60,9 @@ main = patch(main, `$("ph-table").addEventListener("click",e=>{const b=e.target.
   `$("ph-table").addEventListener("click",e=>{const ed=e.target.closest("button[data-edit]");if(ed){const h=phLoad().items[Number(ed.dataset.edit)];if(h){const f=form.elements;if(h.theme&&![...f.theme.options].some(o=>o.value===h.theme))f.theme.add(new Option(h.theme,h.theme));f.acct.value=h.acct||"";f.tk.value=h.tk;f.theme.value=h.theme||"Other";f.cur.value=h.cur||"USD";f.qty.value=h.qty;f.cost.value=h.cost==null?"":h.cost;f.px.value=h.px==null?"":h.px;f.qty.focus();form.scrollIntoView({block:"center",behavior:"smooth"});$("ph-msg").textContent="Editing "+h.tk+": change the values, then press Add / update."}return}const b=e.target.closest("button[data-del]");if(!b)return;`, "ledger edit handler");
 main = patch(main, `$("ph-clear").onclick=()=>{phSave(`, `$("ph-clear").onclick=()=>{if(!confirm("Remove ALL holdings? This cannot be undone."))return;phSave(`, "confirm clear holdings");
 
+/* macro panels: say what happened (the data did not load) instead of claiming no source is connected */
+main = patch(main, `'<div class="empty">Rates and inflation: no market-data source connected.</div>'`, `'<div class="empty">Rates and inflation data did not load. It retries automatically; reload the page if it is still empty after a minute.</div>'`, "macro empty copy");
+main = patch(main, `S.fredErr="Macro history: no market-data source connected."`, `S.fredErr="Macro history did not load. It retries automatically; reload the page if it is still empty after a minute."`, "macro history copy");
 writeFileSync(P("v3", "lekha-engine.js"), HDR("public/v2/index.html (adapter + main script)") + adapter + "\n" + main);
 
 /* ---------- account / banner painter ---------- */

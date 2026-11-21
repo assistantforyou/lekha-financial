@@ -148,15 +148,20 @@
   window.PT_TIER_READY = meAsync; /* resolves to the /api/auth/me record (or null) */
   meAsync(); /* start tier discovery immediately */
 
-  async /* Shared market datasets are identical for every account and contain nothing personal,
+  /* Shared market datasets are identical for every account and contain nothing personal,
      so they are fetched WITHOUT the auth header — Vercel's CDN never caches authorized
      requests, and the edge cache is what keeps a page load fast on the Hobby plan.
      Anything per-user (HISTORY, FACTOR, VALIN, fund, rev, extras, me, state) keeps Bearer. */
   var SHARED_RE = /^(?:csv\/(?:ROTATION|RISK|BREADTH|OBOS|PEER|VOLATILITY)|doc\?|collection\/(?:etf|ins|news))(?:$|[/?&])/;
-  function get(path, asText) {
+  async function get(path, asText) {   /* async keyword used to sit stranded before the comment above, so await below was read as a call to a function named "await" and every signed-in data request threw */
     var url = BASE + path;
     var opts = { headers: { Accept: "application/json, text/csv, */*" } };
-    var r = await (SHARED_RE.test(path) ? fetch(url, opts) : authFetch(url, opts));
+    var r, shared = SHARED_RE.test(path);
+    for (var attempt = 0; attempt < 2; attempt++) {   /* one quiet retry: a cold serverless start or a provider hiccup should not read as "no data" */
+      try { r = await (shared ? fetch(url, opts) : authFetch(url, opts)); } catch (e) { if (attempt) throw { code: "source_http_0", message: "Network error" }; await new Promise(function (ok) { setTimeout(ok, 1200); }); continue; }
+      if (r.status >= 500 && !attempt) { await new Promise(function (ok) { setTimeout(ok, 1200); }); continue; }
+      break;
+    }
     if (r.status === 204 || r.status === 404) return null;
     if (r.status === 401) throw { code: "needs_reauth", message: "Session expired — sign in again." };
     if (!r.ok) throw { code: "source_http_" + r.status, message: "Data source returned HTTP " + r.status };
