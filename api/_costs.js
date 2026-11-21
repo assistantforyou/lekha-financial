@@ -2,11 +2,11 @@
 const { sb } = require("./_lib");
 const { tokenCost } = require("./_pricing");
 
-async function logUsage({ service, job, model, inTok = 0, outTok = 0, extra = {} }) {
+async function logUsage({ service, job, model, inTok = 0, outTok = 0, extra = {}, timeoutMs = 1000 }) {
   const usd = tokenCost(model, inTok, outTok);
   try {
     await sb("pt_costs", {
-      method: "POST",
+      method: "POST", signal: AbortSignal.timeout(timeoutMs),
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ service, job, model, units: { in: inTok, out: outTok, ...extra }, usd: usd == null ? 0 : usd }),
     });

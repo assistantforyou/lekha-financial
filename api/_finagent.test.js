@@ -12,3 +12,7 @@ assert.ok(names("Is AAPL overvalued?", ["AAPL"]).includes("calculate_valuation")
 assert.ok(names("show me AAPL 10-K filing", ["AAPL"]).includes("get_sec_filings"));
 assert.ok(Object.keys(A.TOOLS).length >= 13);
 console.log("_finagent.test.js ok");
+
+assert.deepEqual(A.checkNumbers({text:"Price is 18450 USD", evidence:["E1"]}, byId), [18450]);
+assert.deepEqual(A.checkNumbers({text:"Price rose 3.25%", evidence:["E1"]}, byId), [3.25]);
+assert.deepEqual(A.checkNumbers({text:"Revenue was 130.5 million", evidence:["E2"]}, byId), [130.5]);
