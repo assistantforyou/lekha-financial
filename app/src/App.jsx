@@ -18,7 +18,7 @@ import PAGES from "@/pages"
 
 const START = "ptpub.v1.v3.start"
 /* demo visitors see real market data as of a fixed past date (the server enforces it); say so */
-const demoAsOf = () => { try { const d = window.PT_DEMO && window.PT_DEMO.DEMO_DATE; return d ? "Market data as of " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) + " close" : "" } catch (e) { return "" } }
+const demoAsOf = () => { try { const d = window.PT_DEMO && window.PT_DEMO.DEMO_DATE; return d ? "Simulated portfolio as of " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) + " close" : "" } catch (e) { return "" } }
 function initialHash() {
   if (location.hash && location.hash.length > 2) return
   let k = DEFAULT_ROUTE; try { const s = JSON.parse(localStorage.getItem(START) || "null"); if (s === "macro") k = "macro/dashboard"; else { const last = JSON.parse(localStorage.getItem("ptpub.v1.app.route") || "null"); if (last && BY_KEY[last]) k = last } } catch (e) {}

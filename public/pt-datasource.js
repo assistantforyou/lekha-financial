@@ -27,7 +27,15 @@
   }
   async function authFetch(url, opts) {
     opts = opts || {}; var t = await token(); var h = Object.assign({}, opts.headers || {});
-    if (t) h.Authorization = "Bearer " + t;
+    if (window.PT_DEMO_MODE && (url === "/api/data/agent" || url === "/api/rag")) {
+      var keyName = "lekha.demo.knowledgeKey";
+      var key = sessionStorage.getItem(keyName);
+      if (!key) {
+        key = Array.from(crypto.getRandomValues(new Uint8Array(32)), function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+        sessionStorage.setItem(keyName, key);
+      }
+      h["X-Lekha-Demo-Key"] = key;
+    } else if (t) h.Authorization = "Bearer " + t;
     return fetch(url, Object.assign({}, opts, { headers: h }));
   }
   window.PT_AUTH = { session: sess, setSession: setSess, token: token, fetch: authFetch };
@@ -88,30 +96,6 @@
   }
 
 
-  /* The sample portfolio runs on REAL market data: the fixed sample tickers come from /api/free/demo (the same providers a signed-in
-     account uses), market-wide sets from the public /api/free endpoints. If any call fails, that one dataset falls back to the
-     local simulation so the page never breaks. */
-  function liveDemo(sim) {
-    var B = location.origin + "/api/free";
-    function txt(u) { return fetch(u).then(function (r) { return r.ok && r.status !== 204 ? r.text() : null; }); }
-    function js(u) { return fetch(u).then(function (r) { return r.ok ? r.json() : null; }); }
-    return {
-      fetchCsv: function (k) {
-        var personal = k === "HISTORY" || k === "FACTOR" || k === "VALIN";
-        return txt(personal ? B + "/demo?k=" + k : B + "/csv/" + encodeURIComponent(k)).then(function (t) {
-          if (!t) throw 0;
-          if (k === "HISTORY") computeLive(t, holdingSymbols(), holdingMap());
-          return t;
-        }).catch(function () { return sim.fetchCsv(k); });
-      },
-      getDoc: function (p) { return js(B + "/doc?path=" + encodeURIComponent(p)).then(function (v) { if (v && typeof v === "object" && !Array.isArray(v)) return v; throw 0; }).catch(function () { return sim.getDoc(p); }); },
-      getCollection: function (n) {
-        var u = n === "fund" || n === "rev" ? B + "/demo?k=" + n : B + "/collection/" + encodeURIComponent(n);
-        return js(u).then(function (v) { if (Array.isArray(v) && v.length) return v; throw 0; }).catch(function () { return sim.getCollection(n); });
-      }
-    };
-  }
-
   window.PT_TIER_READY = function () { return Promise.resolve({ tier: "premium" }); };
   if (window.PT_DEMO_MODE) {
     /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ----
@@ -119,10 +103,10 @@
        analyst, the council and the simulation engine render without an account. */
     window.PT_TIER = "premium";
     window.PT_LIMITS = { holdings: null, aiPerDay: null, simulationsPerDay: null, historyYears: null };
-    window.PT_SOURCE_LABEL = "Demo";
+    window.PT_SOURCE_LABEL = "Simulated sample portfolio";
     if (window.PT_DEMO && window.PT_DEMO.source) {
       try { window.PT_DEMO._seedDemo(); } catch (e) {}
-      window.PT_DATA_SOURCE = liveDemo(window.PT_DEMO.source());
+      window.PT_DATA_SOURCE = window.PT_DEMO.source();
     }
     return;
   }

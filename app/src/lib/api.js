@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, useCallback } from "react"
 // Every financial datum on screen comes through /api/data (the unified FinancialDataService). The UI never sees provider schemas.
 export async function api(path, { method = "GET", body, auth = false, signal } = {}) {
   const headers = {}; if (body) headers["Content-Type"] = "application/json"
-  if (auth && window.PT_AUTH) { const t = await window.PT_AUTH.token(); if (t) headers.Authorization = "Bearer " + t }
-  const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined, signal })
+  const send = auth && window.PT_AUTH ? window.PT_AUTH.fetch : fetch
+  const r = await send(path, { method, headers, body: body ? JSON.stringify(body) : undefined, signal })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw Object.assign(new Error(j.error || `Request failed (${r.status})`), { status: r.status, code: j.code, attempts: j.attempts, body: j })
   return j

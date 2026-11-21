@@ -13,7 +13,12 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":
 const icon = (p) => `<svg viewBox="0 0 24 24" class="cn-ic" aria-hidden="true">${p}</svg>`;
 const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLive = () => !window.PT_DEMO_MODE && window.PT_TIER === "premium";
-const nsKey = () => (window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.") + "v3.council";
+const nsKey = () => {
+  if (window.PT_DEMO_MODE) return "ptpub.v1.demo.v3.council";
+  const email = window.PT_AUTH?.session()?.email;
+  if (!email) throw new Error("Account identity unavailable");
+  return "ptpub.v1.v3.council." + encodeURIComponent(email.toLowerCase());
+};
 const store = { get() { try { return JSON.parse(localStorage.getItem(nsKey()) || "[]"); } catch (e) { return []; } }, add(r) { try { const a = store.get(); a.unshift(r); localStorage.setItem(nsKey(), JSON.stringify(a.slice(0, 20))); } catch (e) {} } };
 
 let host, demo = null, st = { phase: "idle", report: null, err: null, q: "", scope: "portfolio", shown: 0, timers: [] };
@@ -47,7 +52,7 @@ function frame() {
   host.innerHTML = `<section class="panel cn">
   <div class="sim-head"><div><p class="sim-eyebrow">LEKHA LLM COUNCIL</p><h2 class="sim-title">Five perspectives · one CEO synthesis</h2>
   <p class="sim-sub">One research question is examined through five analytical lenses in a single model response, then reconciled by the CEO into a final verdict. Dissent is kept, not averaged away.</p></div>
-  <div class="sim-tags">${live ? '<span class="pill live">PREMIUM · LIVE</span>' : '<span class="pill live">PREMIUM · FULL ACCESS</span>'}</div></div>
+  <div class="sim-tags">${live ? '<span class="pill live">PREMIUM · LIVE</span>' : '<span class="pill">SAMPLE COUNCIL · DEMONSTRATION</span>'}</div></div>
   <form class="cn-form" id="cn-form"><textarea id="cn-q" rows="2" maxlength="600" placeholder="${live ? "Ask a research question about your portfolio or one holding…" : "Choose a sample question below to explore the Council"}" ${live ? "" : "readonly"}>${esc(st.q)}</textarea>
     <div class="row"><label class="note">Scope <select id="cn-scope" class="btn"${live ? "" : " disabled"}><option value="portfolio">Whole portfolio</option>${holdings().map((t) => `<option${st.scope === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
     <button class="btn pri" type="submit" id="cn-go"${live ? "" : " hidden"}>Convene the Council</button>
@@ -70,11 +75,16 @@ function board() {
   <div class="cn-grid">${LENSES.map((L, i) => card(L, P && P[L[0]], status(i), isDemo)).join("")}</div>${links(st.shown)}
   <div class="cn-ceo ${ceoOn ? "on" : ""}">${icon(CEO_ICON)}<b>THE CEO</b>${ceoOn ? `<span class="cn-verdict v-${esc((r.ceo.verdict || "").split(" ")[0].toLowerCase())}">${esc(r.ceo.verdict)}</span>` : `<span>${st.phase === "error" ? "No verdict" : "Synthesising…"}</span>`}</div>
   ${ceoOn ? report(r) : ""}`;
-  el.querySelectorAll(".cn-card[data-l]").forEach((c) => (c.onclick = (e) => { if (e.target.closest("a")) return; c.classList.toggle("open"); c.setAttribute("aria-expanded", c.classList.contains("open")); }));
+  el.querySelectorAll('.cn-card[role="button"]').forEach((card) => {
+    card.onclick = () => card.setAttribute("aria-expanded", card.classList.toggle("open"));
+    card.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); card.click(); }
+    };
+  });
 }
 function card(L, p, status, isDemo) {
   const [k, n, name, role, q, ic] = L, s = { idle: "Standing by", queued: "Queued", working: "Analysing", done: p ? p.stance : "", failed: "Unavailable" }[status];
-  return `<div class="cn-card ${status} ${p && status === "done" ? "st-" + esc(p.stance) : ""}" data-l="${k}" role="button" tabindex="0" aria-expanded="false">
+  return `<div class="cn-card ${status} ${p && status === "done" ? "st-" + esc(p.stance) : ""}" data-l="${k}" ${p && status === "done" ? 'role="button" tabindex="0" aria-expanded="false"' : ''}>
     <div class="cn-top">${icon(ic)}<span class="cn-n">JUDGE ${n}</span><span class="cn-st">${esc(s)}</span></div><b class="cn-name">${name}</b><span class="cn-role">${role}</span>
     ${p && status === "done" ? `<p class="cn-head">${esc(p.headline)}</p><div class="cn-more"><h4>${esc(q)}</h4><ul>${(p.points || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>${(p.risks || []).length ? `<h4>Risks to this view</h4><ul>${p.risks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div><span class="cn-x">Details</span>` : `<p class="cn-q">${esc(q)}</p>`}</div>`;
 }
@@ -87,7 +97,7 @@ function report(r) {
   const P = (x) => (x ? `<p>${esc(x)}</p>` : ""), UL = (a) => (a && a.length ? `<ul>${a.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "");
   const agree = UL(c.agree), dissent = c.dissent && c.dissent.length ? `<ul>${c.dissent.map((d) => `<li><b>${esc(d.lens)}:</b> ${esc(d.reason)}</li>`).join("")}</ul>` : "<p>No material dissent recorded.</p>";
   return `<article class="cn-report"><header><p class="sim-eyebrow">LEKHA INVESTMENT INTELLIGENCE REPORT</p><h3>${esc(r.question)}</h3>
-    <p class="note">Scope: ${esc(r.scope === "portfolio" ? "whole portfolio" : r.scope)} · ${isDemo ? `sample report` : `generated ${esc((m.generatedAt || "").slice(0, 16).replace("T", " "))} UTC · ${m.cached ? "cached answer" : "1 model request"}${m.retries ? ` (${m.retries} transport retr${m.retries > 1 ? "ies" : "y"})` : ""}${m.fallback ? ` · ${esc(m.fallback)}` : ""}`}</p></header>
+    <p class="note">Scope: ${esc(r.scope === "portfolio" ? "whole portfolio" : r.scope)} · ${isDemo ? `sample report` : `generated ${esc((m.generatedAt || "").slice(0, 16).replace("T", " "))} UTC · ${m.cached ? "cached answer" : (m.llmRequests ? m.llmRequests + " model request" + (m.llmRequests === 1 ? "" : "s") : "generated report")}${m.retries ? ` (${m.retries} transport retr${m.retries > 1 ? "ies" : "y"})` : ""}${m.fallback ? ` · ${esc(m.fallback)}` : ""}`}</p></header>
     <div class="cn-exec"><span class="cn-verdict v-${esc((c.verdict || "").split(" ")[0].toLowerCase())}">${esc(c.verdict)}</span>${P(c.executive)}</div>
     <div class="cn-cols">${sec("Investment thesis", P(c.thesis))}${sec("Valuation assessment", P(c.valuation))}${sec("Bull case", P(c.bullCase))}${sec("Bear case", P(c.bearCase))}${sec("Portfolio implications", P(c.portfolio))}${sec("Council consensus", (agree ? "<h5>Agreement</h5>" + agree : "") + "<h5>Dissent</h5>" + dissent)}${sec("Confidence & evidence quality", P(c.evidenceQuality) + UL(c.limitations))}</div>
     <div class="cn-final"><h4>Final CEO verdict</h4>${P(c.final)}</div>
@@ -114,7 +124,7 @@ function playDemo(id) {
 async function convene() {
   if (!isLive()) return; /* never call the model outside Premium; the server enforces this too */
   const q = host.querySelector("#cn-q").value.trim(), scope = host.querySelector("#cn-scope").value;
-  if (q.length < 3) { st.err = "Type a research question first."; board(); return; }
+  if (q.length < 3) { st.phase = "error"; st.report = null; st.err = "Type a research question first."; board(); return; }
   clearTimers(); st.q = q; st.scope = scope; st.err = null; st.report = null; st.phase = "session"; board();
   host.querySelector("#cn-go").disabled = true;
   try {
