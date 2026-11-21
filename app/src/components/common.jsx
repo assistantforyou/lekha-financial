@@ -27,17 +27,21 @@ export function DataState({ s, empty, children, rows = 4 }) {
   if (empty && (s.data == null || (Array.isArray(s.data) && !s.data.length))) return <EmptyBox>{empty}</EmptyBox>
   return children
 }
-export const ErrorBox = ({ message, attempts, onRetry }) => (
-  <div className="flex items-start gap-3 rounded-lg border border-[color-mix(in_srgb,var(--down)_40%,var(--border))] bg-[color-mix(in_srgb,var(--down)_8%,transparent)] p-3 text-sm" role="alert">
+const WHAT = { statements: "financial statements", earnings: "earnings history", peers: "peer comparison", filings: "SEC filings", history: "price history", news: "news", quote: "a live quote", profile: "a company profile", ratios: "valuation ratios", facts: "company facts" }
+// provider failures arrive as snake_case codes; people should never have to read those
+const friendly = (m) => { const x = /^no_provider_for_(\w+)$/.exec(String(m || "").split(/\s/)[0]); if (x) return { none: true, text: `No ${WHAT[x[1]] || x[1].replace(/_/g, " ")} for this symbol from the connected providers. That is normal for ETFs, indices and crypto, which have no company statements or filings, and for non-US issuers.` }; if (/^[a-z0-9_]+$/.test(String(m || ""))) return { none: false, text: `The data provider returned “${String(m).replace(/_/g, " ")}”. Try again in a moment.` }; return { none: false, text: m } }
+export const ErrorBox = ({ message, attempts, onRetry }) => { const f = friendly(message)
+  if (f.none) return <div className="flex items-start gap-3 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground" role="status"><Inbox className="mt-0.5 size-4 shrink-0" /><div className="min-w-0"><div>{f.text}</div>{attempts && attempts.length ? <div className="mt-1 text-[11px]">Checked: {attempts.map((a) => `${a.provider} (${a.status})`).join(" → ")}</div> : null}</div></div>
+  return (<div className="flex items-start gap-3 rounded-lg border border-[color-mix(in_srgb,var(--down)_40%,var(--border))] bg-[color-mix(in_srgb,var(--down)_8%,transparent)] p-3 text-sm" role="alert">
     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--down)]" />
-    <div className="min-w-0 flex-1"><div className="font-medium">This data could not be loaded</div><div className="text-[13px] text-muted-foreground">{message}</div>
+    <div className="min-w-0 flex-1"><div className="font-medium">This data could not be loaded</div><div className="text-[13px] text-muted-foreground">{f.text}</div>
       {attempts && attempts.length ? <div className="mt-1 text-[11px] text-muted-foreground">Tried: {attempts.map((a) => `${a.provider} (${a.status})`).join(" → ")}</div> : null}</div>
     {onRetry && <Button size="sm" variant="outline" onClick={onRetry}><RefreshCw />Retry</Button>}
-  </div>)
+  </div>) }
 export const EmptyBox = ({ children }) => <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"><Inbox className="size-4" />{children}</div>
 export const Stat = ({ label, value, sub, tone, hint }) => (
   <div className="min-w-0 rounded-lg border border-border bg-card px-3.5 py-3"><div className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}{hint && <Tooltip content={hint}><span className="cursor-help rounded-full border border-border px-1 text-[9px] normal-case">i</span></Tooltip>}</div>
-    <div className={cn("num mt-1 truncate text-lg font-semibold", tone)}>{value}</div>{sub && <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">{sub}</div>}</div>)
+    <div className={cn("num mt-1 break-words text-base font-semibold sm:text-lg", tone)}>{value}</div>{sub && <div className="mt-0.5 break-words text-[11.5px] text-muted-foreground">{sub}</div>}</div>)
 export const FreshBadge = ({ meta }) => { const f = meta && meta.freshness; if (!f) return null; return <Badge variant={f === "realtime" ? "up" : f === "delayed" ? "warn" : "outline"}>{f}</Badge> }
 
 /* Line / area chart with crosshair tooltip. points: [[x(label), value], ...] */
@@ -53,8 +57,11 @@ export function LineChart({ points, height = 220, format = (v) => v.toFixed(2), 
   }, [points, H])
   if (!g) return <EmptyBox>Not enough data to chart.</EmptyBox>
   const hp = hover != null ? points[hover] : null
+  const at = (e) => { const r = e.currentTarget.getBoundingClientRect(), i = Math.round(((e.clientX - r.left) / r.width * W - P.l) / (W - P.l - P.r) * (points.length - 1)); setHover(Math.max(0, Math.min(points.length - 1, i))) }
   return (<div className="relative">
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" onMouseLeave={() => setHover(null)} onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(), i = Math.round(((e.clientX - r.left) / r.width * W - P.l) / (W - P.l - P.r) * (points.length - 1)); setHover(Math.max(0, Math.min(points.length - 1, i))) }}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full select-none outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ touchAction: "pan-y" }} tabIndex={0} role="img" aria-label={`Line chart, ${points.length} points${hp && hp[1] != null ? `. ${xLabel(hp[0])}: ${format(hp[1])}` : ""}. Use arrow keys to move the crosshair.`}
+      onPointerLeave={() => setHover(null)} onPointerCancel={() => setHover(null)} onPointerDown={at} onPointerMove={at}
+      onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); setHover((h) => Math.max(0, Math.min(points.length - 1, (h ?? points.length - 1) + (e.key === "ArrowLeft" ? -1 : 1)))) } else if (e.key === "Escape") setHover(null) }}>
       {ref0 != null && <line x1={P.l} x2={W - P.r} y1={g.Y(ref0)} y2={g.Y(ref0)} stroke="var(--line)" strokeDasharray="4 4" />}
       {area && <path d={`${g.d}L${g.X(points.length - 1)},${H - P.b}L${g.X(0)},${H - P.b}Z`} fill={color} opacity=".1" />}
       <path d={g.d} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
