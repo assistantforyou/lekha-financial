@@ -82,8 +82,8 @@
       n.dataset.pid = pid; n.classList.add("lay-item");
       var ph = n.querySelector(":scope > .ph");
       if (ph && WHY[pid] && !ph.querySelector(".why")) { var p = document.createElement("p"); p.className = "why"; p.textContent = WHY[pid]; ph.appendChild(p); }
-      if (ph && !ph.querySelector(".lay-col")) {
-        var b = document.createElement("button"); b.type = "button"; b.className = "lay-col"; b.title = "Collapse or expand this panel"; b.setAttribute("aria-label", "Collapse or expand");
+      if (ph && ph.querySelector(".why, .note") && !ph.querySelector(".lay-col")) {
+        var b = document.createElement("button"); b.type = "button"; b.className = "lay-col"; b.title = "Show or hide the description"; b.setAttribute("aria-label", "Show or hide the description"); b.setAttribute("aria-expanded", "true");
         b.textContent = "▾"; b.onclick = function () { toggleCollapse(tab, pid); };
         ph.insertBefore(b, ph.firstChild);
       }
@@ -117,7 +117,7 @@
       var n = nodes[p]; lay.appendChild(n);
       n.classList.toggle("lay-half", L.half.indexOf(p) >= 0);
       n.classList.toggle("lay-hidden", L.hidden.indexOf(p) >= 0);
-      n.classList.toggle("lay-collapsed", L.collapsed.indexOf(p) >= 0);
+      n.classList.toggle("lay-collapsed", L.collapsed.indexOf(p) >= 0); var cb = n.querySelector(":scope > .ph > .lay-col"); if (cb) cb.setAttribute("aria-expanded", L.collapsed.indexOf(p) >= 0 ? "false" : "true");
     });
     if (editing) decorate(tab);
   }
@@ -410,7 +410,7 @@
     // import
     html += DEMO()
       ? card("set-import", "Statement import", "<p class='note'>Import is for your real account, so it's switched off in the demo — real statements never mix with simulated data. Create a free account to import a broker PDF, screenshot or CSV.</p>", "Import holdings from a broker PDF, screenshot or CSV.")
-      : card("set-import", "Statement import", "<div class='set-f'><input type='password' id='set-imppass' name='passcode' placeholder='Import passcode' value='" + h(LS("importpass") || "") + "' autocomplete='current-password' autocapitalize='none' autocorrect='off' spellcheck='false' aria-label='Import passcode'><button class='btn' type='button' id='set-impsave'>Save passcode</button></div><p class='note'>Pick one or several statements at once; you review every line before it is added.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
+      : card("set-import", "Statement import", "<p class='note'>Pick one or several statements at once; you review every line before it is added.</p>", "Import holdings from a broker PDF, screenshot or CSV.");
 
     // admin
     if (u && u.is_admin) html += card("set-costs", "Running costs (admin)", "<div id='set-costs-body'><div class='empty'>Loading costs…</div></div>", "What this site costs to run: AI calls metered per request, plus fixed monthly plans. Only admins see this.");
@@ -472,7 +472,7 @@
     });
     document.querySelectorAll("#set-layout [data-preset]").forEach(function (b) { b.onclick = function () { applyPreset(b.getAttribute("data-tab"), b.getAttribute("data-preset")); renderSettings(); }; });
     var imp = el("set-impsave");
-    if (imp) imp.onclick = function () { LS("importpass", el("set-imppass").value.trim()); try { localStorage.setItem("ptpub.v1.importpass", el("set-imppass").value.trim()); } catch (e) {} imp.textContent = "Saved"; };
+    if (imp) imp.onclick = function () {};
   }
 
   async function loadCosts() {
@@ -512,7 +512,7 @@
     ":root[data-density='compact'] .lay{gap:10px}",
     ".lay>.lay-item{grid-column:1/-1;min-width:0}.lay>.lay-item.lay-half{grid-column:auto}",
     ".lay>.lay-hidden{display:none!important}",
-    ".lay-collapsed>*:not(.ph):not(.lay-bar){display:none!important}",
+    ".lay-collapsed>.ph>.why,.lay-collapsed>.ph>.note{display:none!important}",
     ".lay-col{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;margin-right:2px;transition:transform .15s}",
     ".lay-collapsed .lay-col{transform:rotate(-90deg)}",
     ".lay-editing .lay>.lay-hidden{display:flex!important;opacity:.45}",

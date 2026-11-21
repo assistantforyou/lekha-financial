@@ -91,6 +91,11 @@ ui = patch(ui, `Object.keys(PRESETS[tab]).map(`, `Object.keys(PRESETS[tab] || { 
 ui = patch(ui, `html += card("set-layout", "Dashboard layout", lay + "`, `html += card("set-layout", "Dashboard layout", "<div id='v3-start-pref'></div>" + lay + "`, "start pref slot");
 ui = patch(ui, `"Five-agent LLM Council", "Billion-path simulations"`, `"LLM Council (five perspectives + CEO)", "1 Billion Simulation Engine (1M-path runs)"`, "honest plan copy");
 ui = patch(ui, `setupTab("ov"); setupTab("val");`, `TABS.forEach(setupTab);`, "boot tabs");
+/* Panel arrow: hide/show only the description under the title (header .why / .note), never the panel body */
+ui = patch(ui, `if (ph && !ph.querySelector(".lay-col")) {`, `if (ph && ph.querySelector(".why, .note") && !ph.querySelector(".lay-col")) {`, "arrow only where there is a description");
+ui = patch(ui, `b.title = "Collapse or expand this panel"; b.setAttribute("aria-label", "Collapse or expand");`, `b.title = "Show or hide the description"; b.setAttribute("aria-label", "Show or hide the description"); b.setAttribute("aria-expanded", "true");`, "arrow label");
+ui = patch(ui, `n.classList.toggle("lay-collapsed", L.collapsed.indexOf(p) >= 0);`, `n.classList.toggle("lay-collapsed", L.collapsed.indexOf(p) >= 0); var cb = n.querySelector(":scope > .ph > .lay-col"); if (cb) cb.setAttribute("aria-expanded", L.collapsed.indexOf(p) >= 0 ? "false" : "true");`, "arrow aria-expanded");
+ui = patch(ui, `".lay-collapsed>*:not(.ph):not(.lay-bar){display:none!important}",`, `".lay-collapsed>.ph>.why,.lay-collapsed>.ph>.note{display:none!important}",`, "collapse hides description only");
 writeFileSync(P("v3", "lekha-ui.js"), HDR("public/v2/pt-ui.js") + ui);
 
 /* ---------- pt-themes → lekha-themes (adds LEKHA themes first) ---------- */
