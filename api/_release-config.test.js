@@ -22,9 +22,10 @@ test("price ids are checked against the configured Stripe account", async () => 
   const { stripePriceIssues } = await import("../scripts/check-release-config.mjs");
   const env = { VERCEL_ENV: "preview", STRIPE_SECRET_KEY: "sk_test_fixture", STRIPE_PRICE_PAID: "price_paid", STRIPE_PRICE_PREMIUM: "price_premium" };
   const reply = (status, body) => ({ ok: status < 400, status, json: async () => body });
-  const monthly = { livemode: false, recurring: { interval: "month" } };
+  const monthly = { active: true, currency: "thb", livemode: false, billing_scheme: "per_unit", recurring: { interval: "month", interval_count: 1, usage_type: "licensed" } };
 
-  assert.deepEqual(await stripePriceIssues(env, async () => reply(200, monthly)), []);
+  assert.deepEqual(await stripePriceIssues(env, async url => reply(200, { ...monthly, unit_amount: url.endsWith("price_paid") ? 69900 : 129900 })), []);
+  assert.ok((await stripePriceIssues(env, async () => reply(200, { ...monthly, unit_amount: 129900 }))).some(entry => entry.startsWith("STRIPE_PRICE_PAID")));
   assert.deepEqual(await stripePriceIssues(env, async () => { throw new Error("network"); }), []);
   assert.deepEqual(await stripePriceIssues({ ...env, STRIPE_SECRET_KEY: "" }, async () => { throw new Error("should not be called"); }), []);
 
@@ -33,8 +34,8 @@ test("price ids are checked against the configured Stripe account", async () => 
   assert.ok(missing.every(entry => /not found/.test(entry)));
 
   const wrongMode = await stripePriceIssues(env, async () => reply(200, { livemode: true, recurring: { interval: "month" } }));
-  assert.ok(wrongMode.every(entry => /wrong Stripe mode/.test(entry)));
+  assert.ok(wrongMode.some(entry => /wrong Stripe mode/.test(entry)));
 
   const oneOff = await stripePriceIssues(env, async () => reply(200, { livemode: false, recurring: null }));
-  assert.ok(oneOff.every(entry => /recur monthly/.test(entry)));
+  assert.ok(oneOff.some(entry => /recur monthly/.test(entry)));
 });

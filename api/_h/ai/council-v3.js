@@ -197,6 +197,7 @@ async function convene({ uid, scope, question, evidence, lang, key }) {
     perspectives: v.perspectives,
     ceo: v.ceo,
     meta: {
+      provider: info.provider,
       model: info.model ? `${info.provider} ${info.model}` : null, llmRequests: info.requests, retries: info.retries || 0, cached: false, fallback: info.fallback ? `Z.ai unavailable (${info.fallback}); answered by Gemini` : null,
       generatedAt: new Date().toISOString(),
       dataAsOf: prune({ ...(evidence.asOf || {}), portfolio: ctx && ctx.valDate ? clean(ctx.valDate, 40) : null,
@@ -233,11 +234,13 @@ module.exports = async (req, res) => {
     const hit = await cacheGet(key).catch(() => null);
     if (hit && hit.payload && hit.payload.ceo) return res.status(200).json({ ...hit.payload, meta: { ...hit.payload.meta, cached: true } });
 
-    if (!pending.has(key)) {
+    const shared = pending.has(key);
+    if (!shared) {
       const task = convene({ uid, scope, question, evidence, lang, key }).finally(() => pending.delete(key));
       pending.set(key, task);
     }
     const { status, body } = await pending.get(key);
+    if (shared && body.meta) return res.status(status).json({ ...body, meta: { ...body.meta, shared: true } });
     return res.status(status).json(body);
   } catch (e) {
     console.error(JSON.stringify({ event: "council_failed", status: e?.status || 502 }));

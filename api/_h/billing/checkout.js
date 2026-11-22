@@ -2,6 +2,7 @@
 // Paid = ฿699/month (STRIPE_PRICE_PAID), Premium = ฿1,299/month (STRIPE_PRICE_PREMIUM).
 // One active subscription at a time: switching plans goes through the Stripe billing portal.
 const { callbackUrl, requireUser, profile, updateProfile } = require("../../_auth");
+const { rateHit } = require("../../_lib");
 const { stripe } = require("../../_stripe");
 
 const PLANS = {
@@ -13,6 +14,9 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
   const u = await requireUser(req, res); if (!u) return;
+  if (!(await rateHit(`billing/sessions/${u.id}/${Math.floor(Date.now() / 600000)}`, 20))) {
+    return res.status(429).json({ error: "Too many billing requests. Try again shortly." });
+  }
   const plan = req.body?.plan ?? "premium";
   if (plan !== "paid" && plan !== "premium") return res.status(400).json({ error: "Choose Paid or Premium." });
   const priceId = process.env[PLANS[plan].env];

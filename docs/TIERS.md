@@ -2,18 +2,17 @@
 
 One product, four levels. The terminal is the same for everyone; what changes is
 **whether the data is simulated or real, how deep it goes, and (on Premium) the AI layer.**
-No feature is hidden behind a tier wall — lower tiers see the same panels with limited
-depth and upgrade hints.
+Some panels preview higher tiers. The server checks account entitlements for restricted operations.
 
 | | Demo | Free | Paid ฿699/mo | Premium ฿1,299/mo |
 |---|---|---|---|---|
 | Sign-in | none | account | account | account |
-| Data | fully simulated, deterministic | real (public sources) | real + Alpha Vantage layer | real + Alpha Vantage layer |
+| Data | sample portfolio; some research routes use historical provider data | real (public sources) | real + Alpha Vantage layer | real + Alpha Vantage layer |
 | Holdings | 14 demo positions (demo namespace) | 20 | unlimited | unlimited |
 | Own-portfolio history | full simulated | 5 years | full depth the source serves | full depth the source serves |
 | Valuation symbols | 14 | 12 | unlimited | unlimited |
 | Analyst estimate revisions | simulated | — | ✓ | ✓ |
-| 1B Projection Lab (synthetic scenario panel) | ✓ | locked teaser | hidden | ✓ |
+| Illustrative Projection Lab (synthetic scenario panel) | ✓ | locked teaser | hidden | ✓ |
 | AI analyst chat / daily briefing / Monte Carlo & stress sims | canned demo answers | teaser | teaser | ✓ (40 asks, 3 briefings, 10 sims per day) |
 
 Market-wide datasets (rotation, breadth, OBOS, factor, peer, volatility, macro, flows)
@@ -54,15 +53,9 @@ is not `active`/`trialing` or is past its `period_end` (+1 day grace) → free;
 
 ## Demo architecture
 
-Anonymous visitors get the demo automatically (`?demo=1` forces it even signed in).
-`public/pt-demo.js` is a deterministic, seeded simulation (mulberry32 per symbol,
-market-correlated walks) that implements the exact data-source contract the parsers
-already read: all nine CSV datasets, the `meta/*` market docs, and the
-fund/rev/news/etf/ins collections — so every panel, chart and AI answer renders with
-one internally consistent story (a big NVDA winner, a deep TSLA drawdown, semiconductor
-concentration). The demo never calls `/api`, writes only to the `ptpub.v1.demo.*`
-localStorage namespace, and refuses to sync (`pt-state.js` no-ops while
-`PT_DEMO_MODE` is set). Every surface is marked "DEMO — SIMULATED DATA".
+Anonymous visitors enter demo mode. The browser seeds sample holdings and uses a separate storage namespace. Historical research routes can contact the server. Council scenarios are pre-written and local Monte Carlo runs use the sample portfolio. Account document sync is disabled in demo mode.
+
+The cited research endpoint allows 15 questions per day in demo, 30 per signed-in Free or Paid account and 80 on Premium. Premium expert requests also consume the research allowance. The portfolio analyst has a separate 40-question cap. The Premium Council default is 10 new generations per day. Its five perspectives and synthesis come from one structured model response. Cached Council answers consume no new generation.
 
 ## Stripe
 
@@ -75,9 +68,7 @@ STRIPE_PRICE_PREMIUM=price_1UcqQNQ0yLOm6KwFJRbgNC8n   # ฿1,299/month
 
 - Checkout: `POST /api/billing/checkout {plan:"paid"|"premium"}` → Stripe Checkout.
   An existing active subscription gets `409` (switch plans from the customer portal).
-- Webhook: signature-verified; maps the subscription's price id to the plan
-  (`STRIPE_PRICE_PAID` → paid, any other price → premium, so the old $60/mo price
-  stays premium). Canceled subs write `plan:"free"`.
+- Webhook: only explicitly mapped Paid, Premium and grandfathered price IDs grant access. An unknown active price raises a retryable error for operator reconciliation.
 - Until both price env vars are set in Vercel, checkout returns a clear 503 and
   everything else works.
 
@@ -94,5 +85,4 @@ go if that ever changes.
 - **Themes** (`public/pt-themes.js`): 100 editor-style themes (74 dark, 26 light) plus LEKHA Auto/Light/Dark, picked
   from the palette button in the header and stored in the `theme` display preference (synced per account).
   `node scripts/check-themes.mjs` verifies every theme's contrast.
-- **Demo calendar**: in the Demo tier "today" is frozen at 18 Aug 2026 (`ptNow()` / `PT_DEMO_DATE`), and each date the
-  page shows carries "(Outdated date used for DEMO only)". Other tiers use real time.
+- **Demo calendar**: supported historical research endpoints use the demo cutoff. The browser clock and individual datasets may have different dates. Check each source's observation date.

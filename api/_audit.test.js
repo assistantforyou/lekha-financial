@@ -19,3 +19,9 @@ assert.strictEqual(s.total, 4); assert.strictEqual(s.activeUsers, 1); assert.str
 assert.strictEqual(s.byRoute[0].route, "data/statements"); assert.strictEqual(s.byRoute[0].errors, 1);
 assert.ok(s.topErrors.some((x) => x.code === "ai_limit")); assert.strictEqual(s.byDay[0].serverErrors, 1);
 console.log("_audit.test.js ok");
+
+for (const [kind, flags, attempts] of [["fresh", {}, 2], ["cached", {cached:true}, 0], ["shared", {shared:true}, 0]]) {
+  const row = a.buildEvent({grp:"ai", route:"council-v3", req:{}, status:200, ms:12,
+    seen:{provider:"Gemini", requests:2, fallback:true, ...flags}});
+  assert.deepStrictEqual(row.meta,{provider:"Gemini",fallback:true,generation:kind,provider_attempts:attempts});
+}

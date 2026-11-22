@@ -318,7 +318,7 @@
 
   /* ---- one tier card in the pricing grid: the "Revised pricing structure" table, one column per card ---- */
   var PLAN_ROWS = ["Market data", "Portfolio tracking", "Historical analysis", "Valuation coverage", "Advanced indicators",
-    "AI investment analyst", "Five-agent LLM Council", "Monte Carlo simulations", "Stress testing"];
+    "AI investment analyst", "Single-model LLM Council", "Monte Carlo simulations", "Stress testing"];
   var PLAN_VALS = {
     demo:    ["Simulated", "Simulated", "Simulated", "Simulated", "Demo", "Demo only", "Demo only", "Demo only", "Demo only"],
     free:    ["Real", "20 holdings", "5 years", "12 symbols", "Basic", "—", "—", "—", "—"],

@@ -107,7 +107,7 @@ const handle = async (req, res) => {
     if (String(b.confirm || "") !== "DELETE") return res.status(400).json({ error: "Type DELETE to confirm." });
     if (!(await reauth(u, String(b.password || ""), res))) return;
     const p = await profile(u);
-    if ((p.plan === "paid" || p.plan === "premium") && p.sub_status && !/^(canceled|cancelled|incomplete_expired)$/.test(p.sub_status)) return res.status(409).json({ error: "Cancel your subscription first (Plans & billing, Manage subscription), then delete the account.", code: "active_subscription" });
+    if ((p.stripe_subscription_id || (p.sub_status && ["paid", "premium"].includes(p.plan))) && !["canceled", "cancelled", "incomplete_expired"].includes(p.sub_status)) return res.status(409).json({ error: "Cancel your subscription first (Plans & billing, Manage subscription), then delete the account.", code: "active_subscription" });
     // Profiles and state cascade from auth.users. Retrieval documents also support demo owners and use a text key.
     const cleanup = await sb(`pt_rag_docs?owner=eq.${encodeURIComponent(u.id)}`, { method: "DELETE" });
     if (!cleanup.ok && cleanup.status !== 404) return res.status(503).json({ error: "Could not remove account documents. Retry deletion shortly." });

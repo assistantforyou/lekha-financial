@@ -6,13 +6,15 @@ const load = path => require('./' + path);
 Object.assign(process.env, { VERCEL_ENV: 'preview', SITE_URL: 'https://fixture.invalid', SUPABASE_URL: 'https://fixture.invalid', SUPABASE_SERVICE_ROLE_KEY: 'fixture', STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: 'fixture', STRIPE_PRICE_PAID: 'price_P' });
 const profile = { user_id: 'a', plan: 'free' };
 const docs = new Map();
+let allowRequests = true;
+const accountChanges = [];
 let rejectWrite = false, failedWrites = 0;
 const user = id => ({id, email: id + '@example.test'});
 global.fetch = async (url, options = {}) => {
   const u = new URL(url), path = u.pathname, body = options.body;
   const json = Response.json;
   if (u.hostname === 'fixture.invalid') {
-    if (path.endsWith('/pt_rate_hit')) return json(true);
+    if (path.endsWith('/pt_rate_hit')) return json(allowRequests);
     if (path === '/auth/v1/signup' || path === '/auth/v1/recover') {
       assert.equal(u.searchParams.get('redirect_to'), 'https://fixture.invalid/auth-callback.html');
       assert.equal(JSON.parse(body).email, user('a').email);
@@ -22,8 +24,15 @@ global.fetch = async (url, options = {}) => {
       assert.equal(options.headers.Authorization, 'Bearer renewed-a');
       return new Response(null, {status:204});
     }
+    if (path === '/auth/v1/admin/users/a' || path.endsWith('/pt_rag_docs')) {
+      assert.equal(options.method, 'DELETE');
+      if (path.endsWith('/pt_rag_docs')) assert.equal(u.searchParams.get('owner'), 'eq.a');
+      accountChanges.push(path);
+      return new Response(null, {status:204});
+    }
     if (path === '/auth/v1/token') {
       const input = JSON.parse(body);
+      if (input.refresh_token === "fixture-expired") return json({}, {status:400});
       if (u.searchParams.get('grant_type') === 'refresh_token') assert.equal(input.refresh_token, 'refresh-a');
       else assert.equal(input.email, user('a').email);
       return json({access_token: u.search.includes('refresh_token') ? 'renewed-a' : 'login-a', refresh_token: 'refresh-a', user:user('a')});
@@ -31,6 +40,11 @@ global.fetch = async (url, options = {}) => {
     if (path === '/auth/v1/user') {
       const token = options.headers.Authorization;
       assert.ok(['Bearer renewed-a','Bearer login-b'].includes(token));
+      if (options.method === "PUT") {
+        assert.equal(JSON.parse(body).email,"replacement@example.test");
+        assert.equal(u.searchParams.get("redirect_to"),"https://fixture.invalid/auth-callback.html");
+        accountChanges.push("request-email-confirmation");
+      }
       return json(user(token.endsWith('-a') ? 'a' : 'b'));
     }
     const id = u.searchParams.get('user_id');
@@ -110,6 +124,24 @@ async function bill(route, payload, signature) {
   assert.equal((await bill('webhook',event,sig)).code,200);
   assert.equal(profile.plan,'paid');
   assert.equal((await bill('checkout',{plan:'paid'})).code,409);
+  Object.assign(profile, {plan:"free", sub_status:"past_due"});
+  const deletion = await call(auth, {method:"POST",query:{action:"delete"},headers:headers(token),body:{password:"fixture-password",confirm:"DELETE"}});
+  assert.equal(deletion.code,409);
+  assert.equal(deletion.data.code,"active_subscription");
+  allowRequests = false;
+  for (const route of ["checkout","portal"]) assert.equal((await bill(route,{plan:"paid"})).code,429);
+  allowRequests = true;
+  assert.deepEqual(accountChanges, []);
+  const expired = await call(auth,{method:"POST",query:{action:"refresh"},headers:{},body:{refresh_token:"fixture-expired"}});
+  assert.equal(expired.code,401);
+  const emailChange = await call(auth,{method:"POST",query:{action:"email"},headers:headers(token),
+    body:{email:"replacement@example.test",password:"fixture-password"}});
+  assert.equal(emailChange.code,200);
+  assert.deepEqual(accountChanges, ["request-email-confirmation"]);
+  Object.assign(profile, {plan:"free", sub_status:"canceled"});
+  const closed = await call(auth, {method:"POST",query:{action:"delete"},headers:headers(token),body:{password:"fixture-password",confirm:"DELETE"}});
+  assert.equal(closed.code,200);
+  assert.deepEqual(accountChanges.slice(1), ["/rest/v1/pt_rag_docs","/auth/v1/admin/users/a"]);
   const logout = await call(auth,{method:'POST',query:{action:'logout'},headers:headers(token)});
   assert.equal(logout.data.ok,true);
   console.log('PASS signup, recovery, logout and Checkout, portal, signed activation, duplicate subscription guard');

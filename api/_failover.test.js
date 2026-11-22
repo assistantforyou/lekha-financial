@@ -55,6 +55,24 @@ const stall = (signal) => new Promise((_, reject) => signal.addEventListener("ab
   delete process.env.GEMINI_API_KEY;
   await assert.rejects(generateJson({ ...prompt, model: "missing" }), /upstream/);
   assert.equal(backupCalls, 4);
+  process.env.GEMINI_API_KEY = "fixture";
+  const now = Date.now;
+  let probes = 0;
+  try {
+    Date.now = () => now() + 31000;
+    global.fetch = async url => {
+      if (!String(url).startsWith("https://")) return new Response(null);
+      assert.ok(url.includes("api.z.ai"));
+      probes++;
+      return primary(JSON.stringify(valid));
+    };
+    const info = {};
+    assert.deepEqual(await generateJson({ ...prompt, model: "outage", info }), valid);
+    assert.equal(info.provider, "Z.ai");
+    assert.equal(info.fallback, null);
+    assert.equal(probes, 1);
+  } finally { Date.now = now; }
+  delete process.env.GEMINI_API_KEY;
   delete process.env.ZAI_API_KEY;
   await assert.rejects(generateJson(prompt), /not_configured/);
   console.log("structured failover, evidence preservation, attempt limits and circuit checks passed");

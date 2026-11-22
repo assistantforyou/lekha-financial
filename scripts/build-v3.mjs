@@ -103,7 +103,7 @@ ui = patch(ui, `["ov", "val"].forEach(function (tab) {\n      var L = layout(tab
   `TABS.forEach(function (tab) {\n      if (!defaults[tab] || defaults[tab].length < 2) return;\n      var L = layout(tab), names = TAB_NAMES[tab] || tab;`, "layout card");
 ui = patch(ui, `Object.keys(PRESETS[tab]).map(`, `Object.keys(PRESETS[tab] || { Default: null }).map(`, "presets");
 ui = patch(ui, `html += card("set-layout", "Dashboard layout", lay + "`, `html += card("set-layout", "Dashboard layout", "<div id='v3-start-pref'></div>" + lay + "`, "start pref slot");
-ui = patch(ui, `"Five-agent LLM Council", "Monte Carlo simulations"`, `"LLM Council (five perspectives + CEO)", "Monte Carlo simulations (up to 1M paths per run)"`, "honest plan copy");
+ui = patch(ui, `"Single-model LLM Council", "Monte Carlo simulations"`, `"LLM Council (five perspectives + CEO)", "Monte Carlo simulations (up to 1M paths per run)"`, "honest plan copy");
 ui = patch(ui, `setupTab("ov"); setupTab("val");`, `TABS.forEach(setupTab);`, "boot tabs");
 /* Panel arrow: hide/show only the description under the title (header .why / .note), never the panel body */
 ui = patch(ui, `if (ph && !ph.querySelector(".lay-col")) {`, `if (ph && ph.querySelector(".why, .note") && !ph.querySelector(".lay-col")) {`, "arrow only where there is a description");

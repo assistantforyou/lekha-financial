@@ -87,11 +87,11 @@ const PRICE = { demo: "Free", free: "Free", paid: "฿699/mo", premium: "฿1,29
 const TIERS = [
   {
     id: "demo", name: "Demo", tagline: "Everything unlocked, no account.",
-    body: "Open the full terminal with every panel switched on. The portfolio is a deterministic sample and every price, filing and AI answer is computed from that sample data in this browser — nothing is saved, nothing is sent to an account, and nothing is billed.",
+    body: "Open the full terminal with every panel switched on. Explore a sample portfolio and pre-written Council reports. Some research screens retrieve historical market data from the server. An account is required to save a personal portfolio to the service.",
     points: [
       ["Whole app, no sign-up", "All portfolio, research, sector, macro, simulation, council and analyst screens are available immediately."],
       ["Council samples and simulations", "Explore pre-written Council reports and run Monte Carlo simulations with the sample portfolio."],
-      ["Sample data, real maths", "Quotes, fundamentals and history come from a fixed simulated dataset; every ratio, weight, P&L and simulation is calculated from it with the same code the paid tiers use."],
+      ["Sample data, real maths", "Portfolio panels use sample inputs. Data-source labels and observation dates identify the inputs used on research screens."],
       ["Nothing persisted", "Holdings, layouts and settings stay in this browser only, and reset whenever you clear site data."],
     ],
   },
@@ -122,10 +122,10 @@ const TIERS = [
     body: "Everything in Paid plus the AI layer: a portfolio analyst you can question, a daily briefing written from your holdings, the five-perspective LLM council with a CEO synthesis, and the full 1M-path simulation engine.",
     points: [
       ["AI investment analyst", "Ask about positions, concentration, drawdowns or what would change the view, and get an answer computed from your live weights and history — plus a briefing every day."],
-      ["LLM council", "Five independent perspectives on one question, then a CEO synthesis that names the disagreements. Saved as a report you can reread."],
-      ["Monte Carlo simulation engine", "Up to one million Monte Carlo paths on worker threads: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
+      ["LLM council", "One model writes five role-based perspectives and a CEO synthesis in the same response. Saved as a report you can reread."],
+      ["Monte Carlo simulation engine", "Up to one million Monte Carlo paths per run for up to 25 invested holdings: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
       ["Advanced stress testing", "The full scenario library plus custom shocks on rates, sectors and factors, applied to your real weights."],
-      ["80 AI research questions a day", "Roughly three times the Paid allowance across the analyst, research agent and council."],
+      ["80 AI research questions a day", "The research and expert modes share this allowance. Portfolio questions, briefings and Council reports have separate limits."],
       ["Everything in Paid", "Unlimited holdings, full history, unlimited valuation coverage and every advanced indicator."],
     ],
   },

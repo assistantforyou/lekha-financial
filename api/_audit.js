@@ -20,6 +20,12 @@ function buildEvent({ grp, route, req, status, ms, seen = {}, userId = null, cli
   const sym = String(q.symbol || "").toUpperCase();
   const providerErrors = Array.isArray(seen.attempts) ? seen.attempts.filter((a) => a && a.status === "error").map((a) => String(a.provider || "").slice(0, 24)).filter(Boolean).slice(0, 8) : [];
   const meta = {};
+  if (grp === "ai" && route === "council-v3" && ["Z.ai", "Gemini"].includes(seen.provider)) {
+    meta.provider = seen.provider;
+    meta.fallback = !!seen.fallback;
+    meta.generation = seen.cached ? "cached" : seen.shared ? "shared" : "fresh";
+    meta.provider_attempts = meta.generation === "fresh" && Number.isInteger(seen.requests) ? seen.requests : 0;
+  }
   if (providerErrors.length) meta.provider_errors = providerErrors;
   if (seen.cache) meta.cache = String(seen.cache).slice(0, 12);
   return {
@@ -42,7 +48,14 @@ async function record(evt, timeoutMs = 1500) {
 async function around(grp, route, req, res, run) {
   const t0 = Date.now(), seen = {}, json = res.json && res.json.bind(res);
   if (json) res.json = (body) => {
-    if (body && typeof body === "object") { if (body.user_id && !req.__uid) req.__uid = body.user_id; if (body.code) seen.code = body.code; else if (body.error && res.statusCode >= 400) seen.code = String(body.error).slice(0, 60); if (body.meta) { seen.attempts = body.meta.attempts; seen.cache = body.meta.cache; } }
+    if (body && typeof body === "object") {
+      if (body.user_id && !req.__uid) req.__uid = body.user_id;
+      if (body.code) seen.code = body.code;
+      else if (body.error && res.statusCode >= 400) seen.code = "http_" + res.statusCode;
+      const meta = body.meta;
+      if (meta) Object.assign(seen, { attempts: meta.attempts, cache: meta.cache, provider: meta.provider,
+        fallback: !!meta.fallback, requests: meta.llmRequests, cached: meta.cached, shared: meta.shared });
+    }
     return json(body);
   };
   let thrown = null;
