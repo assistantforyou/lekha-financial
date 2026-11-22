@@ -13,7 +13,18 @@ Preview alias: `portfolio-terminal-git-f896cf-assistantforyou999-8501s-projects.
 ## Added to Preview (branch-scoped)
 `ZAI_API_KEY`, `GEMINI_API_KEY`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`, `TWELVEDATA_API_KEY`, `AV_API_KEY`, `GEMINI_MODEL`, `ALPACA_DATA_URL`. The six keys were stored as Secret (James's rule going forward: store as pullable, not Secret/Sensitive). `PT_PROBE_TEST` is a leftover dummy variable (value `x`); delete it in the dashboard.
 
-## Not done / blocked
+## Found and fixed since the first handoff
+- **Signup/login/AI all returned 429 on staging.** Root cause: `pt_rate_hit` and `pt_av_spend` were never created in the staging database; `rateHit()` fails closed. SQL now in `docs/sql/2026-11-22-rpc-functions.sql` (applied to staging only). Anyone creating a new Supabase project must run it.
+- **Audit trail** (`pt_audit`, `api/_audit.js`, admin report `GET /api/data/audit?days=7`): one row per API call with verified user id, route, status, latency, error code, ticker, provider failures. No prompts, bodies, emails or tokens. Schema: `docs/sql/2026-11-22-audit-events.sql` (applied to staging). No UI page yet. Keep 90 days.
+- Signed in on the Preview and ran the AI agent: Gemini and Z.ai both answer; cost about $0.003.
+
+## Still open
+- **Stripe checkout fails**: `stripe_resource_missing`. `STRIPE_PRICE_PAID` / `STRIPE_PRICE_PREMIUM` in Preview are not prices in the test-mode account behind `STRIPE_SECRET_KEY`. Create test products/prices (or fix the IDs) and re-run. The release guard should also verify the prices exist. Webhook delivery untested.
+- **Confirmation email never arrives on staging**: Supabase built-in SMTP only delivers to org members, and Site URL looks like `localhost:3000`. Set staging Site URL/redirects to the preview URL and configure SMTP. The test user was confirmed by SQL instead, so the real email path is unverified.
+- Production Supabase has an extra function `pt_rag_match` (vector search) that staging lacks.
+- Not investigated: null dataset refresh timestamps, insider history 0/45 days, signed-in live news, real AI provider fallback ordering.
+
+## Previously listed (still true)
 - **Signed-in checks** (persistence, isolation, AI fallback, Stripe checkout and webhook) were not completed. Sign-up on the Preview returns `Too many attempts. Wait a few minutes.` (HTTP 429). It is either the app limiter (20 auth attempts per client per 10 min, `api/auth/[action].js`) or the staging Supabase email send limit. Retry after the window; if it persists, check staging Supabase auth logs (the staging project is NOT in the connector account used in this session).
 - Anonymous AI endpoint returned `Daily research limit reached (15/day)`; real AI fallback needs a signed-in account.
 - Stripe connector in this session only exposes the LIVE account; no test-mode calls were made. Check test-mode prices and webhook delivery in the Stripe test dashboard. The webhook needs a reachable URL (Preview is protected: needs a protection bypass or a public alias).
