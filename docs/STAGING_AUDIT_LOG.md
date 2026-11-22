@@ -107,3 +107,13 @@ Left in place (TEST only): users 1 and 2 with active Premium TEST subscriptions,
 Also observed: auth mail is sent as `LEKHA <noreply@gingerbrosshop.com>` via Resend click tracking, which wraps Supabase one-time links (one signup token was consumed before the user opened it). Sender domain and click tracking need an owner decision before launch.
 
 AI spend this session: USD 0.00874 (16 metered calls in total on staging, USD 0.01393).
+
+## 2026-11-22 Push and deployed verification
+
+| UTC | Action | Scope | Evidence / outcome |
+| --- | --- | --- | --- |
+| 2026-11-22T16:41Z | Owner reconnected GitHub. Pushed the five local commits unchanged, `5d145d3..faa0137` (`2511e0e`, `98cb531`, `d5484e5`, `4ffd905`, `faa0137`) | GitHub | `refs/heads/audit/full-system-repair` and `refs/pull/15/head` both `faa013780435f8a9fe512deed00bc30e82090b59`. |
+| 2026-11-22T16:42Z | Vercel Preview `dpl_FBjMsS18zG4NH7mKcrPoypHcayjH` built from `faa0137` | staging Preview | READY on the branch alias. |
+| 2026-11-22T16:43:01Z | Statements as user 1: NVDA latest FY ending 2026-01-25, revenue 215,938,000,000, EPS 4.90, filed 2026-02-25; GOOGL FY2025, revenue 402,836,000,000, EPS 10.81, filed 2026-02-05 | staging Preview | Match SEC companyfacts exactly. **Fix verified deployed.** |
+| 2026-11-22T16:43:01Z | Quotes (Sunday): NVDA 125.65, AMD 424.30, AAPL 343.40, SPY 690.68, source `Alpaca IEX (session close)`, freshness historical, asOf session date 2026-11-20 | staging Preview | Versus Nasdaq official closes (125.53 / 424.39 / 342.56 / 689.81): at most 0.25% (was up to 2.9%). The remainder is the IEX-only vs consolidated close difference of the free feed. **Fix verified deployed.** |
+| 2026-11-22T16:43:28Z | Email change for user 2 back to its original alias: API message names both addresses; both links delivered 16:43:33Z; first link renders "One more step" on the deployed callback (Chromium); second link completes; sign-in by original alias 200, by temporary alias 400 | staging Preview | **Fix verified deployed.** |
