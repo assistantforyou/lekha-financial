@@ -17,3 +17,13 @@ assert.match(portfolioBlock(demo), /Simulated sample prices/);
 assert.equal(demo.rows.find(r=>r.tk==="PTT.BK").valUsd,200);
 assert.equal(demo.rows.find(r=>r.tk==="0700.HK").valUsd,5320.3);
 })().catch(e => {console.error(e);process.exitCode=1;});
+
+require("node:test").test("missing FX cannot turn foreign cash into a USD balance", async t => {
+  t.mock.method(global, "fetch", async () => Response.json([{key:"holdings/all",data:{items:[
+    {tk:"CASH",cur:"HKD",qty:100}, {tk:"CASH",cur:"USD",qty:25}, {tk:"CASH",cur:"EUR",qty:50}
+  ]}}]));
+  const account = await userContext("fixture");
+  assert.equal(account.total, 25);
+  assert.deepEqual(account.rows.map(row => row.priced), [false,true,false]);
+  assert.match(portfolioBlock(account), /Priced subtotal: ~\$25/);
+});

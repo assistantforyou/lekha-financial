@@ -19,13 +19,23 @@ async function applySub(sub, userId) {
   const key = userId ? "user_id" : "stripe_customer_id";
   const id = userId || sub.customer;
   if (!id) throw new Error("Missing billing profile identifier");
-  const response = await sb(`pt_profiles?${key}=eq.${encodeURIComponent(id)}&select=${key}`, {
+  const profile = `pt_profiles?${key}=eq.${encodeURIComponent(id)}`;
+  // A late cancellation or failed renewal of an old subscription must leave its replacement intact.
+  const inactive = body.plan === "free";
+  const guard = inactive ? `&or=(stripe_subscription_id.is.null,stripe_subscription_id.eq.${encodeURIComponent(sub.id)})` : "";
+  const response = await sb(`${profile}${guard}&select=${key}`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({ ...body, updated_at: new Date().toISOString() }),
   });
   if (!response.ok) throw new Error(`Entitlement update failed (HTTP ${response.status})`);
   const rows = await response.json();
+  if (inactive && Array.isArray(rows) && rows.length === 0) {
+    const current = await sb(`${profile}&select=${key},stripe_subscription_id`);
+    const matches = current.ok && await current.json();
+    if (Array.isArray(matches) && matches.length === 1 && matches[0][key] === id &&
+        matches[0].stripe_subscription_id && matches[0].stripe_subscription_id !== sub.id) return;
+  }
   if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.[key] !== id) {
     throw new Error("Entitlement update did not confirm the intended profile");
   }
@@ -37,6 +47,9 @@ module.exports = async (req, res) => {
   if (!verifySignature(body, req.headers["stripe-signature"], process.env.STRIPE_WEBHOOK_SECRET)) return res.status(400).json({ error: "bad signature" });
   let ev; try { ev = JSON.parse(body); } catch (e) { return res.status(400).end(); }
   try {
+    if (process.env.VERCEL_ENV === "preview" && ev.livemode !== false) {
+      return res.status(400).json({ error: "Preview accepts test-mode events only." });
+    }
     const o = ev.data && ev.data.object;
     if (ev.type === "checkout.session.completed" && o.mode === "subscription" && o.subscription) {
       const sub = await stripe("GET", "subscriptions/" + o.subscription);

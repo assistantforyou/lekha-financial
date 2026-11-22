@@ -1,7 +1,7 @@
 // POST /api/billing/checkout {plan:"paid"|"premium"} (signed in) -> {url} of a Stripe Checkout page.
 // Paid = ฿699/month (STRIPE_PRICE_PAID), Premium = ฿1,299/month (STRIPE_PRICE_PREMIUM).
 // One active subscription at a time: switching plans goes through the Stripe billing portal.
-const { requireUser, profile, updateProfile } = require("../../_auth");
+const { callbackUrl, requireUser, profile, updateProfile } = require("../../_auth");
 const { stripe } = require("../../_stripe");
 
 const PLANS = {
@@ -13,22 +13,25 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
   const u = await requireUser(req, res); if (!u) return;
-  const plan = req.body && (req.body.plan === "paid" || req.body.plan === "premium") ? req.body.plan : "premium";
+  const plan = req.body?.plan ?? "premium";
+  if (plan !== "paid" && plan !== "premium") return res.status(400).json({ error: "Choose Paid or Premium." });
   const priceId = process.env[PLANS[plan].env];
   if (!process.env.STRIPE_SECRET_KEY || !priceId) return res.status(503).json({ error: `Payments for the ${PLANS[plan].label} plan are not set up on this site yet.` });
   try {
     const p = await profile(u);
-    if (["active", "trialing"].includes(p.sub_status) && p.stripe_subscription_id) {
+    if (p.stripe_subscription_id && !["canceled", "incomplete_expired"].includes(p.sub_status)) {
       return res.status(409).json({ error: "You already have an active subscription. Use Manage subscription to switch plans." });
     }
     let customer = p.stripe_customer_id;
     if (!customer) {
-      const c = await stripe("POST", "customers", { email: u.email, metadata: { user_id: u.id } });
+      const c = await stripe("POST", "customers", { email: u.email, metadata: { user_id: u.id } }, "lekha-customer-" + u.id);
       customer = c.id;
       if (!customer || !(await updateProfile(u.id, { stripe_customer_id: customer }))) throw new Error("Billing customer link unavailable");
     }
     const ret = req.body && ["/v2", "/v3"].includes(req.body.ret) ? req.body.ret : "/";
-    const origin = `https://${req.headers["x-forwarded-host"] || req.headers.host}`;
+    const callback = callbackUrl(req);
+    if (!callback) return res.status(503).json({ error: "Billing return address is not configured." });
+    const origin = new URL(callback).origin;
     const s = await stripe("POST", "checkout/sessions", {
       mode: "subscription", customer, client_reference_id: u.id,
       line_items: { 0: { price: priceId, quantity: 1 } },

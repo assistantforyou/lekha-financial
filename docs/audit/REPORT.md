@@ -14,6 +14,10 @@
 
 The merge incorporated 21 upstream commits across 41 files. Main independently fixed signed-in initialization, watchlist validation, council network failover and misleading AI summaries. The merge retained the upstream sortable watchlist, analyst screens, council questions, summary guards, chart and company routing work, and the audit's schema validation, circuit breaker, unit checks, duplicate-request protection and browser regressions. The unified app bundle was regenerated from source.
 
+## Commercial release follow-up
+
+The [commercial release decision](../COMMERCIAL_RELEASE.md) records the subsequent account, billing, financial-data and operational repairs, the 35-file regression run, and the remaining staging and owner approvals.
+
 ## PR #15 billing release check
 
 **P1 resolved.** A signed checkout webhook returned HTTP 200 when the Supabase profile update returned HTTP 503 or matched zero rows. Stripe could treat delivery as complete while a paying account stayed on Free. The handler now requests the profile identifier in the PATCH response and acknowledges the event only after a successful write returns exactly one matching identifier. A write failure or missing confirmation returns HTTP 500 so Stripe can retry.

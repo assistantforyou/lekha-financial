@@ -220,8 +220,14 @@ function paint() {
 }
 function dl(name, type, text) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 
-export function mount(el) {
-  host = el; shell(); paint();
+export async function mount(el) {
+  host = el;
+  const account = await window.PT_TIER_READY();
+  if (!demo() && account?.tier !== "premium") {
+    host.innerHTML = '<section class="panel"><h2>Monte Carlo simulations</h2><p>Personal portfolio simulations require Premium. The demo includes a sample portfolio.</p><a href="?demo=1">Open the demo</a></section>';
+    return;
+  }
+  shell(); paint();
   /* first visit: one 100K run once the portfolio is priced (local computation only, no network) */
   const tryAuto = () => { if (st.auto || st.job || st.res) return; const r = window.LEKHA_SHELL && LEKHA_SHELL.route(); if (!r || r.t !== "simulation") return;
     const b = buildSimInput(); if (b.err) { st.err = b.err; paint(); return setTimeout(tryAuto, 1500); } st.auto = true; start(); };

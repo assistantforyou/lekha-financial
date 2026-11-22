@@ -112,6 +112,7 @@ const publicProfile = (p) => {
     plan: tier === "paid" || tier === "premium" ? tier : "free",
     tier,
     limits: LIMITS[tier],
+    can_manage_billing: !!p.stripe_customer_id,
     sub_status: p.sub_status || null,
     period_end: p.period_end || null,
     is_admin: !!p.is_admin,

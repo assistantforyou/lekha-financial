@@ -27,11 +27,16 @@ async function cacheGetMany(keys) {
 }
 
 async function cacheSet(key, payload) {
-  await sb("pt_av_cache", {
+  const response = await sb("pt_av_cache", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ key, payload, fetched_at: new Date().toISOString() }),
   });
+  return response.ok;
+}
+
+async function persistJobData(key, payload) {
+  if (!(await cacheSet(key, payload))) throw new Error("Scheduled data write failed");
 }
 
 // Atomic per-key counter in the database (pt_rate_hit): true = allowed, false = over the limit. Fails closed on errors.
@@ -90,4 +95,4 @@ async function cached(key, ttlMs, build) {
   return hit ? hit.payload : null;
 }
 
-module.exports = { sb, av, avCsv, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };
+module.exports = { persistJobData, sb, av, avCsv, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };

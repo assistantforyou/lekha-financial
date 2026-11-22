@@ -1,3 +1,4 @@
+import { ReleasePolicies } from "../../app/src/components/ReleasePolicies"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -225,6 +226,7 @@ export default function Login() {
           </Button>
         </form>
 
+        {setup && <ReleasePolicies />}
         {!setup && (
           <Button
             type="button"

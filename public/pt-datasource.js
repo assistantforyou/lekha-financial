@@ -15,7 +15,7 @@
   /* ---- account session (email + password via /api/auth; tokens kept in this browser) ---- */
   var SKEY = "ptpub.v1.session";
   function sess() { try { return JSON.parse(localStorage.getItem(SKEY) || "null"); } catch (e) { return null; } }
-  function setSess(v) { try { if (v) localStorage.setItem(SKEY, JSON.stringify(v)); else localStorage.removeItem(SKEY); } catch (e) {} }
+  function setSess(v) { try { if (v) localStorage.setItem(SKEY, JSON.stringify(v)); else localStorage.removeItem(SKEY); if (pageOwner && owner(v) !== pageOwner) location.reload(); } catch (e) {} }
   function owner(s) {
     if (!s) return null;
     if (s.user_id) return s.user_id;
@@ -36,7 +36,7 @@
         var j = r.ok ? await r.json() : null;
         if (sess()?.refresh_token !== s.refresh_token) return null;
         if (j && j.session && owner(j.session) === pageOwner) { setSess(j.session); return j.session.access_token; }
-        if (r.status === 401) { setSess(null); location.reload(); }
+        if (r.status === 401) setSess(null);
         return null;
       })
       .catch(function () { return s.access_token; }).finally(function () { refreshing = null; });

@@ -243,6 +243,7 @@ async function generateJson({ system, user, schema, model, timeoutMs = 50000, jo
     info.fallback = "circuit_open";
   }
   if (!backup) throw err("not_configured", 503);
+  if (info.fallback) console.warn(JSON.stringify({ event: "ai_provider_fallback", from: "Z.ai", to: "Gemini" }));
   info.provider = "Gemini";
   info.model = gm && !DEPRECATED.has(gm) ? gm : geminiModel();
   info.requests++;

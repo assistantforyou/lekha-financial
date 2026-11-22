@@ -11,12 +11,13 @@ function form(obj, prefix, out = []) {
   return out.join("&");
 }
 
-async function stripe(method, path, params) {
+async function stripe(method, path, params, idempotencyKey) {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw Object.assign(new Error("stripe_not_configured"), { status: 503 });
+  if (process.env.VERCEL_ENV === "preview" && !/^(sk|rk)_test_/.test(key)) throw new Error("Preview billing requires a Stripe test key");
   const qs = method === "GET" && params ? "?" + form(params) : "";
   const r = await fetch(`https://api.stripe.com/v1/${path}${qs}`, {
-    method, headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded", "Stripe-Version": "2025-08-27.basil" },
+    method, headers: { ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}), Authorization: `Bearer ${key}`, "Content-Type": "application/x-www-form-urlencoded", "Stripe-Version": "2025-08-27.basil" },
     body: method === "GET" || !params ? undefined : form(params),
   });
   const j = await r.json();

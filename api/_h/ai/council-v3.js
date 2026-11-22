@@ -240,7 +240,7 @@ module.exports = async (req, res) => {
     const { status, body } = await pending.get(key);
     return res.status(status).json(body);
   } catch (e) {
-    console.error("council-v3 failed:", e && e.status, String((e && e.message) || e).slice(0, 160), e && e.cause ? "cause: " + String(e.cause).slice(0, 120) : "");
+    console.error(JSON.stringify({ event: "council_failed", status: e?.status || 502 }));
     if (e && e.status === 503) return res.status(503).json({ error: "The research council is not configured on this site yet.", code: "not_configured" });
     return res.status(502).json({ error: "The council could not answer right now. Try again in a moment.", code: "upstream" });
   }

@@ -91,8 +91,8 @@ const mkRes = () => ({ _c: 0, _j: null, setHeader() {}, status(c) { this._c = c;
   assert.strictEqual(res._c, 200);
   assert.ok(res._j.ok);
 
-  for (const [name, method] of [["ask", "POST"], ["briefing", "GET"], ["simulate", "POST"], ["council", "POST"], ["../data/agent-route", "POST"]]) {
-    const handler = require("./_h/ai/" + name);
+  for (const [name, method] of [["ai/ask", "POST"], ["ai/briefing", "GET"], ["ai/simulate", "POST"], ["ai/council", "POST"], ["data/agent-route", "POST"]]) {
+    const handler = require("./_h/" + name);
     for (const tier of ["demo", "free", "paid"]) {
       profileRow = { user_id: "u1", plan: tier, sub_status: "active", period_end: "2999-01-01" };
       res = mkRes();

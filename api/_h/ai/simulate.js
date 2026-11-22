@@ -96,7 +96,8 @@ module.exports = async (req, res) => {
       const row = ctx.rows.find((r) => r.tk === s);
       items.push({ tk: s, beta: Math.round(beta * 100) / 100, idio, weight: row ? row.valUsd : 0, theme: row ? row.theme : "" });
     }
-    const wSum = items.reduce((s, x) => s + x.weight, 0) || 1;
+    const wSum = items.reduce((s, x) => s + x.weight, 0);
+    if (!(wSum > 0)) return res.status(422).json({ error: "A priced holding with sufficient return history is required.", code: "insufficient_history" });
     for (const x of items) x.weightPct = Math.round((x.weight / wSum) * 1000) / 10;
 
     const weeks = Math.round(years * 52);
@@ -134,7 +135,7 @@ module.exports = async (req, res) => {
         schema: NARRATIVE_SCHEMA,
       });
       narrative = String(ai.narrative || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 700);
-    } catch (e) { /* math is the deliverable; narrative stays empty when the LLM is unavailable */ }
+    } catch { narrative = "AI commentary is currently unavailable. The simulation results are calculated independently."; }
 
     return res.status(200).json({
       seed: "deterministic (user+day+holdings)", years, paths: PATHS, weeks,

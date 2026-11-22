@@ -20,6 +20,10 @@ function fixture(t) {
     write(url, body, headers) {
       const key = sub.metadata.user_id ? "user_id" : "stripe_customer_id";
       assert.equal(url.searchParams.get(key), "eq." + account[key]);
+      if (url.searchParams.has("or") && account.stripe_subscription_id && account.stripe_subscription_id !== body.stripe_subscription_id) {
+        assert.equal(url.searchParams.get("or"), "(stripe_subscription_id.is.null,stripe_subscription_id.eq." + sub.id + ")");
+        return Response.json([]);
+      }
       Object.assign(account, body);
       if (headers.Prefer === "return=minimal") return new Response(null, { status: 204 });
       assert.equal(headers.Prefer, "return=representation");
@@ -34,6 +38,7 @@ function fixture(t) {
       return Response.json(sub);
     }
     assert.equal(url.href.split("?")[0], "https://db.invalid/rest/v1/pt_profiles");
+    if (!init.method) return Response.json([account]);
     assert.equal(init.method, "PATCH");
     return store.write(url, JSON.parse(init.body), init.headers);
   });
@@ -93,6 +98,9 @@ test("customer-keyed creation, upgrade, cancellation and a late update use curre
   sub.items.data[0].price.id = "price_premium";
   assert.equal(await deliver("customer.subscription.updated"), 200);
   assert.equal(account.plan, "premium");
+  sub.items.data[0].price.id = "price_paid";
+  assert.equal(await deliver("customer.subscription.updated"), 200);
+  assert.equal(account.plan, "paid");
   sub.status = "canceled";
   assert.equal(await deliver("customer.subscription.deleted"), 200);
   assert.equal(account.plan, "free");
@@ -105,4 +113,13 @@ test("invalid signature is rejected before contacting Stripe or Supabase", async
   const { deliver, requests } = fixture(t);
   assert.equal(await deliver("checkout.session.completed", "invalid-secret"), 400);
   assert.deepEqual(requests, []);
+});
+
+test("a superseded subscription cancellation leaves the replacement entitlement intact", async t => {
+  const { account, sub, deliver } = fixture(t);
+  Object.assign(account, { plan: "premium", stripe_subscription_id: "sub_replacement", sub_status: "active" });
+  sub.status = "canceled";
+  assert.equal(await deliver("customer.subscription.deleted"), 200);
+  assert.equal(account.plan, "premium");
+  assert.equal(account.stripe_subscription_id, "sub_replacement");
 });
