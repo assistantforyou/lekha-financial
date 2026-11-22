@@ -68,5 +68,26 @@ global.fetch = async (url) => {
     system: "system", user: "user",
     schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] },
   }), (e) => e.message === "upstream_server_error");
+  // Per-job routing: a listed job asks Gemini first; when Gemini's answer fails accept(), Z.ai is the backup and is
+  // validated by the same check. Unlisted jobs keep Z.ai first.
+  process.env.GEMINI_API_KEY = "test-gemini-key"; process.env.LLM_GEMINI_FIRST_JOBS = "ai-council-v3, agent-answer";
+  const order = []; let zaiOk = true;
+  global.fetch = async (url) => {
+    const u = String(url); order.push(u.includes("/chat/completions") ? "zai" : "gemini");
+    if (u.includes("/chat/completions")) return zaiOk ? { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '{"answer":"from zai"}' } }], usage: {} }) } : { ok: false, status: 500, json: async () => ({ error: { code: "server_error" } }) };
+    return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"answer":"from gemini"}' }] } }], usageMetadata: {} }) };
+  };
+  const S1 = { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] };
+  let i1 = {}; let o1 = await generateJson({ system: "s", user: "u", schema: S1, job: "ai-council-v3", info: i1 });
+  assert.strictEqual(o1.answer, "from gemini"); assert.deepStrictEqual(order, ["gemini"]); assert.strictEqual(i1.provider, "Gemini"); assert.strictEqual(i1.fallback, null);
+  order.length = 0; i1 = {};
+  o1 = await generateJson({ system: "s", user: "u", schema: S1, job: "agent-answer", info: i1, accept: (a) => a.answer !== "from gemini" });
+  assert.strictEqual(o1.answer, "from zai"); assert.deepStrictEqual(order, ["gemini", "zai"]); assert.strictEqual(i1.provider, "Z.ai"); assert.strictEqual(i1.fallback, "unusable_response");
+  order.length = 0; zaiOk = false;
+  await assert.rejects(() => generateJson({ system: "s", user: "u", schema: S1, job: "agent-answer", accept: () => false }), (e) => e.message === "upstream_server_error");
+  order.length = 0; zaiOk = true; i1 = {};
+  o1 = await generateJson({ system: "s", user: "u", schema: S1, job: "agent-expert", info: i1 });
+  assert.strictEqual(o1.answer, "from zai"); assert.deepStrictEqual(order, ["zai"], "unlisted jobs stay Z.ai-first");
+  delete process.env.LLM_GEMINI_FIRST_JOBS;
   console.log("llm fallback ok");
 })().catch((e) => { console.error(e); process.exit(1); });

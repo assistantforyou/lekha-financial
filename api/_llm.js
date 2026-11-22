@@ -223,6 +223,24 @@ async function generateJson({ system, user, schema, model, timeoutMs = 50000, jo
   const gm = process.env.NEWS_GEMINI_MODEL;
   const backup = geminiReady();
   Object.assign(info, { provider: null, model: null, retries: 0, requests: 0, fallback: null });
+  // Per-job primary: LLM_GEMINI_FIRST_JOBS lists jobs (e.g. "ai-council-v3,agent-answer") whose structured output Z.ai
+  // repeatedly fails to validate. Those try Gemini first and keep Z.ai as the backup, with the same accept() check.
+  const geminiFirst = backup && zaiReady() && String(process.env.LLM_GEMINI_FIRST_JOBS || "").split(",").map((x) => x.trim()).includes(job);
+  if (geminiFirst) {
+    Object.assign(info, { provider: "Gemini", model: gm && !DEPRECATED.has(gm) ? gm : geminiModel(), requests: 1, routing: "gemini_first" });
+    try {
+      const first = await geminiJson({ job, model: info.model, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: Math.ceil(budget * 0.6), maxTokens });
+      if (accept && !accept(first)) throw err("unusable_response", 502);
+      return first;
+    } catch (error) {
+      info.fallback = error.message;
+      console.warn(JSON.stringify({ event: "ai_provider_fallback", from: "Gemini", to: "Z.ai", job }));
+      Object.assign(info, { provider: "Z.ai", model: zm, requests: 2 });
+      const answer = await zaiJson({ job, model: zm, system, schema, content: user, timeoutMs: Math.max(1000, end - Date.now()), maxTokens });
+      if (accept && !accept(answer)) throw err("unusable_response", 502);
+      return answer;
+    }
+  }
   const circuit = circuits.get(zm);
   if (zaiReady() && (!backup || !circuit || Date.now() >= circuit.until)) {
     Object.assign(info, { provider: "Z.ai", model: zm, requests: 1 });
