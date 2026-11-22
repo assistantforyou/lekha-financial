@@ -41,10 +41,12 @@ async function userFrom(req) {
 
 async function profile(user) {
   const r = await sb(`pt_profiles?user_id=eq.${user.id}&select=*`);
-  let p = r.ok ? (await r.json())[0] : null;
+  if (!r.ok) throw new Error("Account profile unavailable");
+  let p = (await r.json())[0];
   if (!p) {
     const ins = await sb("pt_profiles", { method: "POST", headers: { Prefer: "return=representation,resolution=merge-duplicates" }, body: JSON.stringify({ user_id: user.id, email: user.email }) });
-    p = ins.ok ? (await ins.json())[0] : { user_id: user.id, email: user.email, plan: "free", prefs: {} };
+    p = ins.ok && (await ins.json())[0];
+    if (!p) throw new Error("Account profile unavailable");
   }
   // premium only while the paid period is current (1-day grace for renewal webhooks)
   const premium = ["active", "trialing"].includes(p.sub_status) && !!p.period_end && Date.parse(p.period_end) + 864e5 > Date.now();
@@ -52,7 +54,10 @@ async function profile(user) {
 }
 
 async function updateProfile(userId, patch) {
-  return sb(`pt_profiles?user_id=eq.${userId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }) });
+  const r = await sb(`pt_profiles?user_id=eq.${encodeURIComponent(userId)}&select=user_id`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }) });
+  if (!r.ok) return false;
+  const rows = await r.json();
+  return rows.length === 1 && rows[0].user_id === userId;
 }
 
 // Guards for route handlers: return the user/profile, or send the error response and return null.

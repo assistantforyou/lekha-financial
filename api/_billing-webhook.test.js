@@ -5,7 +5,7 @@ const { test } = require("node:test");
 const billing = require("./billing");
 
 Object.assign(process.env, {
-  STRIPE_SECRET_KEY: "test-key", STRIPE_WEBHOOK_SECRET: "test-secret", STRIPE_PRICE_PAID: "price_paid",
+  STRIPE_SECRET_KEY: "test-key", STRIPE_WEBHOOK_SECRET: "test-secret", STRIPE_PRICE_PAID: "price_paid", STRIPE_PRICE_PREMIUM: "price_premium",
   SUPABASE_URL: "https://db.invalid", SUPABASE_SERVICE_ROLE_KEY: "test-key",
 });
 

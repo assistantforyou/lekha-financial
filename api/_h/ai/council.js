@@ -2,7 +2,7 @@
 // The numbers come from the browser's own Monte Carlo run, so every field is validated here (fixed persona
 // list, finite clamped numbers, tickers that must be in the caller's real holdings). Nothing free-text from the
 // request ever reaches the prompt. Answers are written in the language the user picked.
-const { requireTier } = require("../../_auth");
+const { requirePremium } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { userContext, marketBlock, cleanTk } = require("./_ctx");
@@ -35,7 +35,7 @@ const clean = (s, m) => String(s || "").replace(/[\u0000-\u001f]/g, " ").trim().
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
-  const p = await requireTier(req, res, ["demo", "free", "paid", "premium"]);
+  const p = await requirePremium(req, res);
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
     const lang = langOf(b.lang);
     const s = b.summary && typeof b.summary === "object" ? b.summary : {};
     if (!persona || !hz) return res.status(400).json({ error: "Pick a persona and a horizon." });
-    if (!(await rateHit(`ai/council/${p.user_id}/${Math.floor(Date.now() / DAY)}`, p.demo ? 300 : 30))) return res.status(429).json({ error: "Daily limit reached (30 explanations per day).", code: "ai_limit" });
+    if (!(await rateHit(`ai/council/${p.user_id}/${Math.floor(Date.now() / DAY)}`, 30))) return res.status(429).json({ error: "Daily limit reached (30 explanations per day).", code: "ai_limit" });
 
     const ctx = await userContext(p.user_id);
     if (!ctx) return res.status(400).json({ error: "Add holdings to your portfolio first.", code: "no_holdings" });

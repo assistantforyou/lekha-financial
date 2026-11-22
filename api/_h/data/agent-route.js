@@ -1,6 +1,7 @@
 // POST /api/data/agent {question, symbol?, lang?}: source-aware research agent (see _fin/agent.js). Open to every tier while the product is in preview;
 // demo visitors get a small per-client daily allowance. Entitlements and limits are enforced here, never trusted from the browser.
 const { requireTier } = require("../../_auth");
+const { tierOf } = require("../../_tiers");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { knowledgeOwner } = require("../../_demo-owner");
@@ -16,8 +17,11 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const b = req.body && typeof req.body === "object" ? req.body : {}, question = String(b.question || "").slice(0, 600).trim();
   if (question.length < 3) return res.status(400).json({ error: "Ask a question first." });
-  const who = p.demo ? "d-" + clientId(req) : p.user_id, limit = p.demo ? 15 : p.plan === "premium" ? 80 : 30;
-  if (!(await rateHit(`ai/agent/${who}/${Math.floor(Date.now() / DAY)}`, limit).catch(() => true))) return res.status(429).json({ error: `Daily research limit reached (${limit}/day).`, code: "ai_limit" });
+  if (b.mode === "expert" && tierOf(p) !== "premium") {
+    return res.status(p.demo ? 401 : 402).json({ error: "Premium plan required for the analyst.", need: ["premium"] });
+  }
+  const who = p.demo ? "d-" + clientId(req) : p.user_id, limit = p.demo ? 15 : tierOf(p) === "premium" ? 80 : 30;
+  if (!(await rateHit(`ai/agent/${who}/${Math.floor(Date.now() / DAY)}`, limit).catch(() => false))) return res.status(429).json({ error: `Daily research limit reached (${limit}/day).`, code: "ai_limit" });
   const lang = langOf(b.lang), hasLlm = !!(process.env.ZAI_API_KEY || process.env.GEMINI_API_KEY);
   const llm = hasLlm ? { json: (o) => generateJson(o) } : null;
   /* signed-in users get their own knowledge base; demo visitors get one built from their browser
@@ -25,8 +29,8 @@ module.exports = async (req, res) => {
   const owner = knowledgeOwner(p, req);
   /* analyst chat: expert mode, no tool plan, caller-supplied context (see agent.expert) */
   if (b.mode === "expert") {
-    const limitX = p.demo ? 40 : p.plan === "premium" ? 80 : 30;
-    if (!(await rateHit(`ai/expert/${who}/${Math.floor(Date.now() / DAY)}`, limitX).catch(() => true))) return res.status(429).json({ error: `Daily question limit reached (${limitX}/day).`, code: "ai_limit" });
+    const limitX = p.demo ? 40 : tierOf(p) === "premium" ? 80 : 30;
+    if (!(await rateHit(`ai/expert/${who}/${Math.floor(Date.now() / DAY)}`, limitX).catch(() => false))) return res.status(429).json({ error: `Daily question limit reached (${limitX}/day).`, code: "ai_limit" });
     try { return res.status(200).json(await agent.expert({ question, context: String(b.context || "").slice(0, 14000), llm, langHint: langOf(b.lang) && langOf(b.lang) !== "en" ? "\n" + withLang("", langOf(b.lang)).trim() : "" })); }
     catch (e) { return res.status(e.status === 400 ? 400 : e.status === 503 ? 503 : 502).json({ error: e.message === "llm_not_configured" ? "AI is not configured on this deployment." : "The analyst could not answer right now.", code: e.message }); }
   }

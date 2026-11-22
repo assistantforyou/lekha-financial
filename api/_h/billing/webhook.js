@@ -4,13 +4,14 @@ const { stripe, verifySignature, periodEnd } = require("../../_stripe");
 
 const raw = (req) => new Promise((resolve, reject) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => resolve(Buffer.concat(c).toString("utf8"))); req.on("error", reject); });
 
-// Price id -> plan on the profile. An unknown price (e.g. the legacy $60/month plan) maps to
-// premium so existing subscribers keep everything they already had.
+// Only prices explicitly assigned to this product can grant paid access.
 function planOf(sub) {
-  const item = sub.items && sub.items.data && sub.items.data[0];
-  const price = item && item.price && item.price.id;
-  if (price && price === process.env.STRIPE_PRICE_PAID) return "paid";
-  return "premium";
+  const price = sub.items?.data?.[0]?.price?.id;
+  if (!price) throw new Error("Missing subscription price");
+  if (price === process.env.STRIPE_PRICE_PAID) return "paid";
+  const legacy = (process.env.STRIPE_LEGACY_PREMIUM_PRICES || "").split(",").map(s => s.trim());
+  if (price === process.env.STRIPE_PRICE_PREMIUM || legacy.includes(price)) return "premium";
+  throw new Error("Unmapped subscription price");
 }
 
 async function applySub(sub, userId) {
@@ -49,7 +50,7 @@ module.exports = async (req, res) => {
     }
     return res.status(200).json({ received: true });
   } catch (e) {
-    console.error("webhook failed:", ev.type, e.message);
+    console.error(JSON.stringify({ event: "billing_sync_failed", stripeEvent: ev.id, type: ev.type, reason: e instanceof TypeError ? "transport_error" : e instanceof SyntaxError ? "invalid_response" : e.message }));
     return res.status(500).json({ error: "retry" });
   }
 };

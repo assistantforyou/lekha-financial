@@ -108,7 +108,7 @@ export default function Login() {
     setBusy(true)
     setMsg({ text: "", kind: "" })
     try {
-      const r = await post("/api/auth/setup", {
+      const r = await post("/api/auth/signup", {
         email: email.trim(),
         password,
       })
