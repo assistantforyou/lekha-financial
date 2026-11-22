@@ -17,3 +17,24 @@ test("deployment checks hold an unprotected preview, shared database and live St
   const issues = releaseIssues({ ...preview, VERCEL_ENV: "production" });
   for (const requirement of ["COMMERCIAL_DATA_APPROVAL", "VITE_PRIVACY_URL", "VITE_TERMS_URL"]) assert.ok(issues.includes(requirement));
 });
+
+test("price ids are checked against the configured Stripe account", async () => {
+  const { stripePriceIssues } = await import("../scripts/check-release-config.mjs");
+  const env = { VERCEL_ENV: "preview", STRIPE_SECRET_KEY: "sk_test_fixture", STRIPE_PRICE_PAID: "price_paid", STRIPE_PRICE_PREMIUM: "price_premium" };
+  const reply = (status, body) => ({ ok: status < 400, status, json: async () => body });
+  const monthly = { livemode: false, recurring: { interval: "month" } };
+
+  assert.deepEqual(await stripePriceIssues(env, async () => reply(200, monthly)), []);
+  assert.deepEqual(await stripePriceIssues(env, async () => { throw new Error("network"); }), []);
+  assert.deepEqual(await stripePriceIssues({ ...env, STRIPE_SECRET_KEY: "" }, async () => { throw new Error("should not be called"); }), []);
+
+  const missing = await stripePriceIssues(env, async () => reply(404, { error: {} }));
+  assert.equal(missing.length, 2);
+  assert.ok(missing.every(entry => /not found/.test(entry)));
+
+  const wrongMode = await stripePriceIssues(env, async () => reply(200, { livemode: true, recurring: { interval: "month" } }));
+  assert.ok(wrongMode.every(entry => /wrong Stripe mode/.test(entry)));
+
+  const oneOff = await stripePriceIssues(env, async () => reply(200, { livemode: false, recurring: null }));
+  assert.ok(oneOff.every(entry => /recur monthly/.test(entry)));
+});

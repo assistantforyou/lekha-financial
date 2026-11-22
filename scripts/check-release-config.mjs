@@ -36,8 +36,38 @@ export function releaseIssues(env) {
   return issues;
 }
 
+/**
+ * A price ID that does not exist in the configured Stripe account only fails at the
+ * customer's first click (checkout returns stripe_resource_missing), so the build asks
+ * Stripe. Definitive answers (4xx) hold the deployment; a Stripe outage or a missing key
+ * is not treated as proof of a bad configuration.
+ */
+export async function stripePriceIssues(env, fetchImpl = globalThis.fetch) {
+  const key = env.STRIPE_SECRET_KEY?.trim();
+  if (!key || typeof fetchImpl !== "function") return [];
+  const issues = [];
+  for (const name of ["STRIPE_PRICE_PAID", "STRIPE_PRICE_PREMIUM"]) {
+    const id = env[name]?.trim();
+    if (!id) continue;
+    let res;
+    try {
+      res = await fetchImpl("https://api.stripe.com/v1/prices/" + encodeURIComponent(id), {
+        headers: { Authorization: "Bearer " + key },
+      });
+    } catch { continue; }
+    if (res.status >= 400 && res.status < 500) { issues.push(name + " (not found in this Stripe account)"); continue; }
+    if (!res.ok) continue;
+    const price = await res.json().catch(() => null);
+    if (!price) continue;
+    const shouldBeLive = env.VERCEL_ENV === "production";
+    if (typeof price.livemode === "boolean" && price.livemode !== shouldBeLive) issues.push(name + " (wrong Stripe mode)");
+    if (!price.recurring || price.recurring.interval !== "month") issues.push(name + " (must recur monthly)");
+  }
+  return issues;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const issues = releaseIssues(process.env);
+  const issues = [...releaseIssues(process.env), ...await stripePriceIssues(process.env)];
   if (issues.length) {
     console.error("Deployment held. Review " + issues.join(", ") + ". See docs/COMMERCIAL_RELEASE.md.");
     process.exitCode = 1;
