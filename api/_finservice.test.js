@@ -23,6 +23,14 @@ const f = { entityName: "T", cik: 1, facts: { "us-gaap": {
 const ann = sec.buildStatements(f, "T", "annual"); assert.strictEqual(ann.length, 1); assert.strictEqual(ann[0].revenue, 105, "amendment (later filed) wins");
 assert.strictEqual(ann[0].freeCashFlow, 23); assert.strictEqual(ann[0].eps, 2.5); assert.strictEqual(ann[0].totalDebt, 50); assert.strictEqual(ann[0].accession, "a2");
 const qq = sec.buildStatements(f, "T", "quarterly"); assert.strictEqual(qq.length, 1); assert.strictEqual(qq[0].revenue, 20); assert.strictEqual(qq[0].periodType, "quarterly");
+// fiscal labels come from the ORIGINAL filing, not a later filing that repeats the period as a comparative
+const g = { entityName: "T", cik: 2, facts: { "us-gaap": { Revenues: { units: { USD: [
+  { start: "2025-04-01", end: "2025-06-30", val: 10, form: "10-Q", filed: "2025-08-01", fy: 2025, fp: "Q2", accn: "x1" },
+  { start: "2025-04-01", end: "2025-06-30", val: 11, form: "10-Q", filed: "2026-08-01", fy: 2026, fp: "Q2", accn: "x2" },
+  { start: "2026-04-01", end: "2026-06-30", val: 15, form: "10-Q", filed: "2026-08-01", fy: 2026, fp: "Q2", accn: "x2" }] } } } } };
+const gq = sec.buildStatements(g, "T", "quarterly").sort((p, q) => p.period < q.period ? -1 : 1);
+assert.strictEqual(gq.length, 2); assert.strictEqual(gq[0].fiscalYear, 2025, "comparative keeps its own fiscal year"); assert.strictEqual(gq[1].fiscalYear, 2026);
+assert.strictEqual(gq[0].revenue, 11, "restated value still wins");
 // chain: skips unconfigured, falls back on error, reports attempts
 (async () => {
   const r = await svc.chain("x", [[{ name: "a", configured: () => false }, async () => 1], [{ name: "b", configured: () => true }, async () => { throw new Error("boom"); }], [{ name: "c", configured: () => true }, async () => 42]]);

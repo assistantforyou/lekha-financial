@@ -98,6 +98,10 @@ function series(facts, defs, unit, asOf) {
 // pick, for each period key, the most recently FILED fact (restatements win)
 function pick(rows, keyOf) { const m = new Map(); for (const f of rows) { const k = keyOf(f); if (k == null) continue; const o = m.get(k); if (!o || f.filed > o.filed) m.set(k, f); } return m; }
 
+// fy/fp describe the FILING a fact appeared in, not the fact's own period. A later filing repeats prior periods as
+// comparatives with its own fy/fp, so labels must come from the EARLIEST filing for that period end.
+function pickFirst(rows, keyOf) { const m = new Map(); for (const f of rows) { const k = keyOf(f); if (k == null) continue; const o = m.get(k); if (!o || f.filed < o.filed) m.set(k, f); } return m; }
+
 function buildStatements(facts, symbol, type, asOf) {
   const annual = type === "annual", lo = annual ? 340 : 80, hi = annual ? 390 : 100, forms = annual ? /^(10-K|10-K\/A)$/ : /^(10-Q|10-Q\/A)$/;
   const flows = {}, ps = {}, sh = {};
@@ -107,9 +111,11 @@ function buildStatements(facts, symbol, type, asOf) {
   const inst = {};
   for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, "USD", asOf).filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
   const anchor = flows.revenue.size ? flows.revenue : flows.netIncome;
+  const anchorDef = flows.revenue.size ? FLOW.revenue : FLOW.netIncome;
+  const labels = pickFirst(series(facts, anchorDef, "USD", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   const ends = [...anchor.keys()].sort().reverse().slice(0, annual ? 12 : 16), name = facts.entityName || null, cik = facts.cik ? String(facts.cik) : null, out = [];
   for (const end of ends) {
-    const a = anchor.get(end), row = { symbol, name, cik, period: end, periodType: annual ? "annual" : "quarterly", fiscalYear: a.fy || null, fiscalPeriod: a.fp || null, periodStart: a.start, periodEnd: end,
+    const a = anchor.get(end), lb = labels.get(end) || a, row = { symbol, name, cik, period: end, periodType: annual ? "annual" : "quarterly", fiscalYear: lb.fy || null, fiscalPeriod: lb.fp || null, periodStart: a.start, periodEnd: end,
       filingDate: a.filed, form: a.form, accession: a.accn, source: "SEC EDGAR" };
     for (const k of Object.keys(flows)) { const f = flows[k].get(end); if (f) row[k] = f.val; }
     for (const k of Object.keys(ps)) { const f = ps[k].get(end); if (f) row[k] = f.val; }
@@ -118,7 +124,7 @@ function buildStatements(facts, symbol, type, asOf) {
     row.totalDebt = (row.debtLT != null || row.debtCur != null) ? (row.debtLT || 0) + (row.debtCur || 0) : null;
     row.capex = row.capex != null ? Math.abs(row.capex) : null;
     if (row.da != null && row.operatingIncome != null) row.ebitda = row.operatingIncome + row.da;
-    const st = S.statement(row); st.derived = []; if (row.da != null) st.derived.push("ebitda"); if (a.fp) st.fiscalPeriod = a.fp; out.push(st);
+    const st = S.statement(row); st.derived = []; if (row.da != null) st.derived.push("ebitda"); if (lb.fp) st.fiscalPeriod = lb.fp; out.push(st);
   }
   return out;
 }
