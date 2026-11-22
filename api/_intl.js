@@ -3,11 +3,13 @@
 // Frankfurter (ECB reference rates, keyless). Everything is cached in pt_av_cache.
 const { cached, cacheGetMany } = require("./_lib");
 const { twelveSeries } = require("./_prices");
+const { allowed } = require("./_licensing");
 
 const INTL = /\.(HK|BK|T|L|TO|AX|SI|KS|KQ|SS|SZ|NS|BO|DE|PA|AS|SW|MI|MC|TW)$/;
 const isIntl = (s) => INTL.test(String(s || ""));
 
 async function yahooSeries(sym, range = "10y") {
+  if (!allowed("yahoo")) throw new Error("source_blocked");
   const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=1d`, {
     headers: { "User-Agent": "Mozilla/5.0 (portfolio-terminal)" },
   });
@@ -24,6 +26,7 @@ async function yahooSeries(sym, range = "10y") {
 // {SYM: rows} for non-US symbols, cached 10 min per symbol
 async function intlSeries(symbols) {
   const out = {};
+  if (!allowed("yahoo")) return out; // non-US history has no other source
   await Promise.all(symbols.filter(isIntl).slice(0, 10).map(async (s) => {
     try { const rows = await cached("free/intl/" + s, 10 * 6e4, async () => { const r = await yahooSeries(s, "10y"); return r.length ? r.slice(-2600) : null; }); if (rows) out[s] = rows; }
     catch (e) { /* skip */ }
@@ -39,7 +42,8 @@ async function allTimeHighs(symbols, budget = 6) {
   const keys = symbols.map((s) => "free/ath/" + s);
   const have = await cacheGetMany(keys);
   const out = {}, need = [];
-  for (const s of symbols) { const h = have["free/ath/" + s]; if (h && Date.now() - h.fetchedAt < 7 * 864e5) out[s] = h.payload; else need.push(s); }
+  const yahooOk = allowed("yahoo");
+  for (const s of symbols) { if (isIntl(s) && !yahooOk) continue; const h = have["free/ath/" + s]; if (h && Date.now() - h.fetchedAt < 7 * 864e5) out[s] = h.payload; else need.push(s); }
   const us = need.filter((s) => !isIntl(s)).slice(0, budget), intl = need.filter(isIntl).slice(0, 6);
   await Promise.all([
     ...us.map((s) => cached("free/ath/" + s, 7 * 864e5, async () => athOf((await twelveSeries([s], 5000))[s])).then((v) => { if (v) out[s] = v; }).catch(() => {})),

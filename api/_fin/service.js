@@ -16,6 +16,7 @@ const S = require("./schemas");
 const C = require("./calc");
 const obs = require("./obs");
 const { cacheFetch } = require("./cache");
+const { allowed, policyTag } = require("../_licensing");
 
 const SP = Object.fromEntries(require("../_data/sp500.json").stocks);
 const isCrypto = (s) => /-USD$/i.test(s) || /^(BTC|ETH|SOL|XRP|DOGE|ADA)$/i.test(s);
@@ -30,13 +31,18 @@ async function chain(op, attempts) {
   const log = [];
   for (const [prov, run] of attempts) {
     if (prov.configured && !prov.configured()) { log.push({ provider: prov.name, status: "skipped" }); continue; }
+    if (!allowed(prov.name)) { log.push({ provider: prov.name, status: "blocked" }); continue; }
     try { const data = await run(); if (data != null && !(Array.isArray(data) && !data.length)) { log.push({ provider: prov.name, status: "ok" }); return { data, source: prov.name, attempts: log }; } log.push({ provider: prov.name, status: "empty" }); }
     catch (e) { log.push({ provider: prov.name, status: "error", error: String(e && e.message || e).slice(0, 100) }); }
   }
   const err = new Error(`no_provider_for_${op}`); err.attempts = log; err.status = 502; throw err;
 }
 const wrap = (r, c) => ({ data: r.data, meta: { source: r.source, attempts: r.attempts, cache: c ? c.cache : "miss", stale: c ? !!c.stale : false, ageMs: c ? c.ageMs : 0 } });
-async function cached(cls, key, producer, opts) { const c = await cacheFetch(cls, key, producer, opts); return wrap(c.value, c); }
+async function cached(cls, key, producer, opts) {
+  const c = await cacheFetch(cls, key + policyTag(), producer, opts);
+  if (c.value && c.value.source && !allowed(c.value.source)) { const err = new Error(`no_provider_for_${cls}`); err.status = 502; err.attempts = [{ provider: c.value.source, status: "blocked" }]; throw err; }
+  return wrap(c.value, c);
+}
 
 // ---------------- market data ----------------
 async function quoteAsOf(symbol, asOf) {
@@ -230,7 +236,7 @@ async function search(query, { limit = 12 } = {}) {
   for (const [t, n] of ETFS) if (t.toLowerCase().startsWith(ql) || n.toLowerCase().includes(ql)) push({ symbol: t, name: n, exchange: "NYSE Arca", type: "etf", source: "built-in list" });
   for (const [t, n] of INDICES) if (t.toLowerCase().includes(ql) || n.toLowerCase().includes(ql)) push({ symbol: t, name: n, exchange: null, type: "index", source: "built-in list" });
   for (const [t, n] of CRYPTO) if (t.toLowerCase().startsWith(ql) || n.toLowerCase().includes(ql)) push({ symbol: t, name: n, exchange: "Crypto", type: "crypto", source: "built-in list" });
-  if (results.length < 6) for (const prov of [P.finnhub, P.fmp, P.yahoo]) { if (prov.configured && !prov.configured()) continue; try { (await prov.search(q)).forEach(push); attempts.push({ provider: prov.name, status: "ok" }); break; } catch (e) { attempts.push({ provider: prov.name, status: "error" }); } }
+  if (results.length < 6) for (const prov of [P.finnhub, P.fmp, P.yahoo]) { if ((prov.configured && !prov.configured()) || !allowed(prov.name)) continue; try { (await prov.search(q)).forEach(push); attempts.push({ provider: prov.name, status: "ok" }); break; } catch (e) { attempts.push({ provider: prov.name, status: "error" }); } }
   results.sort((a, b) => score(a) - score(b));
   const concepts = CONCEPTS.filter((c) => c.term.toLowerCase().includes(ql) || c.id.includes(ql)).slice(0, 3);
   const top = results[0];

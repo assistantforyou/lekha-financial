@@ -60,6 +60,7 @@ function parse(xml, publisher, tickers, dflt) {
   return out;
 }
 async function company(sym) {
+  if (!require("../../_licensing").allowed("yahoo")) return [];
   return obs.timed(name, "yahoo-rss", async () => {
     const x = await request(name, `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(sym)}&region=US&lang=en-US`, { text: true, headers: { "User-Agent": BROWSER_UA }, timeoutMs: 8000 });
     return parse(x, "Yahoo Finance", [sym], "company");
