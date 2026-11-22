@@ -14,6 +14,12 @@
 
 The merge incorporated 21 upstream commits across 41 files. Main independently fixed signed-in initialization, watchlist validation, council network failover and misleading AI summaries. The merge retained the upstream sortable watchlist, analyst screens, council questions, summary guards, chart and company routing work, and the audit's schema validation, circuit breaker, unit checks, duplicate-request protection and browser regressions. The unified app bundle was regenerated from source.
 
+## PR #15 billing release check
+
+**P1 resolved.** A signed checkout webhook returned HTTP 200 when the Supabase profile update returned HTTP 503 or matched zero rows. Stripe could treat delivery as complete while a paying account stayed on Free. The handler now requests the profile identifier in the PATCH response and acknowledges the event only after a successful write returns exactly one matching identifier. A write failure or missing confirmation returns HTTP 500 so Stripe can retry.
+
+All seven webhook regression tests passed with local Stripe and Supabase fixtures. They cover successful and duplicate delivery, HTTP 503, a network exception, zero rows, a mismatched identifier, successful retry, creation, upgrade, cancellation, a late update and rejection of an invalid signature. The full suite passed across 33 test files, and the Node 24 production build passed. Live Stripe delivery and deployed Supabase access remain unverified. [Webhook regressions](../../api/_billing-webhook.test.js)
+
 ## Functional verification
 
 | Feature | Initial status or reproduction | Repair | Final status and evidence |

@@ -3,7 +3,6 @@ const { sb } = require("../../_lib");
 const { stripe, verifySignature, periodEnd } = require("../../_stripe");
 
 const raw = (req) => new Promise((resolve, reject) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => resolve(Buffer.concat(c).toString("utf8"))); req.on("error", reject); });
-const patch = (filter, body) => sb(`pt_profiles?${filter}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ...body, updated_at: new Date().toISOString() }) });
 
 // Price id -> plan on the profile. An unknown price (e.g. the legacy $60/month plan) maps to
 // premium so existing subscribers keep everything they already had.
@@ -16,8 +15,19 @@ function planOf(sub) {
 
 async function applySub(sub, userId) {
   const body = { stripe_subscription_id: sub.id, sub_status: sub.status, period_end: periodEnd(sub), plan: ["active", "trialing"].includes(sub.status) ? planOf(sub) : "free", stripe_customer_id: sub.customer };
-  if (userId) return patch(`user_id=eq.${encodeURIComponent(userId)}`, body);
-  return patch(`stripe_customer_id=eq.${encodeURIComponent(sub.customer)}`, body);
+  const key = userId ? "user_id" : "stripe_customer_id";
+  const id = userId || sub.customer;
+  if (!id) throw new Error("Missing billing profile identifier");
+  const response = await sb(`pt_profiles?${key}=eq.${encodeURIComponent(id)}&select=${key}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ ...body, updated_at: new Date().toISOString() }),
+  });
+  if (!response.ok) throw new Error(`Entitlement update failed (HTTP ${response.status})`);
+  const rows = await response.json();
+  if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.[key] !== id) {
+    throw new Error("Entitlement update did not confirm the intended profile");
+  }
 }
 
 module.exports = async (req, res) => {
