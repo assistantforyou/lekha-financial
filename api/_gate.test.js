@@ -50,6 +50,14 @@ const mkRes = () => ({ _c: 0, _j: null, setHeader() {}, status(c) { this._c = c;
   assert.strictEqual(res._j.tier, "free");
   assert.deepStrictEqual(res._j.need, ["premium"]);
 
+  // 2b. Free profile on a paid-or-premium gate -> the message names both plans.
+  res = mkRes();
+  p = await requireTier(req(), res, ["paid", "premium"]);
+  assert.strictEqual(p, null);
+  assert.strictEqual(res._c, 402);
+  assert.strictEqual(res._j.error, "Paid or Premium plan required.");
+  assert.deepStrictEqual(res._j.need, ["paid", "premium"]);
+
   // 3. Free profile allowed on the free gate -> profile returned.
   res = mkRes();
   p = await requireTier(req(), res, ["free", "paid", "premium"]);

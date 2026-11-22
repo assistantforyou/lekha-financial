@@ -87,7 +87,8 @@ async function requireTier(req, res, allowed) {
   const p = await profile(u);
   const tier = tierOf(p);
   if (!list.includes(tier)) {
-    const want = list.includes("premium") ? "Premium" : "Paid";
+    // name the cheapest plan that unlocks this endpoint; a Paid-or-Premium gate must not read as Premium-only
+    const want = list.includes("paid") ? (list.includes("premium") ? "Paid or Premium" : "Paid") : "Premium";
     res.status(402).json({ error: `${want} plan required.`, tier, need: list });
     return null;
   }
