@@ -13,6 +13,8 @@ import Tour from "@/tour/Tour"
 import { ThemeDialog, LangDialog } from "@/components/Pickers"
 import { PageHeader } from "@/components/common"
 import { BY_KEY, DEFAULT_ROUTE, parseHash } from "@/nav"
+import AnalystGate from "@/components/AnalystGate"
+import { Skeleton } from "@/components/ui/skeleton"
 import { isDemo, useMe, useSession } from "@/lib/engine"
 import PAGES from "@/pages"
 
@@ -46,8 +48,10 @@ export default function App() {
     window.scrollTo(0, 0); setMenu(false)
     if (!isPane && window.LEKHA_SHELL) window.LEKHA_SHELL._setRoute({ t: route.t, s: route.s }, false)
   }, [route.key, route.param])
-  const r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param])
+  const qs = route.query ? route.query.toString() : "", r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param, qs])   // query (?tab=…) must be a dependency or tab links never switch
   const admin = !!(me && me.is_admin), demo = isDemo(), signedIn = !!(sess && sess.access_token)
+  // the analyst screens are Premium: Free and Paid users get a page of their own for each (not one shared upsell); Premium and Demo get the live analyst
+  const analystGate = !!(item.analyst && signedIn && !demo), gated = analystGate && !!(me && me.tier && me.tier !== "premium"), gateLoading = analystGate && !me
   const group = BY_KEY[route.key] ? BY_KEY[route.key].groupTitle : ""
   const side = <Sidebar routeKey={route.key} isAdmin={admin} onNavigate={() => setMenu(false)} />
   return (
@@ -59,7 +63,7 @@ export default function App() {
           <aside data-tour="nav" className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border lg:block">{side}</aside>
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">
             <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[12px] text-muted-foreground"><span>{group}</span><ChevronRight className="size-3" /><span className="text-foreground">{item.title}{route.param ? ` · ${route.param}` : ""}</span></nav>
-            {isPane ? <><PageHeader title={item.title} description={item.desc} /><PanelHost ids={item.panes} analyst={item.analyst} route={r} /></> : Page ? <Page route={r} item={item} navigate={navigate} me={me} /> : null}
+            {isPane ? <><PageHeader title={item.title} description={item.desc} />{gated ? <AnalystGate kind={item.analyst} tier={me.tier} navigate={navigate} /> : gateLoading ? <div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div> : <PanelHost ids={item.panes} analyst={item.analyst} route={r} />}</> : Page ? <Page route={r} item={item} navigate={navigate} me={me} /> : null}
             <footer className="mt-12 border-t border-border pt-4 text-[11.5px] leading-relaxed text-muted-foreground">
               <p>LEKHA Financials is analysis software, not investment advice.</p>
               <div id="app-foot-slot" />

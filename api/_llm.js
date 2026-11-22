@@ -96,7 +96,7 @@ async function timed(url, init, timeoutMs) {
     ctl.signal.throwIfAborted();
     return { ok: response.ok, status: response.status, body };
   }
-  catch (e) { throw err(e && e.name === "AbortError" ? "aborted" : "network", 502); }
+  catch (e) { throw Object.assign(err(e && e.name === "AbortError" ? "aborted" : "network", 502), { cause: e?.cause?.code || e?.name }); }
   finally { clearTimeout(timer); }
 }
 

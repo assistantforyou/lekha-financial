@@ -72,6 +72,27 @@ async function getHistoricalPrices(symbol, { days = 365, asOf } = {}) {
   });
 }
 
+async function getIntradayPrices(symbol, { days = 1, asOf } = {}) {
+  const s = sym(symbol), d = +days <= 1 ? 1 : 5, k = `${s}/${d}${asOf ? "/" + asOf : ""}`;
+  return cached("intraday", k, () => {
+    if (isCrypto(s) || isIntl(s)) return chain("intraday", [[P.yahoo, () => P.yahoo.intraday(s, { days: d, asOf })]]);
+    return chain("intraday", [[P.alpaca, () => P.alpaca.intraday(s, { days: d, asOf })], [P.yahoo, () => P.yahoo.intraday(s, { days: d, asOf })]]);
+  });
+}
+
+// ---------------- movers: biggest moves among liquid large caps (one batched quote call, as-of aware) ----------------
+const LARGE_CAPS = "AAPL MSFT NVDA GOOGL AMZN META TSLA AVGO JPM V MA UNH XOM LLY WMT COST HD PG JNJ BAC ORCL NFLX CRM AMD ADBE KO PEP MRK ABBV CVX TMO CSCO ACN MCD QCOM INTC TXN GS CAT BA DIS".split(" ");
+async function getMovers({ asOf } = {}) {
+  return cached("movers", asOf || "live", async () => {
+    const { data: q, meta } = await getQuotes(LARGE_CAPS, { asOf }), rows = Object.values(q).filter((x) => x && x.price > 0 && Number.isFinite(x.changePercent));
+    if (rows.length < 8) { const e = new Error("no_provider_for_movers"); e.status = 502; throw e; }
+    let names = {}; try { for (const d of await P.sec.directory()) names[d.ticker] = d.name === d.name.toUpperCase() ? d.name.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(Inc|Corp|Co|Ltd)\b(?!\.)/g, "$1.").replace(/\b(Llc|Plc|Ag|Nv|Sa|Lp)\b/g, (m) => m.toUpperCase()) : d.name; } catch (e) { /* names are decoration */ }
+    const out = (x) => ({ symbol: x.symbol, name: names[x.symbol] || null, price: x.price, changePercent: x.changePercent, volume: x.volume || null, currency: x.currency || "USD" }), by = (f) => [...rows].sort(f).slice(0, 6).map(out);
+    return { data: { universe: `${rows.length} large caps`, gainers: by((a, b) => b.changePercent - a.changePercent), losers: by((a, b) => a.changePercent - b.changePercent), actives: by((a, b) => (b.volume || 0) * b.price - (a.volume || 0) * a.price),
+      breadth: { up: rows.filter((x) => x.changePercent > 0).length, down: rows.filter((x) => x.changePercent < 0).length }, asOf: asOf || null, meta: S.meta({ source: "calculated from quotes", kind: "calculated", freshness: asOf ? "historical" : "delayed" }) }, source: "calculated", attempts: [] };
+  }, { ttl: 60e3 });
+}
+
 // ---------------- company ----------------
 async function getCompanyProfile(symbol) {
   const s = sym(symbol);
@@ -119,17 +140,24 @@ function dedupe(items) {
   }
   return out;
 }
-async function getNews({ symbol = null, category = null, limit = 25, query = null, asOf = null } = {}) {
-  if (asOf) { const r = await getNews({ symbol, category, query, limit: 100 }); return { data: r.data.filter((n) => day(n.publishedAt) <= asOf).slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines are not archived for the demo date." } }; }
-  const s = symbol ? sym(symbol) : null, key = `${s || "market"}/${category || "all"}/${limit}/${query || ""}`;
+// text is cleaned on the way out as well as on the way in, so rows already sitting in the shared cache are fixed too
+const cleanText = (t) => (t == null ? t : P.news.decode(t));
+async function getNews(opts = {}) {
+  const { asOf = null } = opts, limit = Math.max(1, Math.min(60, +opts.limit || 25));
+  if (asOf) { const r = await getNews({ symbol: opts.symbol, category: opts.category, query: opts.query, limit: 150 }); return { data: r.data.filter((n) => day(n.publishedAt) <= asOf).slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines are not archived for the demo date." } }; }
+  const r = await getNewsCached(opts);
+  return { ...r, data: (r.data || []).slice(0, limit).map((n) => ({ ...n, headline: cleanText(n.headline), summary: cleanText(n.summary) })) };
+}
+async function getNewsCached({ symbol = null, category = null, query = null } = {}) {
+  const s = symbol ? sym(symbol) : null, key = `${s || "market"}/${category || "all"}/${query || ""}`;   // limit is applied after the cache so every caller shares one upstream fetch
   return cached("news", key, async () => {
     const parts = [], attempts = [];
     const add = async (prov, run) => { if (prov.configured && !prov.configured()) { attempts.push({ provider: prov.name, status: "skipped" }); return; } try { const r = await run(); parts.push(...r); attempts.push({ provider: prov.name, status: r.length ? "ok" : "empty" }); } catch (e) { attempts.push({ provider: prov.name, status: "error", error: String(e.message).slice(0, 80) }); } };
-    if (s) await Promise.all([add(P.finnhub, () => P.finnhub.companyNews(s)), add(P.news, () => P.news.company(s))]);
+    if (s) await Promise.all([add(P.finnhub, () => P.finnhub.companyNews(s)), add(P.news, () => P.news.company(s)), add({ name: "rss-market", configured: () => true }, () => P.news.mentioning(s))]);
     else await Promise.all([add(P.finnhub, () => P.finnhub.marketNews("general")), add(P.news, () => P.news.market())]);
     if (!parts.length) { const e = new Error("no_provider_for_news"); e.attempts = attempts; e.status = 502; throw e; }
     let items = dedupe(parts); if (category) items = items.filter((n) => n.category === category); if (query) { const q = query.toLowerCase(); items = items.filter((n) => (n.headline + " " + (n.summary || "")).toLowerCase().includes(q)); }
-    return { data: items.slice(0, limit), source: "merged", attempts };
+    return { data: items.slice(0, 150), source: "merged", attempts };
   }, { ttl: 10 * 6e4 });
 }
 
@@ -287,5 +315,5 @@ function status() {
   return Object.values(P).map((p) => ({ name: p.name, configured: p.configured(), license: p.license || null }));
 }
 
-module.exports = { getQuote, getQuotes, getHistoricalPrices, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, getRatios, getValuation, getCompanyBundle,
+module.exports = { getQuote, getQuotes, getHistoricalPrices, getIntradayPrices, getMovers, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, getRatios, getValuation, getCompanyBundle,
   status, providers: P, dedupe, norm, chain, sym, CONCEPTS };

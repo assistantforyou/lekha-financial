@@ -8,36 +8,55 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
-import { Bars, DataState, EmptyBox, ErrorBox, FreshBadge, LineChart, PageHeader, SourceTag, Stat } from "@/components/common"
+import { Bars, DataState, EmptyBox, ErrorBox, FreshBadge, PageHeader, SourceTag, Stat } from "@/components/common"
 import AgentPanel from "@/components/AgentPanel"
-import { remember } from "@/components/CommandPalette"
+import PriceChart from "@/components/PriceChart"
+import { keyStats } from "@/lib/chartmath"
+import { recent, remember } from "@/components/CommandPalette"
+import { usePortfolioFacts } from "@/lib/suggest"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/watchlist"
-import { api, data as fetchData, useData } from "@/lib/api"
+import { api, data as fetchData, prefetch, useData } from "@/lib/api"
 import { compact, date, dateTime, metric, mult, num, pct, price, tone } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
 
-const POPULAR = [["AAPL", "Apple"], ["MSFT", "Microsoft"], ["NVDA", "NVIDIA"], ["GOOGL", "Alphabet"], ["AMZN", "Amazon"], ["META", "Meta Platforms"], ["TSLA", "Tesla"], ["JPM", "JPMorgan Chase"], ["XOM", "Exxon Mobil"], ["SPY", "S&P 500 ETF"], ["QQQ", "Nasdaq 100 ETF"], ["BTC-USD", "Bitcoin"]]
-const RANGES = [["1M", 21], ["3M", 63], ["6M", 126], ["1Y", 252], ["2Y", 504]]
 const unwrap = (p) => (p && p.ok ? p.data : null)
 
+/* One tile: symbol, name, live price and today's move. Everything on the home screen comes from live data or from the user's own lists; nothing is a fixed list. */
+function Tile({ symbol, name, price: px, chg, ccy, navigate }) {
+  return <button onClick={() => navigate("company/" + encodeURIComponent(symbol))} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary">
+    <div className="min-w-0"><div className="font-mono text-sm font-semibold">{symbol}</div><div className="truncate text-xs text-muted-foreground">{name || " "}</div></div>
+    {px != null && <div className="shrink-0 text-right"><div className="num text-sm">{price(px, ccy)}</div>{chg != null && <div className={cn("num text-xs", tone(chg))}>{pct(chg, 2, true)}</div>}</div>}</button>
+}
+function Section({ title, sub, children }) { return <div><div className="mb-2 flex flex-wrap items-baseline gap-x-2"><h2 className="text-sm font-semibold">{title}</h2>{sub && <span className="text-xs text-muted-foreground">{sub}</span>}</div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div></div> }
 function Home({ navigate }) {
-  const [q, setQ] = useState(""), wl = useWatchlist()
-  return (<div className="space-y-5">
+  const [q, setQ] = useState(""), wl = useWatchlist(), pf = usePortfolioFacts(), mv = useData("movers", {}, { refresh: 180000 }), rc = recent()
+  const m = mv.status === "ok" ? mv.data : null
+  return (<div className="space-y-6">
     <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) navigate("company/" + encodeURIComponent(q.trim().toUpperCase())) }} className="flex max-w-xl gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ticker, e.g. AAPL, SPY, BTC-USD (or press ⌘K to search by name)" className="pl-9" aria-label="Ticker" /></div><Button type="submit">Open</Button></form>
-    {wl.length > 0 && <div><h2 className="mb-2 text-sm font-semibold">Your watchlist</h2><div className="flex flex-wrap gap-2">{wl.map((w) => <Button key={w.symbol} variant="outline" size="sm" onClick={() => navigate("company/" + w.symbol)}><Star className="fill-current text-[var(--warn)]" />{w.symbol}</Button>)}</div></div>}
-    <div><h2 className="mb-2 text-sm font-semibold">Popular</h2><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{POPULAR.map(([s, n]) => <button key={s} onClick={() => navigate("company/" + s)} className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary"><Building2 className="size-4 text-muted-foreground" /><div><div className="font-mono text-sm font-semibold">{s}</div><div className="text-xs text-muted-foreground">{n}</div></div></button>)}</div></div>
+    {pf.rows.length > 0 && <Section title="Your holdings" sub="live prices, largest first">{pf.rows.slice(0, 8).map((r) => <Tile key={r.tk} symbol={r.tk} chg={r.day} price={r.price} navigate={navigate} />)}</Section>}
+    {wl.length > 0 && <Section title="Your watchlist">{wl.slice(0, 12).map((w) => <Tile key={w.symbol} symbol={w.symbol} name={w.name} navigate={navigate} />)}</Section>}
+    {rc.length > 0 && <Section title="Recently viewed">{rc.map((r) => <Tile key={r.symbol} symbol={r.symbol} name={r.name} navigate={navigate} />)}</Section>}
+    {mv.status === "loading" && <div className="space-y-2" aria-busy="true"><Skeleton className="h-5 w-64" /><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div></div>}
+    {mv.status === "error" && <ErrorBox message={mv.error} attempts={mv.attempts} onRetry={mv.reload} />}
+    {m && <>
+      <Section title="Biggest gainers" sub={`among ${m.universe}${m.asOf ? `, as of ${date(m.asOf)}` : " today"} · ${m.breadth.up} up, ${m.breadth.down} down`}>{m.gainers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
+      <Section title="Biggest decliners">{m.losers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
+      <Section title="Most traded" sub="by dollar volume">{m.actives.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
+      <p className="text-[11.5px] text-muted-foreground">Computed from live quotes of {m.universe} (the most liquid US stocks), not a full-market screener. Any ticker, ETF, index or crypto symbol can be opened from the box above.</p></>}
   </div>)
 }
 
-function Overview({ b, setTab }) {
-  const [range, setRange] = useState(252), q = unwrap(b.quote), prof = unwrap(b.profile), hist = unwrap(b.history), ratios = unwrap(b.ratios)
-  const pts = useMemo(() => (hist ? hist.slice(-range).map((x) => [x[0], x[4]]) : []), [hist, range])
-  const first = pts[0] && pts[0][1], last = pts.length ? pts[pts.length - 1][1] : null, ch = first && last ? last / first - 1 : null
+function Overview({ b, setTab, symbol }) {
+  const q = unwrap(b.quote), prof = unwrap(b.profile), hist = unwrap(b.history), ratios = unwrap(b.ratios), ks = useMemo(() => keyStats(hist), [hist]), ccy = (q && q.currency) || "USD"
   const mt = (id) => ratios && ratios.metrics.find((m) => m.id === id)
   return (<div className="space-y-4">
-    <Card><CardHeader className="flex-row flex-wrap items-center justify-between gap-2"><div><CardTitle>Price</CardTitle><CardDescription>{b.history.ok ? <SourceTag meta={b.history.meta} /> : "History unavailable"}</CardDescription></div>
-      <div className="flex items-center gap-2">{ch != null && <span className={cn("num text-sm", tone(ch))}>{pct(ch, 1, true)} over {RANGES.find((r) => r[1] === range)[0]}</span>}<div className="flex rounded-md border border-border p-0.5">{RANGES.map(([l, n]) => <button key={l} onClick={() => setRange(n)} className={cn("rounded px-2.5 py-1 text-xs", range === n ? "bg-accent font-semibold" : "text-muted-foreground hover:text-foreground")}>{l}</button>)}</div></div></CardHeader>
-      <CardContent>{b.history.ok ? <LineChart points={pts} format={(v) => price(v)} xLabel={(d) => date(d)} /> : <ErrorBox message={b.history.error} attempts={b.history.attempts} />}</CardContent></Card>
+    <Card><CardHeader className="flex-row flex-wrap items-center justify-between gap-2"><div><CardTitle>Price</CardTitle><CardDescription>{b.history.ok ? <SourceTag meta={b.history.meta} /> : "History unavailable"}</CardDescription></div></CardHeader>
+      <CardContent><PriceChart symbol={symbol} bars={hist} prevClose={ks && ks.prevClose} historyError={b.history.ok ? null : b.history.error} currency={ccy} /></CardContent></Card>
+    {ks && <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
+      <Stat label="Prev. close" value={price(ks.prevClose, ccy)} sub={`as of ${date(ks.asOf)}`} /><Stat label="Day range" value={`${num(ks.dayLow)} – ${num(ks.dayHigh)}`} sub={`open ${num(ks.open)}`} />
+      <Stat label="52-wk range" value={`${num(ks.lo52)} – ${num(ks.hi52)}`} sub={`${pct(ks.fromHigh, 1, true)} from high`} tone={tone(ks.fromHigh)} /><Stat label="Volume" value={compact(ks.volume, false)} sub={ks.avgVolume ? `avg 30d ${compact(ks.avgVolume, false)}` : "daily bar"} />
+    </div>}
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
       <Stat label="Market cap" value={compact(mt("marketCap") && mt("marketCap").value)} sub="price × shares (SEC)" /><Stat label="P/E" value={mult(mt("pe") && mt("pe").value)} sub="calculated" />
       <Stat label="EV/EBITDA" value={mult(mt("evEbitda") && mt("evEbitda").value)} sub="calculated" /><Stat label="FCF yield" value={pct(mt("fcfYield") && mt("fcfYield").value)} sub="calculated" />
@@ -58,7 +77,7 @@ function Financials({ b }) {
   const rows = (s.ok ? s.data : []).slice(0, 8)
   const currencies = [...new Set(rows.map(r => r.currency))].join(" / ")
   return (<div className="space-y-4">
-    <div className="flex flex-wrap items-center gap-3"><div className="flex rounded-md border border-border p-0.5">{[["annual", "Annual"], ["quarterly", "Quarterly"]].map(([k, l]) => <button key={k} onClick={() => setType(k)} className={cn("rounded px-3 py-1 text-xs", type === k ? "bg-accent font-semibold" : "text-muted-foreground")}>{l}</button>)}</div>{s.ok && <SourceTag meta={s.meta} />}<Badge variant="outline">{currencies} · reported</Badge></div>
+    <div className="flex flex-wrap items-center gap-3"><div className="flex rounded-md border border-border p-0.5">{[["annual", "Annual"], ["quarterly", "Quarterly"]].map(([k, l]) => <button key={k} onClick={() => setType(k)} aria-pressed={type === k} className={cn("rounded px-3 py-1 text-xs", type === k ? "bg-accent font-semibold" : "text-muted-foreground")}>{l}</button>)}</div>{s.ok && <SourceTag meta={s.meta} />}<Badge variant="outline">{currencies} · reported</Badge></div>
     {!s.ok ? <ErrorBox message={s.error} attempts={s.attempts} /> : !rows.length ? <EmptyBox>No statements. SEC XBRL covers US-GAAP filers; add FMP_API_KEY for foreign issuers.</EmptyBox> : <>
       <Card><CardHeader className="flex-row flex-wrap items-center justify-between gap-2"><CardTitle>Trend</CardTitle><div className="flex flex-wrap gap-1">{ROWS.filter((r) => r[2] === "m" || r[0] === "eps").slice(0, 8).map(([k, l]) => <button key={k} onClick={() => setMetricKey(k)} className={cn("rounded-full border px-2.5 py-0.5 text-xs", metricKey === k ? "border-primary text-primary" : "border-border text-muted-foreground")}>{l}</button>)}</div></CardHeader>
         <CardContent><Bars rows={[...rows].reverse().map((r) => ({ label: type === "annual" ? String(r.fiscalYear || r.period.slice(0, 4)) : `${r.fiscalPeriod || ""} ${String(r.fiscalYear || "").slice(2)}`.trim() || r.period.slice(2, 7), v: r[metricKey] == null ? null : metricKey === "eps" ? r[metricKey] : r[metricKey] / 1e9 }))} format={(v) => (metricKey === "eps" ? v.toFixed(2) : `${v.toFixed(1)}B`)} /></CardContent></Card>
@@ -96,8 +115,8 @@ export function NewsList({ items }) {
   return <ul className="divide-y divide-border">{items.map((n) => <li key={n.id} className="py-3"><div className="flex flex-wrap items-start gap-2"><a href={n.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 text-[14px] font-medium hover:text-primary hover:underline">{n.headline}<ExternalLink className="ml-1 inline size-3 opacity-60" /></a>{n.category !== "general" && n.category !== "company" && <Badge variant="outline">{n.category}</Badge>}</div>
     {n.summary && <p className="mt-1 line-clamp-2 text-[12.5px] text-muted-foreground">{n.summary}</p>}<div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground"><span>{n.publisher || n.source}</span><span>{dateTime(n.publishedAt)}</span>{n.tickers.length > 0 && <span className="font-mono">{n.tickers.slice(0, 4).join(" ")}</span>}<span>via {n.source}{n.alsoReportedBy ? ` +${n.alsoReportedBy.length}` : ""}</span></div></li>)}</ul>
 }
-function News({ b }) { const [c, setC] = useState("all"); if (!b.news.ok) return <ErrorBox message={b.news.error} attempts={b.news.attempts} />; const items = b.news.data.filter((n) => c === "all" || n.category === c)
-  return <Card><CardHeader className="flex-row flex-wrap items-center justify-between gap-2"><div><CardTitle>News</CardTitle><CardDescription><SourceTag meta={b.news.meta} /> · de-duplicated across providers</CardDescription></div><div className="flex gap-1">{CATS.map(([k, l]) => <button key={k} onClick={() => setC(k)} className={cn("rounded-full border px-2.5 py-0.5 text-xs", c === k ? "border-primary text-primary" : "border-border text-muted-foreground")}>{l}</button>)}</div></CardHeader><CardContent><NewsList items={items} /></CardContent></Card> }
+function News({ b }) { const [c, setC] = useState("all"), [o, setO] = useState(""); if (!b.news.ok) return <ErrorBox message={b.news.error} attempts={b.news.attempts} />; const pubs = [...new Set(b.news.data.map((n) => n.publisher || n.source).filter(Boolean))].sort(), items = b.news.data.filter((n) => (c === "all" || n.category === c) && (!o || (n.publisher || n.source) === o))
+  return <Card><CardHeader className="flex-row flex-wrap items-center justify-between gap-2"><div><CardTitle>News</CardTitle><CardDescription><SourceTag meta={b.news.meta} /> · de-duplicated across providers</CardDescription></div><div className="flex flex-wrap items-center gap-1"><select value={o} onChange={(e) => setO(e.target.value)} className="rounded-md border border-border bg-card px-2 py-1 text-xs" aria-label="Filter by outlet"><option value="">All outlets ({pubs.length})</option>{pubs.map((p) => <option key={p} value={p}>{p}</option>)}</select>{CATS.map(([k, l]) => <button key={k} onClick={() => setC(k)} className={cn("rounded-full border px-2.5 py-0.5 text-xs", c === k ? "border-primary text-primary" : "border-border text-muted-foreground")}>{l}</button>)}</div></CardHeader><CardContent><NewsList items={items} /></CardContent></Card> }
 
 function Filings({ b, symbol }) { const [f, setF] = useState("all"); if (!b.filings.ok) return <ErrorBox message={b.filings.error} attempts={b.filings.attempts} />; const all = b.filings.data, forms = ["all", ...new Set(all.map((x) => x.form))], rows = all.filter((x) => f === "all" || x.form === f)
   return <Card><CardHeader className="flex-row flex-wrap items-center justify-between gap-2"><div><CardTitle>SEC filings</CardTitle><CardDescription><SourceTag meta={b.filings.meta} /> · primary documents on sec.gov</CardDescription></div><div className="flex flex-wrap gap-1">{forms.slice(0, 8).map((k) => <button key={k} onClick={() => setF(k)} className={cn("rounded-full border px-2.5 py-0.5 text-xs", f === k ? "border-primary text-primary" : "border-border text-muted-foreground")}>{k === "all" ? "All" : k}</button>)}</div></CardHeader>
@@ -110,29 +129,35 @@ function Earnings({ b }) { if (!b.earnings.ok) return <ErrorBox message={b.earni
     <Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Period</TableHead><TableHead className="text-right">EPS actual</TableHead><TableHead className="text-right">EPS estimate</TableHead><TableHead className="text-right">Surprise</TableHead></TableRow></TableHeader><TableBody>{rows.map((r, i) => <TableRow key={i}><TableCell className="num">{r.date}</TableCell><TableCell>{r.fiscalPeriod || "–"}</TableCell><TableCell className="num text-right">{num(r.epsActual)}</TableCell><TableCell className="num text-right">{num(r.epsEstimate)}</TableCell><TableCell className={cn("num text-right", tone(r.surprise))}>{pct(r.surprise, 1, true)}</TableCell></TableRow>)}</TableBody></Table></CardContent></Card> }
 
 function Peers({ b, navigate }) {
-  const peers = b.peers.ok ? b.peers.data : [], [q, setQ] = useState({})
-  useEffect(() => { if (!peers.length) return; api("/api/data/quotes", { method: "POST", auth: true, body: { symbols: peers.slice(0, 10) } }).then((j) => setQ((j.data) || {})).catch(() => {}) }, [peers.join()])
+  const peers = b.peers.ok ? b.peers.data : [], [q, setQ] = useState({}), [loading, setLoading] = useState(false)
+  useEffect(() => {
+    if (!peers.length) return; const ctrl = new AbortController()
+    const pull = () => { if (document.hidden) return; setLoading(true); api("/api/data/quotes", { method: "POST", auth: true, body: { symbols: peers.slice(0, 10) }, signal: ctrl.signal }).then((j) => { setQ(j.data || {}); setLoading(false) }).catch((e) => { if (e.name !== "AbortError") setLoading(false) }) }
+    pull(); const t = setInterval(pull, 30000)
+    return () => { ctrl.abort(); clearInterval(t) }
+  }, [peers.join()])
   if (!b.peers.ok) return <ErrorBox message={b.peers.error} attempts={b.peers.attempts} />
-  return <Card><CardHeader><CardTitle>Comparable companies</CardTitle><CardDescription><SourceTag meta={b.peers.meta} /> · peers come from the provider, or the same S&P 500 sector when no provider is configured</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Symbol</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Today</TableHead><TableHead /></TableRow></TableHeader><TableBody>{peers.slice(0, 10).map((p) => { const x = q[p]; return <TableRow key={p} className="cursor-pointer" onClick={() => navigate("company/" + p)}><TableCell className="font-mono font-semibold">{p}</TableCell><TableCell className="num text-right">{x ? price(x.price, x.currency) : "…"}</TableCell><TableCell className={cn("num text-right", x && tone(x.changePercent))}>{x ? pct(x.changePercent, 2, true) : ""}</TableCell><TableCell className="text-right text-primary">Open →</TableCell></TableRow> })}</TableBody></Table></CardContent></Card>
+  return <Card><CardHeader><CardTitle>Comparable companies</CardTitle><CardDescription><SourceTag meta={b.peers.meta} /> · peers come from the provider, or the same S&P 500 sector when no provider is configured</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Symbol</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Today</TableHead><TableHead /></TableRow></TableHeader><TableBody>{peers.slice(0, 10).map((p) => { const x = q[p]; return <TableRow key={p} className="cursor-pointer" onClick={() => navigate("company/" + p)}><TableCell className="font-mono font-semibold">{p}</TableCell><TableCell className="num text-right">{x ? price(x.price, x.currency) : (loading ? "…" : "–")}</TableCell><TableCell className={cn("num text-right", x && tone(x.changePercent))}>{x ? pct(x.changePercent, 2, true) : ""}</TableCell><TableCell className="text-right text-primary">Open →</TableCell></TableRow> })}</TableBody></Table>{loading && <p className="mt-2 text-xs text-muted-foreground">Loading peer quotes…</p>}</CardContent></Card>
 }
 
 const TABS = [["overview", "Overview"], ["financials", "Financials"], ["valuation", "Valuation"], ["growth", "Growth"], ["news", "News"], ["filings", "Filings"], ["earnings", "Earnings"], ["peers", "Peers"], ["ai", "AI analyst"]]
 function Workspace({ symbol, route, navigate }) {
   const s = useData("company", { symbol }), wl = useWatchlist(), tab = (route.query && route.query.get("tab")) || "overview"
   const setTab = (t) => navigate(`company/${encodeURIComponent(symbol)}?tab=${t}`)
-  const b = s.data, q = b && unwrap(b.quote), prof = b && unwrap(b.profile), watched = wl.some((w) => w.symbol === symbol)
+  const hasQuote = s.status === "ok" && s.data && s.data.quote && s.data.quote.ok, live = useData("quote", { symbol }, { refresh: 15000, enabled: s.status === "ok" && !!hasQuote }), liveNews = useData("news", { symbol, limit: 60 }, { refresh: 300000 }), b0 = s.data, b = b0 && liveNews.status === "ok" && Array.isArray(liveNews.data) ? { ...b0, news: { ok: true, data: liveNews.data, meta: liveNews.meta } } : b0, q = (live.status === "ok" && live.data) || (b && unwrap(b.quote)), prof = b && unwrap(b.profile), watched = wl.some((w) => w.symbol === symbol)
   useEffect(() => { if (b && prof) remember({ symbol, name: prof.name }) }, [b && prof && prof.name])
+  useEffect(() => { if (s.status === "ok") { prefetch("valuation", { symbol }); prefetch("history", { symbol, days: 1900 }) } }, [symbol, s.status])   // warm the tabs people click next so they open instantly
   if (s.status === "loading") return <DataState s={s} rows={6} />
   if (s.status === "error") return <ErrorBox message={s.error} attempts={s.attempts} onRetry={s.reload} />
   const nothing = !q && !prof && !b.annual.ok
   return (<div className="space-y-4">
     <div data-tour="company-head" className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{(prof && prof.name) || (q && q.name) || symbol}</h1><Badge variant="secondary" className="font-mono">{symbol}</Badge>{prof && prof.exchange && <Badge variant="outline">{prof.exchange}</Badge>}{prof && prof.sector && <Badge variant="outline">{prof.sector}</Badge>}</div>
-        {q ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold">{price(q.price, q.currency)}</span><span className={cn("num text-base", tone(q.change))}>{q.change != null ? (q.change > 0 ? "+" : "") + num(q.change) : ""} ({pct(q.changePercent, 2, true)})</span><FreshBadge meta={q.meta} /><SourceTag source={q.source} asOf={q.timestamp} /></div> : <p className="mt-1 text-sm text-muted-foreground">No live quote available from any provider.</p>}</div>
+        {q ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold">{price(q.price, q.currency)}</span><span className={cn("num text-base", tone(q.change))}>{q.change != null ? (q.change > 0 ? "+" : "") + num(q.change) : ""} ({pct(q.changePercent, 2, true)})</span><FreshBadge meta={q.meta} /><SourceTag source={q.source} asOf={q.timestamp} />{live.status === "ok" && <span className="text-[11px] text-muted-foreground" title="Price refreshes every 15 s while this tab is visible">● auto-refresh 15s</span>}</div> : <p className="mt-1 text-sm text-muted-foreground">No live quote available from any provider.</p>}</div>
       <div className="flex gap-2"><Button variant="outline" onClick={() => (watched ? removeFromWatchlist(symbol) : addToWatchlist(symbol, prof && prof.name))}>{watched ? <><StarOff />Unwatch</> : <><Star />Watch</>}</Button><Button onClick={() => setTab("ai")}><Bot />Ask AI</Button></div></div>
     {nothing && <Alert variant="warn"><AlertTitle>No data found for {symbol}</AlertTitle><AlertDescription>Check the ticker. US companies resolve through SEC EDGAR; ETFs, indices and crypto use market data providers (examples: SPY, ^GSPC, BTC-USD, 0700.HK).</AlertDescription></Alert>}
-    <Tabs value={tab} onValueChange={setTab}><TabsList data-tour="company-tabs">{TABS.map(([k, l]) => <TabsTrigger key={k} value={k}>{l}</TabsTrigger>)}</TabsList>
-      <TabsContent value="overview"><Overview b={b} setTab={setTab} /></TabsContent><TabsContent value="financials"><Financials b={b} /></TabsContent>
+    <Tabs value={tab} onValueChange={setTab}><TabsList data-tour="company-tabs" className="h-auto flex-wrap">{TABS.map(([k, l]) => <TabsTrigger key={k} value={k} className="h-8">{l}</TabsTrigger>)}</TabsList>
+      <TabsContent value="overview"><Overview b={b} setTab={setTab} symbol={symbol} /></TabsContent><TabsContent value="financials"><Financials b={b} /></TabsContent>
       <TabsContent value="valuation"><Valuation symbol={symbol} b={b} /></TabsContent><TabsContent value="growth"><Growth b={b} /></TabsContent><TabsContent value="news"><News b={b} /></TabsContent>
       <TabsContent value="filings"><Filings b={b} symbol={symbol} /></TabsContent><TabsContent value="earnings"><Earnings b={b} /></TabsContent><TabsContent value="peers"><Peers b={b} navigate={navigate} /></TabsContent>
       <TabsContent value="ai"><AgentPanel symbol={symbol} key={symbol} /></TabsContent></Tabs>

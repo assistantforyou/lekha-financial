@@ -49,20 +49,22 @@ function evidence() {
 function holdings() { try { return window.PT_APP.lekha.aggregate().list.filter((a) => a.ticker !== "CASH").sort((a, b) => b.value - a.value).map((a) => a.ticker); } catch (e) { return []; } }
 function frame() {
   const live = isLive(), samples = (demo && demo.scenarios) || [];
+  if (st.scope === "portfolio" && !holdings().length) st.scope = "SPY";   // no positions: ask about the market, not an empty portfolio
   host.innerHTML = `<section class="panel cn">
   <div class="sim-head"><div><p class="sim-eyebrow">LEKHA LLM COUNCIL</p><h2 class="sim-title">Five perspectives · one CEO synthesis</h2>
   <p class="sim-sub">One research question is examined through five analytical lenses in a single model response, then reconciled by the CEO into a final verdict. Dissent is kept, not averaged away.</p></div>
-  <div class="sim-tags">${live ? '<span class="pill live">PREMIUM · LIVE</span>' : '<span class="pill">SAMPLE COUNCIL · DEMONSTRATION</span>'}</div></div>
+  <div class="sim-tags">${live ? '<span class="pill live">PREMIUM · LIVE</span>' : window.PT_DEMO_MODE ? '<span class="pill">DEMO · SAMPLE REPORTS</span>' : '<span class="pill">SAMPLE REPORTS · LIVE NEEDS PREMIUM</span>'}</div></div>
   <form class="cn-form" id="cn-form"><textarea id="cn-q" rows="2" maxlength="600" placeholder="${live ? "Ask a research question about your portfolio or one holding…" : "Choose a sample question below to explore the Council"}" ${live ? "" : "readonly"}>${esc(st.q)}</textarea>
-    <div class="row"><label class="note">Scope <select id="cn-scope" class="btn"${live ? "" : " disabled"}><option value="portfolio">Whole portfolio</option>${holdings().map((t) => `<option${st.scope === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+    <div class="row"><label class="note">Scope <select id="cn-scope" class="btn"${live ? "" : " disabled"}>${holdings().length ? '<option value="portfolio">Whole portfolio</option>' : ""}<option value="SPY">SPY · the market</option>${holdings().filter((t) => t !== "SPY").map((t) => `<option${st.scope === t ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
     <button class="btn pri" type="submit" id="cn-go"${live ? "" : " hidden"}>Convene the Council</button>
     ${live || window.PT_DEMO_MODE ? "" : `<span class="note">Live, personalised Council analysis is a Premium feature. <a href="#" id="cn-up">Upgrade to Premium</a></span>`}</div></form>
-  <div class="cn-samples">${samples.map((s) => `<button class="btn" type="button" data-sid="${esc(s.id)}">${esc(s.question)}</button>`).join("")}</div>
+  <div class="cn-samples" id="cn-chips">${live ? '<span class="note">Building questions from today\'s market and your portfolio…</span>' : `<span class="note">Pre-written sample reports, not generated for you:</span> ${samples.map((s) => `<button class="btn" type="button" data-sid="${esc(s.id)}">${esc(s.question)}</button>`).join("")}`}</div>
   <div id="cn-board"></div></section>`;
   const sc = host.querySelector("#cn-scope"); if (sc) sc.value = st.scope;
   host.querySelector("#cn-form").onsubmit = (e) => { e.preventDefault(); convene(); };
   host.querySelectorAll("[data-sid]").forEach((b) => (b.onclick = () => playDemo(b.dataset.sid)));
   const up = host.querySelector("#cn-up"); if (up) up.onclick = (e) => { e.preventDefault(); const b = document.getElementById("tb-set"); if (b) b.click(); };
+  if (live) fillChips();
   board();
 }
 function board() {
@@ -71,7 +73,7 @@ function board() {
   if (st.phase === "idle" && !r) { el.innerHTML = `<div class="cn-grid">${LENSES.map((L) => card(L, null, "idle")).join("")}</div>${links()}<div class="cn-ceo idle">${icon(CEO_ICON)}<b>THE CEO</b><span>Awaiting the five perspectives</span></div>`; return; }
   const status = (i) => st.phase === "session" ? "working" : st.phase === "error" ? "failed" : i < st.shown ? "done" : "queued";
   const ceoOn = st.phase === "done" && st.shown > LENSES.length;
-  el.innerHTML = `${st.phase === "session" ? `<p class="note cn-wait">Council in session — one structured request is being answered…</p>` : ""}${st.err ? `<p class="note warn">${esc(st.err)}</p>` : ""}
+  el.innerHTML = `${isDemo ? `<p class="note warn">Pre-written sample report: not generated for your portfolio or today's market.${window.PT_DEMO_MODE ? "" : " Live reports need Premium."}</p>` : ""}${st.phase === "session" ? `<p class="note cn-wait">Council in session — one structured request is being answered…</p>` : ""}${st.err ? `<p class="note warn">${esc(st.err)}</p>` : ""}
   <div class="cn-grid">${LENSES.map((L, i) => card(L, P && P[L[0]], status(i), isDemo)).join("")}</div>${links(st.shown)}
   <div class="cn-ceo ${ceoOn ? "on" : ""}">${icon(CEO_ICON)}<b>THE CEO</b>${ceoOn ? `<span class="cn-verdict v-${esc((r.ceo.verdict || "").split(" ")[0].toLowerCase())}">${esc(r.ceo.verdict)}</span>` : `<span>${st.phase === "error" ? "No verdict" : "Synthesising…"}</span>`}</div>
   ${ceoOn ? report(r) : ""}`;
@@ -105,6 +107,54 @@ function report(r) {
     <p class="note">Five perspectives produced by one model in one structured response, then synthesised. Not investment advice.</p></article>`;
 }
 
+/* ---------- questions built from live data ---------- */
+const f1 = (n) => (Math.abs(n) * 100).toFixed(1) + "%";
+async function dynamicQs() {
+  // signed-in requests carry the account's token, otherwise the server treats the caller as a demo visitor and pins the demo date
+  const authed = (u, o) => (window.PT_AUTH && window.PT_AUTH.fetch ? window.PT_AUTH.fetch(u, o) : fetch(u, o));
+  const get = (r) => authed("/api/data/" + r).then((x) => (x.ok ? x.json() : null)).then((j) => j && j.data).catch(() => null);
+  // the user's own positions, priced from live quotes (independent of whether the page's engine has finished pricing)
+  const pricedPortfolio = async () => {
+    const items = (window.PT_HOLD && window.PT_HOLD.load().items) || [], usd = items.filter((x) => (x.cur || "USD") === "USD"), syms = usd.filter((x) => x.tk && x.tk !== "CASH").map((x) => x.tk).slice(0, 25);
+    if (!syms.length) return { list: [], total: 0 };
+    const j = await authed("/api/data/quotes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) }).then((r) => r.json()).catch(() => null), q = (j && j.data) || {};
+    const cash = usd.filter((x) => x.tk === "CASH").reduce((a, x) => a + (Number(x.qty) || 0), 0);
+    const list = usd.filter((x) => q[x.tk] && q[x.tk].price > 0).map((x) => ({ ticker: x.tk, theme: x.theme, value: (Number(x.qty) || 0) * q[x.tk].price, day: q[x.tk].changePercent }));
+    return { list, total: list.reduce((a, r) => a + r.value, 0) + cash };
+  };
+  const [mv, mac, agg] = await Promise.all([get("movers"), get("macro"), pricedPortfolio()]);
+  const out = [], add = (q, scope) => { if (!out.some((o) => o.q === q)) out.push({ q, scope: scope || "SPY" }); };
+  const inv = agg ? agg.list.filter((a) => a.ticker !== "CASH" && a.value > 0).sort((a, b) => b.value - a.value) : [], total = agg ? agg.total : 0;
+  if (inv.length && total) {
+    const top = inv[0], w = top.value / total;
+    add(`${top.ticker} is ${f1(w)} of my portfolio${top.day != null ? ` and ${top.day < 0 ? "fell" : "rose"} ${f1(top.day)} today` : ""}: should I add, hold or trim?`, top.ticker);
+    const mover = inv.slice().sort((a, b) => Math.abs((b.day || 0) * b.value) - Math.abs((a.day || 0) * a.value))[0];
+    if (mover && Math.abs(mover.day || 0) >= 0.01 && mover.ticker !== top.ticker) add(`${mover.ticker} ${mover.day < 0 ? "fell" : "rose"} ${f1(mover.day)} today: does it change my thesis?`, mover.ticker);
+    const th = {}; inv.forEach((a) => { if (a.theme && a.theme !== "Other") th[a.theme] = (th[a.theme] || 0) + a.value / total; });
+    const t0 = Object.entries(th).sort((a, b) => b[1] - a[1])[0]; if (t0 && t0[1] >= 0.3) add(`Am I too concentrated in ${t0[0]} (${f1(t0[1])} of my portfolio)?`, "portfolio");
+    if (mac && mac.series) { const y = (mac.series.find((x) => x.id === "DGS10") || {}).latest; if (y) add(`With the 10-year yield at ${y.value.toFixed(2)}%, which of my holdings are most exposed and how should I adjust?`, "portfolio"); }
+  }
+  if (mv && mv.losers && mv.losers[0] && mv.losers[0].changePercent <= -0.02) add(`${mv.losers[0].symbol} is the worst large-cap move today (${f1(mv.losers[0].changePercent)} down): is it a buying opportunity or a warning?`, mv.losers[0].symbol);
+  if (mv && mv.gainers && mv.gainers[0] && mv.gainers[0].changePercent >= 0.02) add(`${mv.gainers[0].symbol} is the best large-cap move today (${f1(mv.gainers[0].changePercent)} up): is the rally justified at this price?`, mv.gainers[0].symbol);
+  if (mac && mac.series) {
+    const by = Object.fromEntries(mac.series.map((x) => [x.id, x])), v = (id) => (by[id] && by[id].latest ? by[id].latest.value : null), sp = v("T10Y2Y"), vx = v("VIXCLS");
+    if (sp != null) add(`The yield curve is ${sp < 0 ? "inverted" : "+" + sp.toFixed(2) + " points"}${vx != null ? ` and the VIX is ${vx.toFixed(1)}` : ""}: how should I position for the next 12 months?`, inv.length ? "portfolio" : "SPY");
+  }
+  return out.slice(0, 6);
+}
+async function fillChips() {
+  const el = host && host.querySelector("#cn-chips"); if (!el) return;
+  let qs = []; try { qs = await dynamicQs(); } catch (e) {}
+  if (!host.contains(el)) return;
+  el.innerHTML = qs.length ? `<span class="note">Questions from live data (click to fill, then Convene):</span> ` + qs.map((x, i) => `<button class="btn" type="button" data-qi="${i}">${esc(x.q)}</button>`).join("") : '<span class="note">Type a research question above.</span>';
+  el.querySelectorAll("[data-qi]").forEach((b) => (b.onclick = () => {
+    const x = qs[+b.dataset.qi], q = host.querySelector("#cn-q"), sc = host.querySelector("#cn-scope"); if (!x || !q) return;
+    q.value = x.q; st.q = x.q;
+    if (sc) { if (![...sc.options].some((o) => o.value === x.scope)) sc.add(new Option(x.scope, x.scope)); sc.value = x.scope; st.scope = x.scope; }
+    q.focus();
+  }));
+}
+
 /* ---------- flows ---------- */
 function clearTimers() { st.timers.forEach(clearTimeout); st.timers = []; }
 function reveal() {
@@ -118,8 +168,7 @@ function playDemo(id) {
   st.report = { ...s, meta: { ...(s.meta || {}), demo: true } };
   const q = host.querySelector("#cn-q"); if (q) q.value = s.question;
   host.querySelectorAll("[data-sid]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.sid === id));
-  st.phase = "session"; board();
-  st.timers.push(setTimeout(() => { st.phase = "done"; reveal(); }, reduce() ? 0 : 900));
+  st.phase = "done"; st.shown = LENSES.length + 1; board();   // shown at once: a pre-written sample is not in session
 }
 async function convene() {
   if (!isLive()) return; /* never call the model outside Premium; the server enforces this too */
@@ -140,7 +189,7 @@ async function convene() {
         .concat(Object.keys(P).map((k) => `${k.toUpperCase()}: ${(P[k] && P[k].headline) || ""} — ${((P[k] && P[k].points) || []).join("; ")}`)).join("\n");
       if (window.PT_AUTH && PT_AUTH.session && PT_AUTH.session()) PT_AUTH.fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "ingest", kind: "report", ref: "council:" + (st.report.savedAt || Date.now()), title: "Council report · " + q.slice(0, 80), text: text.slice(0, 18000), scope }) }).catch(() => {});
     } catch (e) {}
-    reveal(); reports();
+    st.shown = LENSES.length + 1; board(); reports();
   } catch (e) { st.phase = "error"; st.err = e.message; board(); }
   finally { const g = host.querySelector("#cn-go"); if (g) g.disabled = false; }
 }
