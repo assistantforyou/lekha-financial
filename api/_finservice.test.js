@@ -31,6 +31,19 @@ const g = { entityName: "T", cik: 2, facts: { "us-gaap": { Revenues: { units: { 
 const gq = sec.buildStatements(g, "T", "quarterly").sort((p, q) => p.period < q.period ? -1 : 1);
 assert.strictEqual(gq.length, 2); assert.strictEqual(gq[0].fiscalYear, 2025, "comparative keeps its own fiscal year"); assert.strictEqual(gq[1].fiscalYear, 2026);
 assert.strictEqual(gq[0].revenue, 11, "restated value still wins");
+// filers that switch revenue concepts keep every year (NVDA moved from RevenueFromContract... to Revenues after FY2022);
+// the higher-priority concept wins a period both report, and labels still come from the earliest filing
+const sw = { entityName: "S", cik: 3, facts: { "us-gaap": {
+  RevenueFromContractWithCustomerExcludingAssessedTax: { units: { USD: [
+    { start: "2021-02-01", end: "2022-01-30", val: 269, form: "10-K", filed: "2022-03-18", fy: 2022, fp: "FY", accn: "a1" }] } },
+  Revenues: { units: { USD: [
+    { start: "2021-02-01", end: "2022-01-30", val: 999, form: "10-K", filed: "2024-02-21", fy: 2024, fp: "FY", accn: "a3" },
+    { start: "2025-01-27", end: "2026-01-25", val: 2159, form: "10-K", filed: "2026-02-25", fy: 2026, fp: "FY", accn: "a5" }] } } } } };
+const swa = sec.buildStatements(sw, "S", "annual");
+assert.deepStrictEqual(swa.map((r) => r.period), ["2026-01-25", "2022-01-30"], "the later concept's years are not dropped");
+assert.strictEqual(swa[0].revenue, 2159); assert.strictEqual(swa[0].fiscalYear, 2026);
+assert.strictEqual(swa[1].revenue, 269, "the first concept in the list wins a period both report");
+assert.strictEqual(swa[1].fiscalYear, 2022);
 // chain: skips unconfigured, falls back on error, reports attempts
 (async () => {
   const r = await svc.chain("x", [[{ name: "a", configured: () => false }, async () => 1], [{ name: "b", configured: () => true }, async () => { throw new Error("boom"); }], [{ name: "c", configured: () => true }, async () => 42]]);

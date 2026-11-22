@@ -88,12 +88,18 @@ const INSTANT = {
 };
 const DAY = 864e5, dur = (f) => (Date.parse(f.end) - Date.parse(f.start)) / DAY;
 
-function series(facts, defs, unit, asOf) {
+// Filers switch concepts over time (NVDA: RevenueFromContractWithCustomerExcludingAssessedTax up to FY2022, Revenues
+// after), so concepts are merged: a period keeps the facts of the first concept in `defs` that reports it, and later
+// concepts only fill periods the earlier ones lack. Returning the first non-empty concept froze such filers in the past.
+// all=true keeps every concept's facts (used for fiscal labels, which come from the earliest filing of a period).
+function series(facts, defs, unit, asOf, all = false) {
+  const out = [], covered = new Set(), span = (f) => (f.start || "") + "|" + f.end;
   for (const [tax, concept] of defs) { const c = facts.facts && facts.facts[tax] && facts.facts[tax][concept]; const u = c && c.units && c.units[unit]; if (u && u.length) {
-    const available = asOf ? u.filter(f => f.filed && f.filed <= asOf && f.end <= asOf) : u;
-    if (available.length) return available;
+    const available = (asOf ? u.filter(f => f.filed && f.filed <= asOf && f.end <= asOf) : u).filter((f) => !covered.has(span(f)));
+    for (const f of available) out.push(f);
+    if (!all) for (const f of available) covered.add(span(f));
   } }
-  return [];
+  return out;
 }
 // pick, for each period key, the most recently FILED fact (restatements win)
 function pick(rows, keyOf) { const m = new Map(); for (const f of rows) { const k = keyOf(f); if (k == null) continue; const o = m.get(k); if (!o || f.filed > o.filed) m.set(k, f); } return m; }
@@ -112,7 +118,7 @@ function buildStatements(facts, symbol, type, asOf) {
   for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, "USD", asOf).filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
   const anchor = flows.revenue.size ? flows.revenue : flows.netIncome;
   const anchorDef = flows.revenue.size ? FLOW.revenue : FLOW.netIncome;
-  const labels = pickFirst(series(facts, anchorDef, "USD", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  const labels = pickFirst(series(facts, anchorDef, "USD", asOf, true).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   const ends = [...anchor.keys()].sort().reverse().slice(0, annual ? 12 : 16), name = facts.entityName || null, cik = facts.cik ? String(facts.cik) : null, out = [];
   for (const end of ends) {
     const a = anchor.get(end), lb = labels.get(end) || a, row = { symbol, name, cik, period: end, periodType: annual ? "annual" : "quarterly", fiscalYear: lb.fy || null, fiscalPeriod: lb.fp || null, periodStart: a.start, periodEnd: end,
@@ -130,7 +136,7 @@ function buildStatements(facts, symbol, type, asOf) {
 }
 
 // Bump when buildStatements output changes, so rows normalized by older code (up to 7 days in the shared cache) are ignored.
-const STATEMENT_SCHEMA = "v2-fiscal-labels";
+const STATEMENT_SCHEMA = "v3-merged-concepts";
 // Statements are cached by the latest accession number, so they live until a new filing appears.
 async function statements(symbol, { type = "annual", asOf } = {}) {
   const cik = await cikFor(symbol); if (!cik) return [];
