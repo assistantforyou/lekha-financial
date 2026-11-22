@@ -111,7 +111,7 @@ with sync_playwright() as runner:
     page.unroute(quotes_url)
     page.route(quotes_url, lambda r:r.fulfill(status=503,json={"error":"Test outage"}))
     page.reload(wait_until="domcontentloaded")
-    expect(page.locator("main")).to_contain_text("Unavailable")
+    expect(page.locator("main")).to_contain_text("Test outage")
     remove = page.get_by_role("button", name="Remove SPY")
     k = target(remove)
     remove.click()

@@ -153,13 +153,13 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -527,13 +527,13 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -883,7 +883,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -955,85 +955,169 @@
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit NVDA",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove NVDA",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit AMD",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove AMD",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit AVGO",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove AVGO",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit SMH",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove SMH",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit MSFT",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove MSFT",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit AAPL",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove AAPL",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit 0700.HK",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove 0700.HK",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit TSLA",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove TSLA",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit JPM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove JPM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit XOM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove XOM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit PTT.BK",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove PTT.BK",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit JNJ",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove JNJ",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit PEP",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove PEP",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit CASH",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove CASH",
     "id": null,
     "disabled": null
    },
@@ -1051,7 +1135,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -1443,7 +1527,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    }
@@ -2062,78 +2146,6 @@
     "label": "Open",
     "id": null,
     "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "AAPL\nApple",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "MSFT\nMicrosoft",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "NVDA\nNVIDIA",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "GOOGL\nAlphabet",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "AMZN\nAmazon",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "META\nMeta Platforms",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "TSLA\nTesla",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "JPM\nJPMorgan Chase",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "XOM\nExxon Mobil",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "SPY\nS&P 500 ETF",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "QQQ\nNasdaq 100 ETF",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "BTC-USD\nBitcoin",
-    "id": null,
-    "disabled": null
    }
   ],
   "#/research/agent": [
@@ -2439,25 +2451,7 @@
    },
    {
     "tag": "button",
-    "label": "Why did NVDA fall today?",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "Is AAPL overvalued?",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "What do rising yields mean for tech stocks?",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "What is the macro backdrop: rates, inflation and jobs?",
+    "label": "MACROWhat is the macro backdrop: rates, inflation and jobs?",
     "id": null,
     "disabled": null
    },
@@ -4141,7 +4135,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -4539,7 +4533,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -4925,7 +4919,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -5269,7 +5263,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -5655,7 +5649,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -5697,13 +5691,19 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "span",
+    "label": "About this setting: Wide-moat, consistently profitable businesses with steady cash flow. The smalles",
     "id": null,
     "disabled": null
    },
@@ -5714,8 +5714,8 @@
     "disabled": null
    },
    {
-    "tag": "input",
-    "label": "",
+    "tag": "span",
+    "label": "About this setting: Faster-growing companies whose value depends on profits that have not happened y",
     "id": null,
     "disabled": null
    },
@@ -5726,8 +5726,32 @@
     "disabled": null
    },
    {
+    "tag": "span",
+    "label": "About this setting: Businesses whose profits swing with the economy (energy, materials, industrials)",
+    "id": null,
+    "disabled": null
+   },
+   {
     "tag": "input",
     "label": "",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "span",
+    "label": "About this setting: Unprofitable, early-stage or low-confidence names. Their value estimate is the l",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "input",
+    "label": "",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "span",
+    "label": "About this setting: Equity risk premium: the extra yearly return investors demand for owning stocks ",
     "id": null,
     "disabled": null
    },
@@ -5744,6 +5768,12 @@
     "disabled": null
    },
    {
+    "tag": "span",
+    "label": "About this setting: Stock-based pay is a real cost to shareholders because it dilutes them. Counting",
+    "id": null,
+    "disabled": null
+   },
+   {
     "tag": "button",
     "label": "Save settings",
     "id": "vs-save",
@@ -5751,7 +5781,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -5793,13 +5823,13 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -6529,7 +6559,7 @@
    },
    {
     "tag": "select",
-    "label": "Whole portfolio\nNVDA\nAAPL\nSMH\nJPM\nMSFT\nAMD\n0700.HK\nPEP\nAVGO\nXOM\nJNJ\nTSLA\nPTT.BK",
+    "label": "Whole portfolio\nSPY · the market\nNVDA\nAAPL\nSMH\nJPM\nMSFT\nAMD\n0700.HK\nPEP\nAVGO\nXOM\nJNJ\nTSLA\nPTT.BK",
     "id": "cn-scope",
     "disabled": true
    },
@@ -8195,13 +8225,13 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -8599,7 +8629,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -8931,7 +8961,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -12401,7 +12431,43 @@
    },
    {
     "tag": "button",
+    "label": "Symbol",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Price",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Today",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Volume",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "tr",
+    "label": "SPY\nFixture fund\n\t$100.00\t–\t–\thistorical Test fixture",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
     "label": "Remove SPY",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Refresh",
     "id": null,
     "disabled": null
    }
@@ -13077,7 +13143,7 @@
    },
    {
     "tag": "select",
-    "label": "Whole portfolio\nNVDA\nAAPL\nSMH\nJPM\nMSFT\nAMD\n0700.HK\nPEP\nAVGO\nXOM\nJNJ\nTSLA\nPTT.BK",
+    "label": "Whole portfolio\nSPY · the market\nNVDA\nAAPL\nSMH\nJPM\nMSFT\nAMD\n0700.HK\nPEP\nAVGO\nXOM\nJNJ\nTSLA\nPTT.BK",
     "id": "cn-scope",
     "disabled": true
    },
@@ -13247,13 +13313,13 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -13411,13 +13477,13 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -13575,7 +13641,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -13647,85 +13713,169 @@
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit NVDA",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove NVDA",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit AMD",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove AMD",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit AVGO",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove AVGO",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit SMH",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove SMH",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit MSFT",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove MSFT",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit AAPL",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove AAPL",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Edit 0700.HK",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Remove",
+    "label": "Remove 0700.HK",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit TSLA",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove TSLA",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit JPM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove JPM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit XOM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove XOM",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit PTT.BK",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove PTT.BK",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit JNJ",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove JNJ",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit PEP",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove PEP",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Edit CASH",
+    "id": null,
+    "disabled": null
+   },
+   {
+    "tag": "button",
+    "label": "Remove CASH",
     "id": null,
     "disabled": null
    },
@@ -13743,7 +13893,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -13943,7 +14093,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    }
@@ -14065,7 +14215,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -14084,78 +14234,6 @@
    {
     "tag": "button",
     "label": "10Y",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "a",
-    "label": "CPI",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "a",
-    "label": "Fed funds",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "a",
-    "label": "10-year",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "3M",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "6M",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "button",
-    "label": "1Y",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "a",
-    "label": "CNN Business Fear & Greed Index",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "summary",
-    "label": "Drivers (z-scores)",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "summary",
-    "label": "Drivers (z-scores)",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "summary",
-    "label": "Drivers (z-scores)",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "summary",
-    "label": "Method, data and limitations",
-    "id": null,
-    "disabled": null
-   },
-   {
-    "tag": "a",
-    "label": "",
     "id": null,
     "disabled": null
    }
@@ -14277,7 +14355,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -14477,7 +14555,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -14635,7 +14713,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -14835,7 +14913,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -14877,19 +14955,19 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -14901,13 +14979,13 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -15277,7 +15355,7 @@
    },
    {
     "tag": "select",
-    "label": "Whole portfolio\nNVDA\nAAPL\nSMH\nJPM\nMSFT\nAMD\n0700.HK\nPEP\nAVGO\nXOM\nJNJ\nTSLA\nPTT.BK",
+    "label": "Whole portfolio\nSPY · the market\nNVDA\nAAPL\nSMH\nJPM\nMSFT\nAMD\n0700.HK\nPEP\nAVGO\nXOM\nJNJ\nTSLA\nPTT.BK",
     "id": "cn-scope",
     "disabled": true
    },
@@ -15623,7 +15701,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    }
@@ -15745,7 +15823,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -15957,7 +16035,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -16103,7 +16181,7 @@
    },
    {
     "tag": "button",
-    "label": "Collapse or expand",
+    "label": "Show or hide the description",
     "id": null,
     "disabled": null
    },
@@ -19567,7 +19645,7 @@
    },
    {
     "tag": "select",
-    "label": "Whole portfolio",
+    "label": "SPY · the market",
     "id": "cn-scope",
     "disabled": true
    },
@@ -19791,7 +19869,7 @@
    },
    {
     "tag": "select",
-    "label": "Whole portfolio",
+    "label": "SPY · the market",
     "id": "cn-scope",
     "disabled": true
    },
@@ -20043,124 +20121,132 @@
  "http_errors": [
   [
    503,
-   "http://127.0.0.1:3457/api/rag"
+   "http://127.0.0.1:3458/api/rag"
   ],
   [
    503,
-   "http://127.0.0.1:3457/api/rag"
+   "http://127.0.0.1:3458/api/rag"
   ],
   [
    503,
-   "http://127.0.0.1:3457/api/rag"
+   "http://127.0.0.1:3458/api/rag"
   ],
   [
    503,
-   "http://127.0.0.1:3457/api/rag"
+   "http://127.0.0.1:3458/api/rag"
   ],
   [
    502,
-   "http://127.0.0.1:3457/api/data/news"
+   "http://127.0.0.1:3458/api/data/news"
+  ],
+  [
+   502,
+   "http://127.0.0.1:3458/api/data/movers"
   ],
   [
    503,
-   "http://127.0.0.1:3457/api/data/quotes"
+   "http://127.0.0.1:3458/api/data/quotes"
   ],
   [
    503,
-   "http://127.0.0.1:3457/api/auth/setup"
+   "http://127.0.0.1:3458/api/auth/setup"
   ]
  ],
  "console_errors": [
   [
-   "http://127.0.0.1:3457/?demo=1",
+   "http://127.0.0.1:3458/?demo=1",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/data",
+   "http://127.0.0.1:3458/?demo=1#/account/data",
    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/data",
+   "http://127.0.0.1:3458/?demo=1#/account/data",
    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/data",
+   "http://127.0.0.1:3458/?demo=1#/account/data",
    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/data",
+   "http://127.0.0.1:3458/?demo=1#/account/data",
    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
+   "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+  ],
+  [
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/account/preferences",
+   "http://127.0.0.1:3458/?demo=1#/account/preferences",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/portfolio/watchlist",
+   "http://127.0.0.1:3458/?demo=1#/portfolio/watchlist",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/portfolio/watchlist",
+   "http://127.0.0.1:3458/?demo=1#/portfolio/watchlist",
    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1#/analysis/reports",
+   "http://127.0.0.1:3458/?demo=1#/analysis/reports",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/v3?demo=1",
+   "http://127.0.0.1:3458/v3?demo=1",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/v2?demo=1",
+   "http://127.0.0.1:3458/v2?demo=1",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ],
   [
-   "http://127.0.0.1:3457/login.html",
+   "http://127.0.0.1:3458/login.html",
    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
   ],
   [
-   "http://127.0.0.1:3457/?demo=1",
+   "http://127.0.0.1:3458/?demo=1",
    "Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED"
   ]
  ],
@@ -20315,7 +20401,7 @@
   "premium fixture login and council": true
  },
  "control_coverage": {
-  "observed_signatures": 809,
+  "observed_signatures": 854,
   "verified_signatures": 191,
   "verified": [
    [
@@ -21465,6 +21551,6 @@
     "INTELLIGENT SIMULATION"
    ]
   ],
-  "percentage": 23.6
+  "percentage": 22.4
  }
 }
