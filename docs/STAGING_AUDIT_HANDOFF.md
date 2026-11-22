@@ -25,13 +25,12 @@ Preview alias: `portfolio-terminal-git-f896cf-assistantforyou999-8501s-projects.
 - Not investigated: null dataset refresh timestamps, insider history 0/45 days, signed-in live news, real AI provider fallback ordering.
 
 ## Previously listed (still true)
-- **Signed-in checks** (persistence, isolation, AI fallback, Stripe checkout and webhook) were not completed. Sign-up on the Preview returns `Too many attempts. Wait a few minutes.` (HTTP 429). It is either the app limiter (20 auth attempts per client per 10 min, `api/auth/[action].js`) or the staging Supabase email send limit. Retry after the window; if it persists, check staging Supabase auth logs (the staging project is NOT in the connector account used in this session).
-- Anonymous AI endpoint returned `Daily research limit reached (15/day)`; real AI fallback needs a signed-in account.
+- **Not yet tested signed-in:** data persistence across devices, per-user isolation between two accounts, Stripe webhook, real AI provider fallback.
+- AI spend: about $0.003 of the USD 10 cap agreed with James.
 - Stripe connector in this session only exposes the LIVE account; no test-mode calls were made. Check test-mode prices and webhook delivery in the Stripe test dashboard. The webhook needs a reachable URL (Preview is protected: needs a protection bypass or a public alias).
 - Dataset refresh timestamps are null and insider history is 0/45 days: not investigated.
 - Empty AMD news is intentional demo-date behaviour (18 Aug 2026); signed-in live news is unverified.
 - A CLI `vercel deploy` fails the release guard (`SITE_URL` must match the preview host). Only git-triggered deploys pass. Build `jrxdt3sbi` also showed Error.
-- AI spend cap agreed with James: USD 10. Spent so far: effectively 0 (one request rejected by the daily limit).
 
 ## Test account
 A Gmail plus-alias of James's inbox was used for sign-up attempts (address kept out of the repo). Make your own account with an address you can read.
