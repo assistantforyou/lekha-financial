@@ -13,13 +13,19 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":
 const icon = (p) => `<svg viewBox="0 0 24 24" class="cn-ic" aria-hidden="true">${p}</svg>`;
 const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLive = () => !window.PT_DEMO_MODE && window.PT_TIER === "premium";
-const nsKey = () => {
-  if (window.PT_DEMO_MODE) return "ptpub.v1.demo.v3.council";
-  const email = window.PT_AUTH?.session()?.email;
-  if (!email) throw new Error("Account identity unavailable");
-  return "ptpub.v1.v3.council." + encodeURIComponent(email.toLowerCase());
+const store = {
+  get() {
+    return window.PT_SYNC.keys().filter(key => key.startsWith("reports/"))
+      .map(key => JSON.parse(localStorage.getItem(window.PT_STORAGE_NS + "db." + key)))
+      .filter(r => r && r.ceo).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+  },
+  async add(report) {
+    const key = "reports/" + crypto.randomUUID();
+    localStorage.setItem(window.PT_STORAGE_NS + "db." + key, JSON.stringify(report));
+    window.PT_SYNC.touch(key);
+    return window.PT_SYNC.flush();
+  },
 };
-const store = { get() { try { return JSON.parse(localStorage.getItem(nsKey()) || "[]"); } catch (e) { return []; } }, add(r) { try { const a = store.get(); a.unshift(r); localStorage.setItem(nsKey(), JSON.stringify(a.slice(0, 20))); } catch (e) {} } };
 
 let host, demo = null, st = { phase: "idle", report: null, err: null, q: "", scope: "portfolio", shown: 0, timers: [] };
 
@@ -181,7 +187,11 @@ async function convene() {
     const r = await PT_AUTH.fetch("/api/ai/council-v3", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, scope, evidence: evidence(), lang }) });
     const j = await r.json().catch(() => null);
     if (!r.ok || !j || !j.ceo) throw new Error((j && j.error) || "The council could not answer right now.");
-    st.report = { ...j, question: q, scope }; st.phase = "done"; store.add({ ...st.report, savedAt: new Date().toISOString() });
+    st.report = { ...j, question: q, scope }; st.phase = "done"; st.saveNote = "";
+    try {
+      const result = await store.add({ ...st.report, savedAt: new Date().toISOString() });
+      if (!result.ok) st.saveNote = "Saved in this browser. Account sync is pending.";
+    } catch { st.saveNote = "Unable to save this report. Keep this tab open."; }
     /* the saved report also becomes retrieval material for the research agent (owner-scoped) */
     try {
       const c = st.report.ceo || {}, P = st.report.perspectives || {};
@@ -198,7 +208,7 @@ async function convene() {
 function reports() {
   const el = document.getElementById("lekha-reports"); if (!el) return;
   const saved = store.get(), samples = (demo && demo.scenarios) || [];
-  el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">Live reports are kept in this browser (last 20). Samples show what a report looks like.</span></div>
+  el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">${esc(st.saveNote || "Your saved live reports sync to your account.")}</span></div>
     ${saved.length ? `<ul class="cn-list">${saved.map((r, i) => `<li><button class="btn" data-rep="${i}">${esc(r.ceo && r.ceo.verdict)} · ${esc(r.question)}</button><span class="note">${esc((r.savedAt || "").slice(0, 10))}</span></li>`).join("")}</ul>` : `<p class="note">No live Council reports yet${isLive() || window.PT_DEMO_MODE ? "." : " — live reports are a Premium feature."}</p>`}
     <h3>Sample reports</h3><ul class="cn-list">${samples.map((s) => `<li><button class="btn" data-sample="${esc(s.id)}">${esc(s.ceo.verdict)} · ${esc(s.question)}</button></li>`).join("")}</ul></section>`;
   el.querySelectorAll("[data-rep]").forEach((b) => (b.onclick = () => { clearTimers(); st.report = saved[+b.dataset.rep]; st.q = st.report.question; st.phase = "done"; st.shown = LENSES.length + 1; window.LEKHA_SHELL.go("analysis/council"); frame(); }));

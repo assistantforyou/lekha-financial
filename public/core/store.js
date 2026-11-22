@@ -2,9 +2,9 @@
    Built on the same browser storage and server routes as the classic terminal, so an account, a plan and a
    portfolio carry over unchanged between versions. Mode is decided once per page load by pt-datasource.js:
    no session -> sample portfolio, a session -> your real data. */
-const NSR = "ptpub.v1.", NSD = "ptpub.v1.demo.";
+const NSR = "ptpub.v1.";
 export const isDemo = () => !!window.PT_DEMO_MODE;
-const ns = () => (isDemo() ? NSD : NSR);
+const ns = () => window.PT_STORAGE_NS;
 const ls = { get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } } };
 
 /* ---------- preferences (shared with the classic terminal) ---------- */

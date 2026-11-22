@@ -10,7 +10,7 @@
      browser's localStorage and syncs to the account when signed in.
    - Entitlement checks are NOT done here: client-side checks are not security.
      They belong on the server that implements PT_DATA_SOURCE. */
-const PT_NS = window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.";
+const PT_NS = window.PT_STORAGE_NS;
 const PT_MARKET_DOCS = new Set(["meta/macro","meta/fredhist","meta/regime_val","meta/factor_val","meta/f13","meta/cftc","meta/tic","meta/vixeq_hist","meta/valin","meta/fgi"]);
 const PT_MARKET_COLS = new Set(["news","fund","rev","etf","ins"]);
 const PT_USER_DOCS = /^(val\/settings|valhist\/[\w-]+|quant\/[\w-]+|snapshots\/[\w-]+|holdings\/[\w-]+)$/;

@@ -36,28 +36,9 @@
     }
   }
   paint();
-  function demoPrompt(){
-    try{
-      if(!window.PT_DEMO_MODE)return;
-      var s=null;try{s=window.PT_AUTH&&PT_AUTH.session()}catch(e){}
-      if(s&&s.access_token)return;
-      if(localStorage.getItem("ptpub.v1.demoPrompt"))return;
-      var real=null;try{real=localStorage.getItem("ptpub.v1.db.holdings/all")}catch(e){}
-      if(!real)return;
-      localStorage.setItem("ptpub.v1.demoPrompt","1");
-      var d=document.createElement("div");d.id="demo-prompt";
-      d.innerHTML="You have holdings saved in this browser. Create a free account to use them with real market data — or keep exploring the simulated demo.";
-      var b1=document.createElement("button");b1.className="btn";b1.textContent="Create free account";
-      b1.onclick=function(){d.remove();var t=document.getElementById("tb-set");if(t)t.click();};
-      var b2=document.createElement("button");b2.className="btn";b2.textContent="Keep exploring demo";
-      b2.onclick=function(){d.remove();};
-      d.appendChild(b1);d.appendChild(b2);document.body.appendChild(d);
-      setTimeout(function(){d.remove()},60000);
-    }catch(e){}
-  }
   window.addEventListener("pt:state-hydrated",paint);
   window.addEventListener("pt:state-synced",paint);
   document.addEventListener("visibilitychange",paint);
   setTimeout(paint,800);setTimeout(paint,2500);setTimeout(paint,5000);
-  setTimeout(demoPrompt,600);
+
 })();

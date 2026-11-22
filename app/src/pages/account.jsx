@@ -88,7 +88,7 @@ const TIERS = [
     body: "Open the full terminal with every panel switched on. The portfolio is a deterministic sample and every price, filing and AI answer is computed from that sample data in this browser — nothing is saved, nothing is sent to an account, and nothing is billed.",
     points: [
       ["Whole app, no sign-up", "All portfolio, research, sector, macro, simulation, council and analyst screens are available immediately."],
-      ["Premium AI features included", "Ask the analyst, the daily briefing, the five-perspective council and the 1M-path simulation engine all run in the demo."],
+      ["Council samples and simulations", "Explore pre-written Council reports and run Monte Carlo simulations with the sample portfolio."],
       ["Sample data, real maths", "Quotes, fundamentals and history come from a fixed simulated dataset; every ratio, weight, P&L and simulation is calculated from it with the same code the paid tiers use."],
       ["Nothing persisted", "Holdings, layouts and settings stay in this browser only, and reset whenever you clear site data."],
     ],
@@ -121,7 +121,7 @@ const TIERS = [
     points: [
       ["AI investment analyst", "Ask about positions, concentration, drawdowns or what would change the view, and get an answer computed from your live weights and history — plus a briefing every day."],
       ["LLM council", "Five independent perspectives on one question, then a CEO synthesis that names the disagreements. Saved as a report you can reread."],
-      ["1B simulation engine", "Up to one million Monte Carlo paths on worker threads: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
+      ["Monte Carlo simulation engine", "Up to one million Monte Carlo paths on worker threads: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
       ["Advanced stress testing", "The full scenario library plus custom shocks on rates, sectors and factors, applied to your real weights."],
       ["80 AI research questions a day", "Roughly three times the Paid allowance across the analyst, research agent and council."],
       ["Everything in Paid", "Unlimited holdings, full history, unlimited valuation coverage and every advanced indicator."],
@@ -168,7 +168,7 @@ export function Layout({ item }) {
 /* ---------------- Knowledge base (pgvector) ---------------- */
 const kbJson = (r) => r.json().catch(() => ({}))
 const kbCall = (body) => (window.PT_AUTH && PT_AUTH.fetch ? PT_AUTH.fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) : fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).then(kbJson)
-const kbLocalHoldings = () => { try { return JSON.parse(localStorage.getItem((window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.") + "db.holdings/all") || "null") } catch (e) { return null } }
+const kbLocalHoldings = () => { try { return JSON.parse(localStorage.getItem((window.PT_STORAGE_NS) + "db.holdings/all") || "null") } catch (e) { return null } }
 function KnowledgeBase() {
   const demo = isDemo(), [st, set] = useState({ status: "loading" }), [busy, setBusy] = useState(null), did = useRef(false)
   const load = async () => { try { const j = await kbCall({ action: "status" }); set({ status: "ok", data: j }) } catch (e) { set({ status: "error", error: errMsg(e) }) } }

@@ -12,9 +12,23 @@ export const checkout = (plan) => post("/api/billing/checkout", { plan }, true)
 export const portal = () => post("/api/billing/portal", {}, true)
 export const setPref = (k, v) => { try { window.PT_UI.setPref(k, v) } catch (e) {} }
 export const getPref = (k, d) => { try { const v = window.PT_UI.getPref(k); return v == null ? d : v } catch (e) { return d } }
-// everything this browser stores for the app (never the session tokens), for export/backup
+// Backups contain the current portfolio's documents. Version one used absolute storage keys.
 export function exportAll() {
-  const out = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith("ptpub.v1.") && !/session|importpass/.test(k)) { try { out[k] = JSON.parse(localStorage.getItem(k)) } catch (e) { out[k] = localStorage.getItem(k) } } }
-  return { app: "LEKHA Financials", exportedAt: new Date().toISOString(), version: 1, data: out }
+  const data = {}
+  for (const key of window.PT_SYNC.keys()) {
+    data[key] = JSON.parse(localStorage.getItem(window.PT_STORAGE_NS + "db." + key))
+  }
+  return { app: "LEKHA Financials", exportedAt: new Date().toISOString(), version: 2, data }
 }
-export function importAll(obj) { if (!obj || obj.app !== "LEKHA Financials" || !obj.data) throw new Error("This is not a LEKHA export file."); let n = 0; for (const [k, v] of Object.entries(obj.data)) { if (!k.startsWith("ptpub.v1.") || /session|importpass/.test(k)) continue; localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v)); n++ } return n }
+export function importAll(obj) {
+  if (!obj || obj.app !== "LEKHA Financials" || !obj.data) throw new Error("This is not a LEKHA export file.")
+  let count = 0
+  for (const [stored, value] of Object.entries(obj.data)) {
+    const key = obj.version === 1 ? stored.replace(/^ptpub\.v1\.(?:demo\.)?db\./, "") : stored
+    if (!window.PT_SYNC.accepts(key)) continue
+    localStorage.setItem(window.PT_STORAGE_NS + "db." + key, JSON.stringify(value))
+    window.PT_SYNC.touch(key)
+    count++
+  }
+  return count
+}

@@ -5,7 +5,7 @@ const { rateHit, sb } = require("../_lib");
 const { clientId } = require("../_history");
 
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
-const session = (j) => ({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at || Math.floor(Date.now() / 1000) + (j.expires_in || 3600), email: j.user && j.user.email });
+const session = (j) => ({ user_id: j.user && j.user.id, access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at || Math.floor(Date.now() / 1000) + (j.expires_in || 3600), email: j.user && j.user.email });
 
 // password re-check for sensitive actions: rate limited per user as well as per client, then verified against GoTrue
 async function reauth(u, password, res) {

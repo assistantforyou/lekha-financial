@@ -1,4 +1,4 @@
-/* LEKHA V3 Intelligent Simulation ("LEKHA 1 BILLION SIMULATION ENGINE" is the product name).
+/* LEKHA V3 Intelligent Simulation ("LEKHA MONTE CARLO ENGINE" is the product name).
    Real Monte Carlo from core/engine.js via sim-runner.js. Each run is capped at 1,000,000 paths and the UI always shows the
    number of paths actually completed. Inputs come from the classic engine state (PT_APP.S): no second data fetch. */
 import { run, MAX_PATHS, MODEL_VERSION, DEFAULT_HORIZONS } from "./sim-runner.js";
@@ -73,7 +73,7 @@ const demo = () => !!window.PT_DEMO_MODE;
 
 function shell() {
   host.innerHTML = `<section class="panel sim">
-  <div class="sim-head"><div><p class="sim-eyebrow">LEKHA 1 BILLION SIMULATION ENGINE</p><h2 class="sim-title">LEKHA INTELLIGENT SIMULATION</h2>
+  <div class="sim-head"><div><p class="sim-eyebrow">LEKHA MONTE CARLO ENGINE</p><h2 class="sim-title">LEKHA INTELLIGENT SIMULATION</h2>
   <p class="sim-sub">Probability-driven portfolio projections, scenario analysis, and forward-looking risk intelligence.</p></div>
   <div class="sim-tags" id="sim-tags"></div></div>
   <div class="sim-ctrls"><div class="seg" id="sim-hz" role="group" aria-label="Projection horizon">${HZ.map((h) => `<button data-h="${h}">${HZ_LABEL[h]}</button>`).join("")}</div>
@@ -112,7 +112,7 @@ function progress() {
 /* compact summary other modules (Council evidence) can use — always carries the true completed count */
 export function simSummary() {
   if (!st.res) return null; const h = st.res.summary.horizons["1Y"] || {};
-  return { engine: "LEKHA 1 Billion Simulation Engine", completedPaths: st.res.completedPaths, requestedPaths: st.res.requestedPaths, stopped: st.res.stopped, modelVersion: st.res.modelVersion, at: st.res.at,
+  return { engine: "LEKHA Monte Carlo Engine", completedPaths: st.res.completedPaths, requestedPaths: st.res.requestedPaths, stopped: st.res.stopped, modelVersion: st.res.modelVersion, at: st.res.at,
     horizon: "1Y", p5: h.p5, p50: h.p50, p95: h.p95, mean: h.mean, pGain: h.pGain, pLoss10: h.pLoss10, cvar5: h.cvar5, ddMedian: h.dd && h.dd.median, dd95: h.dd && h.dd.p95 };
 }
 

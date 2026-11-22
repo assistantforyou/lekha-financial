@@ -3,7 +3,7 @@
 const { sb } = require("./_lib");
 
 // Document paths the app is allowed to persist. Market data is never stored here (it is read-only).
-const KEY = /^(?:holdings|valhist|quant|snapshots)\/[A-Za-z0-9._:-]{1,80}$|^val\/settings$|^settings\/[a-z0-9._-]{1,40}$/;
+const KEY = /^(?:holdings|valhist|quant|snapshots|reports)\/[A-Za-z0-9._:-]{1,80}$|^val\/settings$|^settings\/[a-z0-9._-]{1,40}$/;
 const MAX_DOC = 512 * 1024;      // one document
 const MAX_BATCH = 4 * 1024 * 1024; // one request
 

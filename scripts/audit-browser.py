@@ -226,7 +226,7 @@ with sync_playwright() as runner:
         account.on("pageerror", lambda e: evidence["page_errors"].append(["tier fixture", str(e)]))
         fixture_user = {"email":tier + "@example.invalid", "tier":tier, "limits":{}, "prefs":{}}
         council_calls = []
-        session = {"access_token":"test-session", "refresh_token":"fixture", "expires_at":4102444800, "email":fixture_user["email"]}
+        session = {"user_id":tier+"-fixture", "access_token":"test-session", "refresh_token":"fixture", "expires_at":4102444800, "email":fixture_user["email"]}
         def api_fixture(route):
             path = route.request.url.split("?")[0].replace(origin,"")
             if path == "/api/free/csv/ROTATION":
