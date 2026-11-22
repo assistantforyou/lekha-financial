@@ -5,7 +5,6 @@ const { listState } = require("../../_state");
 const { cacheGet } = require("../../_lib");
 const { newsDocs } = require("../../_news");
 
-const FX_DEF = { usdthb: 34.5, hkdusd: 0.128 };
 const cleanTk = (t) => String(t || "").trim().toUpperCase().slice(0, 12);
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
@@ -41,7 +40,7 @@ async function userContext(userId) {
   const hDoc = docs.find((d) => d.key === "holdings/all");
   const items = hDoc && hDoc.data && Array.isArray(hDoc.data.items) ? hDoc.data.items : [];
   if (!items.length) return null;
-  const fx = { usdthb: num(hDoc.data.usdthb) || FX_DEF.usdthb, hkdusd: num(hDoc.data.hkdusd) || FX_DEF.hkdusd };
+  const fx = { usdthb: num(hDoc.data.usdthb), hkdusd: num(hDoc.data.hkdusd) };
   const vh = docs.filter((d) => /^valhist\//.test(d.key) && d.data)
     .map((d) => d.data).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))[0] || null;
   // live prices first: the saved valuation snapshot may not exist yet (new accounts) or may be days old
@@ -56,20 +55,19 @@ async function userContext(userId) {
   for (const it of items) {
     const tk = cleanTk(it.tk);
     if (!tk) continue;
-    const cur = ["USD", "THB", "HKD"].includes(String(it.cur).toUpperCase()) ? String(it.cur).toUpperCase() : "USD";
-    const rate = cur === "THB" ? 1 / fx.usdthb : cur === "HKD" ? fx.hkdusd : 1;
+    const cur = String(it.cur || "USD").toUpperCase();
+    const rate = cur === "USD" ? 1 : cur === "THB" && fx.usdthb > 0 ? 1 / fx.usdthb : cur === "HKD" && fx.hkdusd > 0 ? fx.hkdusd : null;
     const qty = Number(it.qty) || 0;
-    const cost = Number(it.cost) || 0;
-    if (tk === "CASH") { rows.push({ tk, cur, theme: "Cash", valUsd: qty * rate, costUsd: qty * rate, qty }); continue; }
-    const lq = live[tk] && live[tk].price > 0 ? live[tk] : null, p = (lq && lq.price) || (px[tk] && num(px[tk].px));
+    const cost = it.cost == null || it.cost === "" ? null : Number(it.cost);
+    if (tk === "CASH") { rows.push({ tk, cur, theme: "Cash", priced: rate !== null, valUsd: rate === null ? null : qty * rate, costUsd: rate === null ? null : qty * rate, qty }); continue; }
+    const lq = live[tk]?.currency === cur && live[tk].price > 0 ? live[tk] : null, p = (lq && lq.price) || (px[tk] && num(px[tk].px));
     const valUsd = p ? qty * p * rate : 0;   // no price = unknown value (NOT the cost basis: that made weights and P&L wrong)
     rows.push({
-      tk, cur, qty, theme: String(it.theme || "").slice(0, 40), priced: !!p, priceSource: lq ? "live quote" : p ? "valuation snapshot" : null, dayPct: lq && Number.isFinite(lq.changePercent) ? Math.round(lq.changePercent * 10000) / 100 : null,
-      valUsd: Math.round(valUsd * 100) / 100, costUsd: Math.round(cost * rate * 100) / 100,
+      tk, cur, qty, theme: String(it.theme || "").slice(0, 40), priced: !!p && rate !== null, priceSource: lq ? [lq.source || "provider quote", lq.timestamp].filter(Boolean).join(" as of ") : p ? "valuation snapshot" : null, dayPct: lq && Number.isFinite(lq.changePercent) ? Math.round(lq.changePercent * 10000) / 100 : null,
+      valUsd: Math.round(valUsd * 100) / 100, costUsd: Number.isFinite(cost) && rate !== null ? Math.round(cost * rate * 100) / 100 : null,
       base: px[tk] && num(px[tk].base), bear: px[tk] && num(px[tk].bear), bull: px[tk] && num(px[tk].bull),
-      px,
+      px: p || null,
     });
-    rows[rows.length - 1].px = p || null;
   }
   const invested = rows.filter((r) => r.tk !== "CASH").reduce((s, r) => s + r.valUsd, 0);
   const cash = rows.filter((r) => r.tk === "CASH").reduce((s, r) => s + r.valUsd, 0);
@@ -81,19 +79,21 @@ async function userContext(userId) {
 // Compact, LLM-friendly text block of the snapshot (the model never sees raw user ids).
 function portfolioBlock(ctx) {
   const lines = [];
+  const partial = ctx.rows.some(r => r.priced === false);
   for (const r of ctx.rows) {
+    const costLabel = r.costUsd == null ? "unknown" : "$" + Math.round(r.costUsd).toLocaleString("en-US");
     let s = r.priced === false
-      ? `${r.tk} — value unknown (no price available right now; cost basis $${Math.round(r.costUsd).toLocaleString("en-US")}), theme ${r.theme || "n/a"}`
-      : `${r.tk} — ${r.weightPct}% of portfolio, value $${Math.round(r.valUsd).toLocaleString("en-US")} (${r.cur}${r.priceSource ? ", " + r.priceSource : ""}${r.dayPct != null ? `, ${r.dayPct >= 0 ? "+" : ""}${r.dayPct}% today` : ""}), cost basis $${Math.round(r.costUsd).toLocaleString("en-US")}, theme ${r.theme || "n/a"}`;
+      ? `${r.tk} — value unknown (price or currency conversion unavailable; cost basis ${costLabel}), theme ${r.theme || "n/a"}`
+      : `${r.tk} — ${r.weightPct}% of ${partial ? "priced holdings and cash" : "portfolio"}, value $${Math.round(r.valUsd).toLocaleString("en-US")} (${r.cur}${r.priceSource ? ", " + r.priceSource : ""}${r.dayPct != null ? `, ${r.dayPct >= 0 ? "+" : ""}${r.dayPct}% versus previous close` : ""}), cost basis ${costLabel}, theme ${r.theme || "n/a"}`;
     if (r.base != null) {
-      const mos = r.px ? Math.round(((r.base - r.px) / r.px) * 1000) / 10 : null;
-      s += `, last valuation price ${r.px}, base-case intrinsic value ${r.base}, margin of safety ${mos != null ? mos + "%" : "n/a"}, range ${r.bear}–${r.bull}`;
+      const mos = r.px > 0 && r.base > 0 ? Math.round(((r.base - r.px) / r.base) * 1000) / 10 : null;
+      s += `, price used ${r.px}, base-case intrinsic value ${r.base}, margin of safety ${mos != null ? mos + "%" : "n/a"}, range ${r.bear}–${r.bull}`;
     }
     lines.push(s);
   }
   return [
-    `Total portfolio value: ~$${Math.round(ctx.total).toLocaleString("en-US")} (invested $${Math.round(ctx.invested).toLocaleString("en-US")}, cash $${Math.round(ctx.cash).toLocaleString("en-US")}).`,
-    ctx.rows.some((r) => r.priced === false) ? "Some positions have no price right now: their value is unknown and they are left out of the total and the weights." : "All positions are priced from live quotes (or the saved valuation snapshot where noted).",
+    `${partial ? "Priced subtotal" : "Total portfolio value"}: ~$${Math.round(ctx.total).toLocaleString("en-US")} (invested $${Math.round(ctx.invested).toLocaleString("en-US")}, cash $${Math.round(ctx.cash).toLocaleString("en-US")}).`,
+    ctx.demo ? "Simulated sample prices and FX. These figures illustrate the demo portfolio." : partial ? "Some positions lack a price or currency conversion: their value is unknown and they are left out of the total and the weights." : "All positions are priced from live quotes (or the saved valuation snapshot where noted).",
     ctx.valDate ? `Valuation snapshot date: ${ctx.valDate}.` : "No valuation snapshot saved yet.",
     lines.join("\n"),
   ].join("\n");

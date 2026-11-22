@@ -4,7 +4,7 @@
 // Snapshots are stored one document per trading day in pt_av_cache under free/etf/YYYY-MM-DD, shape
 // {date, at, items:{TICKER:{so (millions), nav, asOf, aum, src}}} -- what the page's flEtf() reads.
 const zlib = require("zlib");
-const { cacheGet, cacheGetMany, cacheSet } = require("./_lib");
+const { cacheGet, cacheGetMany, persistJobData } = require("./_lib");
 
 const UA = { "User-Agent": "portfolio-terminal personal-dashboard" };
 const SSGA_FUNDS = ["XLK", "XLC", "XLY", "XLP", "XLV", "XLF", "XLI", "XLE", "XLU", "XLB", "XLRE", "SPY", "XBI"];
@@ -160,8 +160,8 @@ async function runEtf() {
   const { obs, failed } = await fetchAll();
   const existing = await loadDocs();
   const changed = mergeDocs(existing, obs, new Date().toISOString());
-  for (let i = 0; i < changed.length; i += 8) await Promise.all(changed.slice(i, i + 8).map((d) => cacheSet(dayKey(d.date), d)));
-  await cacheSet("free/etf/last", { at: new Date().toISOString(), failed, written: changed.length });
+  for (let i = 0; i < changed.length; i += 8) await Promise.all(changed.slice(i, i + 8).map((d) => persistJobData(dayKey(d.date), d)));
+  await persistJobData("free/etf/last", { at: new Date().toISOString(), failed, written: changed.length });
   return { written: changed.length, failed, funds: Object.keys(obs).length, newest: changed.length ? changed[changed.length - 1].date : null };
 }
 
@@ -176,7 +176,7 @@ async function maybeRefresh(docs) {
   }
   const lock = await cacheGet("free/etf/lock");
   if (lock && Date.now() - lock.fetchedAt < 30 * 60 * 1000) return false;
-  await cacheSet("free/etf/lock", { at: new Date().toISOString() });
+  await persistJobData("free/etf/lock", { at: new Date().toISOString() });
   await runEtf().catch(() => {});
   return true;
 }

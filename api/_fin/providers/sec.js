@@ -88,25 +88,40 @@ const INSTANT = {
 };
 const DAY = 864e5, dur = (f) => (Date.parse(f.end) - Date.parse(f.start)) / DAY;
 
-function series(facts, defs, unit) {
-  for (const [tax, concept] of defs) { const c = facts.facts && facts.facts[tax] && facts.facts[tax][concept]; const u = c && c.units && c.units[unit]; if (u && u.length) return u; }
-  return [];
+// Filers switch concepts over time (NVDA: RevenueFromContractWithCustomerExcludingAssessedTax up to FY2022, Revenues
+// after), so concepts are merged: a period keeps the facts of the first concept in `defs` that reports it, and later
+// concepts only fill periods the earlier ones lack. Returning the first non-empty concept froze such filers in the past.
+// all=true keeps every concept's facts (used for fiscal labels, which come from the earliest filing of a period).
+function series(facts, defs, unit, asOf, all = false) {
+  const out = [], covered = new Set(), span = (f) => (f.start || "") + "|" + f.end;
+  for (const [tax, concept] of defs) { const c = facts.facts && facts.facts[tax] && facts.facts[tax][concept]; const u = c && c.units && c.units[unit]; if (u && u.length) {
+    const available = (asOf ? u.filter(f => f.filed && f.filed <= asOf && f.end <= asOf) : u).filter((f) => !covered.has(span(f)));
+    for (const f of available) out.push(f);
+    if (!all) for (const f of available) covered.add(span(f));
+  } }
+  return out;
 }
 // pick, for each period key, the most recently FILED fact (restatements win)
 function pick(rows, keyOf) { const m = new Map(); for (const f of rows) { const k = keyOf(f); if (k == null) continue; const o = m.get(k); if (!o || f.filed > o.filed) m.set(k, f); } return m; }
 
-function buildStatements(facts, symbol, type) {
+// fy/fp describe the FILING a fact appeared in, not the fact's own period. A later filing repeats prior periods as
+// comparatives with its own fy/fp, so labels must come from the EARLIEST filing for that period end.
+function pickFirst(rows, keyOf) { const m = new Map(); for (const f of rows) { const k = keyOf(f); if (k == null) continue; const o = m.get(k); if (!o || f.filed < o.filed) m.set(k, f); } return m; }
+
+function buildStatements(facts, symbol, type, asOf) {
   const annual = type === "annual", lo = annual ? 340 : 80, hi = annual ? 390 : 100, forms = annual ? /^(10-K|10-K\/A)$/ : /^(10-Q|10-Q\/A)$/;
   const flows = {}, ps = {}, sh = {};
-  for (const [k, d] of Object.entries(FLOW)) flows[k] = pick(series(facts, d, "USD").filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
-  for (const [k, d] of Object.entries(PERSHARE)) ps[k] = pick(series(facts, d, "USD/shares").filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
-  for (const [k, d] of Object.entries(SHARES)) sh[k] = pick(series(facts, d, "shares").filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(FLOW)) flows[k] = pick(series(facts, d, "USD", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(PERSHARE)) ps[k] = pick(series(facts, d, "USD/shares", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(SHARES)) sh[k] = pick(series(facts, d, "shares", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   const inst = {};
-  for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, "USD").filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, "USD", asOf).filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
   const anchor = flows.revenue.size ? flows.revenue : flows.netIncome;
+  const anchorDef = flows.revenue.size ? FLOW.revenue : FLOW.netIncome;
+  const labels = pickFirst(series(facts, anchorDef, "USD", asOf, true).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   const ends = [...anchor.keys()].sort().reverse().slice(0, annual ? 12 : 16), name = facts.entityName || null, cik = facts.cik ? String(facts.cik) : null, out = [];
   for (const end of ends) {
-    const a = anchor.get(end), row = { symbol, name, cik, period: end, periodType: annual ? "annual" : "quarterly", fiscalYear: a.fy || null, fiscalPeriod: a.fp || null, periodStart: a.start, periodEnd: end,
+    const a = anchor.get(end), lb = labels.get(end) || a, row = { symbol, name, cik, period: end, periodType: annual ? "annual" : "quarterly", fiscalYear: lb.fy || null, fiscalPeriod: lb.fp || null, periodStart: a.start, periodEnd: end,
       filingDate: a.filed, form: a.form, accession: a.accn, source: "SEC EDGAR" };
     for (const k of Object.keys(flows)) { const f = flows[k].get(end); if (f) row[k] = f.val; }
     for (const k of Object.keys(ps)) { const f = ps[k].get(end); if (f) row[k] = f.val; }
@@ -115,18 +130,20 @@ function buildStatements(facts, symbol, type) {
     row.totalDebt = (row.debtLT != null || row.debtCur != null) ? (row.debtLT || 0) + (row.debtCur || 0) : null;
     row.capex = row.capex != null ? Math.abs(row.capex) : null;
     if (row.da != null && row.operatingIncome != null) row.ebitda = row.operatingIncome + row.da;
-    const st = S.statement(row); st.derived = []; if (row.da != null) st.derived.push("ebitda"); if (a.fp) st.fiscalPeriod = a.fp; out.push(st);
+    const st = S.statement(row); st.derived = []; if (row.da != null) st.derived.push("ebitda"); if (lb.fp) st.fiscalPeriod = lb.fp; out.push(st);
   }
   return out;
 }
 
+// Bump when buildStatements output changes, so rows normalized by older code (up to 7 days in the shared cache) are ignored.
+const STATEMENT_SCHEMA = "v3-merged-concepts";
 // Statements are cached by the latest accession number, so they live until a new filing appears.
-async function statements(symbol, { type = "annual" } = {}) {
+async function statements(symbol, { type = "annual", asOf } = {}) {
   const cik = await cikFor(symbol); if (!cik) return [];
   const sub = await submissions(cik).catch(() => null);
   const latest = sub && sub.filings && sub.filings.recent && (sub.filings.recent.accessionNumber || [])[0] || "na";
-  const { value } = await cacheFetch("statements", `${cik}/${type}/${latest}`, async () => buildStatements(await companyFacts(cik), String(symbol).toUpperCase(), type), { shared: true });
+  const { value } = await cacheFetch("statements", `${STATEMENT_SCHEMA}/${cik}/${type}/${latest}/${asOf || "latest"}`, async () => buildStatements(await companyFacts(cik), String(symbol).toUpperCase(), type, asOf), { shared: true });
   return value;
 }
 
-module.exports = { name, configured: () => true, license: "Public domain (US government). Declared User-Agent required.", directory, cikFor, submissions, companyFacts, profile, filings, statements, buildStatements };
+module.exports = { STATEMENT_SCHEMA, name, configured: () => true, license: "Public domain (US government). Declared User-Agent required.", directory, cikFor, submissions, companyFacts, profile, filings, statements, buildStatements };

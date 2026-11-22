@@ -54,6 +54,18 @@ function beta(asset, market) {
   for (let i = 0; i < n; i++) { cov += (a[i] - ma) * (m[i] - mm); vr += (m[i] - mm) ** 2; }
   return vr > 0 ? safe(cov / vr) : null;
 }
+function betaFromBars(assetBars, marketBars) {
+  const prices = new Map(marketBars.map(bar => [String(bar[0]).slice(0, 10), bar[4]]));
+  const asset = [], market = [];
+  for (const bar of assetBars) {
+    const price = prices.get(String(bar[0]).slice(0, 10));
+    if (ok(bar[4], price) && bar[4] > 0 && price > 0) {
+      asset.push(bar[4]);
+      market.push(price);
+    }
+  }
+  return beta(returnsFrom(asset), returnsFrom(market));
+}
 function sharpe(returns, riskFreeAnnual = 0, periodsPerYear = 252) {
   if (returns.length < 2) return null; const ex = returns.map((r) => r - riskFreeAnnual / periodsPerYear), s = stdev(ex);
   return s > 0 ? safe((mean(ex) / s) * Math.sqrt(periodsPerYear)) : null;
@@ -72,15 +84,30 @@ function portfolioAllocation(positions) {
     concentrationHHI: total ? rows.reduce((s, p) => s + (p.value / total) ** 2, 0) : null };
 }
 function portfolioReturn(positions) {
-  let value = 0, cost = 0, day = 0;
-  for (const p of positions) { if (!ok(p.quantity, p.price)) continue; const v = p.quantity * p.price; value += v; if (fin(p.costBasis)) cost += p.costBasis; if (fin(p.previousClose)) day += p.quantity * (p.price - p.previousClose); }
-  return { value, cost: cost || null, pnl: cost ? value - cost : null, returnFraction: cost > 0 ? value / cost - 1 : null, dayChange: day, dayChangeFraction: value - day > 0 ? day / (value - day) : null };
+  const sum = (field, scale = false) => {
+    if (!positions.every(p => fin(p[field]) && (!scale || fin(p.quantity)))) return null;
+    return positions.reduce((total, p) => total + p[field] * (scale ? p.quantity : 1), 0);
+  };
+  const value = sum("price", true), cost = sum("costBasis"), prior = sum("previousClose", true);
+  const pnl = ok(value, cost) ? value - cost : null;
+  const dayChange = ok(value, prior) ? value - prior : null;
+  return { value, cost, pnl, returnFraction: fin(pnl) && cost > 0 ? pnl / cost : null,
+    dayChange, dayChangeFraction: fin(dayChange) && prior > 0 ? dayChange / prior : null };
 }
-// Trailing-twelve-month sum over the latest four quarterly rows (newest first or last: sorted here by period).
-function ttm(rows, field) { const q = rows.filter((r) => r && fin(r[field])).sort((a, b) => (a.period < b.period ? 1 : -1)).slice(0, 4); return q.length === 4 ? q.reduce((s, r) => s + r[field], 0) : null; }
+
+// Never bridge a missing quarter or add the same fiscal period twice.
+function ttm(rows, field) {
+  const q = rows.filter(r => r && r.period).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 4);
+  if (q.length !== 4 || !q.every(r => fin(r[field]) && Number.isFinite(Date.parse(r.period)))) return null;
+  for (let i = 1; i < q.length; i++) {
+    const days = (Date.parse(q[i - 1].period) - Date.parse(q[i].period)) / 86400000;
+    if (days < 75 || days > 105) return null;
+  }
+  return q.reduce((total, r) => total + r[field], 0);
+}
 
 // A calculation packaged with what an evidence trail needs: the value, its unit, the formula and the exact inputs.
 const result = (name, value, unit, formula, inputs) => ({ name, value: safe(value), unit, kind: "calculated", formula, inputs });
 
 module.exports = { cagr, growth, yoy, qoq, margin, roe, roic, investedCapital, debtToEquity, currentRatio, interestCoverage, enterpriseValue, pe, earningsYield, fcfYield, evToEbitda, priceToSales, priceToBook, peg,
-  costOfEquity, wacc, dcf, returnsFrom, volatility, beta, sharpe, drawdown, maxDrawdown, totalReturn, portfolioAllocation, portfolioReturn, ttm, mean, stdev, result };
+  costOfEquity, wacc, dcf, returnsFrom, volatility, beta, betaFromBars, sharpe, drawdown, maxDrawdown, totalReturn, portfolioAllocation, portfolioReturn, ttm, mean, stdev, result };

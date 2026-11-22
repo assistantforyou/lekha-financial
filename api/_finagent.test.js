@@ -22,3 +22,7 @@ const rag = require("./_fin/rag"), doc = rag.docText("holdings/all", { items: [{
 assert.ok(/NVDA.*price not stored/.test(doc) && !/last price \$0\b/.test(doc) && !/-100\.00%/.test(doc) && /CASH.*value \$12,000/.test(doc));
 assert.strictEqual(A.staleZero("NVDA (Semis, USD): 60 units at cost $3,994.2, last price $0, value $0, unrealized P&L -100.00%, account Demo."), "NVDA (Semis, USD): 60 units at cost $3,994.2, price not stored, account Demo.");
 console.log("_finagent.test.js ok");
+
+assert.deepEqual(A.checkNumbers({text:"Price is 18450 USD", evidence:["E1"]}, byId), [18450]);
+assert.deepEqual(A.checkNumbers({text:"Price rose 3.25%", evidence:["E1"]}, byId), [3.25]);
+assert.deepEqual(A.checkNumbers({text:"Revenue was 130.5 million", evidence:["E2"]}, byId), [130.5]);

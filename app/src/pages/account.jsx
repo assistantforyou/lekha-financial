@@ -1,3 +1,4 @@
+import { ReleasePolicies } from "../components/ReleasePolicies"
 import { useEffect, useRef, useState } from "react"
 import { AlertTriangle, Check, CircleHelp, Download, LogOut, RefreshCw, Upload } from "lucide-react"
 import { ui } from "@/tour/copy"
@@ -36,6 +37,7 @@ function AuthForms() {
   return (<Card><CardHeader><CardTitle>{mode === "login" ? "Sign in" : mode === "signup" ? "Create your free account" : "Reset your password"}</CardTitle><CardDescription>{isDemo() ? "You are exploring the demo. An account keeps your own holdings, watchlist, layout and settings on every device and switches to real market data." : "Use your email and password."}</CardDescription></CardHeader>
     <form onSubmit={submit}><CardContent className="space-y-3"><Field label="Email" id="auth-email"><Input id="auth-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
       {mode !== "recover" && <Field label="Password" id="auth-pw" hint={mode === "signup" ? "8 to 72 characters." : undefined}><Input id="auth-pw" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} maxLength={72} value={pw} onChange={(e) => setPw(e.target.value)} /></Field>}
+      {mode === "signup" && <ReleasePolicies />}
       {msg && <Alert variant={msg.ok ? "success" : "destructive"}><AlertDescription>{msg.t}</AlertDescription></Alert>}</CardContent>
       <CardFooter className="flex-wrap"><Button type="submit" disabled={busy}>{busy ? "One moment…" : mode === "login" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset link"}</Button>
         {mode !== "login" && <Button type="button" variant="ghost" onClick={() => setMode("login")}>Have an account? Sign in</Button>}{mode === "login" && <><Button type="button" variant="outline" onClick={() => setMode("signup")}>Create account</Button><Button type="button" variant="ghost" onClick={() => setMode("recover")}>Forgot password?</Button></>}</CardFooter></form></Card>)
@@ -85,11 +87,11 @@ const PRICE = { demo: "Free", free: "Free", paid: "฿699/mo", premium: "฿1,29
 const TIERS = [
   {
     id: "demo", name: "Demo", tagline: "Everything unlocked, no account.",
-    body: "Open the full terminal with every panel switched on. The portfolio is a deterministic sample and every price, filing and AI answer is computed from that sample data in this browser — nothing is saved, nothing is sent to an account, and nothing is billed.",
+    body: "Open the full terminal with every panel switched on. Explore a sample portfolio and pre-written Council reports. Some research screens retrieve historical market data from the server. An account is required to save a personal portfolio to the service.",
     points: [
       ["Whole app, no sign-up", "All portfolio, research, sector, macro, simulation, council and analyst screens are available immediately."],
-      ["Premium AI features included", "Ask the analyst, the daily briefing, the five-perspective council and the 1M-path simulation engine all run in the demo."],
-      ["Sample data, real maths", "Quotes, fundamentals and history come from a fixed simulated dataset; every ratio, weight, P&L and simulation is calculated from it with the same code the paid tiers use."],
+      ["Council samples and simulations", "Explore pre-written Council reports and run Monte Carlo simulations with the sample portfolio."],
+      ["Sample data, real maths", "Portfolio panels use sample inputs. Data-source labels and observation dates identify the inputs used on research screens."],
       ["Nothing persisted", "Holdings, layouts and settings stay in this browser only, and reset whenever you clear site data."],
     ],
   },
@@ -120,17 +122,17 @@ const TIERS = [
     body: "Everything in Paid plus the AI layer: a portfolio analyst you can question, a daily briefing written from your holdings, the five-perspective LLM council with a CEO synthesis, and the full 1M-path simulation engine.",
     points: [
       ["AI investment analyst", "Ask about positions, concentration, drawdowns or what would change the view, and get an answer computed from your live weights and history — plus a briefing every day."],
-      ["LLM council", "Five independent perspectives on one question, then a CEO synthesis that names the disagreements. Saved as a report you can reread."],
-      ["1B simulation engine", "Up to one million Monte Carlo paths on worker threads: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
+      ["LLM council", "One model writes five role-based perspectives and a CEO synthesis in the same response. Saved as a report you can reread."],
+      ["Monte Carlo simulation engine", "Up to one million Monte Carlo paths per run for up to 25 invested holdings: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
       ["Advanced stress testing", "The full scenario library plus custom shocks on rates, sectors and factors, applied to your real weights."],
-      ["80 AI research questions a day", "Roughly three times the Paid allowance across the analyst, research agent and council."],
+      ["80 AI research questions a day", "The research and expert modes share this allowance. Portfolio questions, briefings and Council reports have separate limits."],
       ["Everything in Paid", "Unlimited holdings, full history, unlimited valuation coverage and every advanced indicator."],
     ],
   },
 ]
 export function Plans({ item, navigate, me }) {
   const sess = useSession(), signedIn = !!(sess && sess.access_token) && !isDemo(), cur = signedIn ? (me ? me.tier : "free") : "demo", [busy, setBusy] = useState(null), qs = new URLSearchParams(location.search), billing = qs.get("billing")
-  useEffect(() => { if (billing) { try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {} if (billing === "success") { toast.success("Payment received. Your plan switches on as soon as Stripe confirms it."); setTimeout(() => location.reload(), 4500) } else toast("Checkout cancelled. Nothing was charged.") } }, [])
+  useEffect(() => { if (billing) { try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {} if (billing === "success") { toast.success("Checkout returned. Your account updates when Stripe confirms the subscription."); setTimeout(() => location.reload(), 4500) } else toast("Checkout cancelled. Nothing was charged.") } }, [])
   const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   const manage = async () => { setBusy("portal"); try { const j = await A.portal(); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
@@ -147,9 +149,9 @@ export function Plans({ item, navigate, me }) {
           <p className="ml-6 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{detail}</p>
         </div>)}
       </CardContent>
-      <CardFooter className="pt-0">{t.id === "demo" ? (cur !== "demo" ? <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button> : <span className="text-[12.5px] text-muted-foreground">You are in the demo. Everything is already unlocked.</span>) : t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
-    {signedIn && me && me.tier !== "free" && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · renews {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button></CardContent></Card>}
-    <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. The demo needs no account; entitlements for paid tiers are enforced on the server.</p></div>)
+      <CardFooter className="pt-0">{t.id === "demo" ? (cur !== "demo" ? <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button> : <span className="text-[12.5px] text-muted-foreground">You are in the demo. Everything is already unlocked.</span>) : t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => cur === "paid" ? manage() : go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
+    {signedIn && me?.can_manage_billing && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · period ends {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button>{["past_due", "unpaid", "incomplete"].includes(me.sub_status) && <Alert className="basis-full"><AlertTriangle className="size-4" /><AlertTitle>Payment not received</AlertTitle><AlertDescription>The latest charge for your subscription failed, so paid features are paused. Update the card in Manage subscription; access returns as soon as Stripe confirms the payment.</AlertDescription></Alert>}</CardContent></Card>}
+    <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. Investment values can fall. Data may be delayed, and projections are hypothetical.</p><ReleasePolicies /></div>)
 }
 
 /* ---------------- Dashboard layout (the classic layout editor, framed) ---------------- */
@@ -168,7 +170,7 @@ export function Layout({ item }) {
 /* ---------------- Knowledge base (pgvector) ---------------- */
 const kbJson = (r) => r.json().catch(() => ({}))
 const kbCall = (body) => (window.PT_AUTH && PT_AUTH.fetch ? PT_AUTH.fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) : fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).then(kbJson)
-const kbLocalHoldings = () => { try { return JSON.parse(localStorage.getItem((window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.") + "db.holdings/all") || "null") } catch (e) { return null } }
+const kbLocalHoldings = () => { try { return JSON.parse(localStorage.getItem((window.PT_STORAGE_NS) + "db.holdings/all") || "null") } catch (e) { return null } }
 function KnowledgeBase() {
   const demo = isDemo(), [st, set] = useState({ status: "loading" }), [busy, setBusy] = useState(null), did = useRef(false)
   const load = async () => { try { const j = await kbCall({ action: "status" }); set({ status: "ok", data: j }) } catch (e) { set({ status: "error", error: errMsg(e) }) } }

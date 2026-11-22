@@ -9,6 +9,10 @@ module.exports = async (req, res) => {
   const secret = process.env.CRON_SECRET;
   const got = String(req.headers.authorization || "").replace(/^Bearer /, "");
   if (!secret || !got || !same(got, secret)) return res.status(401).json({ error: "unauthorized" });
-  try { return res.status(200).json({ etf: await runEtf() }); }
-  catch (e) { return res.status(500).json({ error: "job_failed" }); }
+  try {
+    const etf = await runEtf();
+    if (!etf.funds && etf.failed?.length) throw new Error("All ETF sources failed");
+    return res.status(200).json({ etf });
+  }
+  catch { console.error(JSON.stringify({ event: "scheduled_refresh_failed", job: "flows" })); return res.status(500).json({ error: "job_failed" }); }
 };

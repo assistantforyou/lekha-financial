@@ -33,14 +33,14 @@ async function build(k) {
 }
 module.exports = async (req, res) => {
   const k = String((req.query && req.query.k) || "");
-  if (!TTL[k]) return res.status(404).json({ error: "Unknown dataset." });
+  if (!Object.hasOwn(TTL, k)) return res.status(404).json({ error: "Unknown dataset." });
   res.setHeader("Cache-Control", "no-store");
   const hit = mem.get(k);
   if (!(hit && Date.now() - hit.at < TTL[k])) {
     // only people who actually need a fresh build count against the limit; everything else is served from the shared cache
     if (!(await rateHit(`rl/demo/${clientId(req)}/${Math.floor(Date.now() / 6e5)}`, 120))) return res.status(429).json({ error: "Too many requests." });
     if (!flight.has(k)) flight.set(k, build(k).then((r) => { if (r && r.code === 200) mem.set(k, { at: Date.now(), r }); flight.delete(k); return r; }, () => { flight.delete(k); return { code: 502, empty: true }; }));
-    var out = mem.get(k) ? mem.get(k).r : await flight.get(k);
+    var out = await flight.get(k);
   } else out = hit.r;
   res.setHeader("Cache-Control", `public, s-maxage=${Math.max(2, Math.floor(TTL[k] / 2000))}, stale-while-revalidate=${Math.floor(TTL[k] / 1000)}`);
   if (!out || out.code !== 200 || out.empty) return res.status(out && out.code === 200 ? 204 : 502).end();

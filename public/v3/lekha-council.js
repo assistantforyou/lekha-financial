@@ -13,8 +13,19 @@ const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":
 const icon = (p) => `<svg viewBox="0 0 24 24" class="cn-ic" aria-hidden="true">${p}</svg>`;
 const reduce = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isLive = () => !window.PT_DEMO_MODE && window.PT_TIER === "premium";
-const nsKey = () => (window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.") + "v3.council";
-const store = { get() { try { return JSON.parse(localStorage.getItem(nsKey()) || "[]"); } catch (e) { return []; } }, add(r) { try { const a = store.get(); a.unshift(r); localStorage.setItem(nsKey(), JSON.stringify(a.slice(0, 20))); } catch (e) {} } };
+const store = {
+  get() {
+    return window.PT_SYNC.keys().filter(key => key.startsWith("reports/"))
+      .map(key => JSON.parse(localStorage.getItem(window.PT_STORAGE_NS + "db." + key)))
+      .filter(r => r && r.ceo).sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+  },
+  async add(report) {
+    const key = "reports/" + crypto.randomUUID();
+    localStorage.setItem(window.PT_STORAGE_NS + "db." + key, JSON.stringify(report));
+    window.PT_SYNC.touch(key);
+    return window.PT_SYNC.flush();
+  },
+};
 
 let host, demo = null, st = { phase: "idle", report: null, err: null, q: "", scope: "portfolio", shown: 0, timers: [] };
 
@@ -72,11 +83,16 @@ function board() {
   <div class="cn-grid">${LENSES.map((L, i) => card(L, P && P[L[0]], status(i), isDemo)).join("")}</div>${links(st.shown)}
   <div class="cn-ceo ${ceoOn ? "on" : ""}">${icon(CEO_ICON)}<b>THE CEO</b>${ceoOn ? `<span class="cn-verdict v-${esc((r.ceo.verdict || "").split(" ")[0].toLowerCase())}">${esc(r.ceo.verdict)}</span>` : `<span>${st.phase === "error" ? "No verdict" : "Synthesising…"}</span>`}</div>
   ${ceoOn ? report(r) : ""}`;
-  el.querySelectorAll(".cn-card[data-l]").forEach((c) => (c.onclick = (e) => { if (e.target.closest("a")) return; c.classList.toggle("open"); c.setAttribute("aria-expanded", c.classList.contains("open")); }));
+  el.querySelectorAll('.cn-card[role="button"]').forEach((card) => {
+    card.onclick = () => card.setAttribute("aria-expanded", card.classList.toggle("open"));
+    card.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); card.click(); }
+    };
+  });
 }
 function card(L, p, status, isDemo) {
   const [k, n, name, role, q, ic] = L, s = { idle: "Standing by", queued: "Queued", working: "Analysing", done: p ? p.stance : "", failed: "Unavailable" }[status];
-  return `<div class="cn-card ${status} ${p && status === "done" ? "st-" + esc(p.stance) : ""}" data-l="${k}" role="button" tabindex="0" aria-expanded="false">
+  return `<div class="cn-card ${status} ${p && status === "done" ? "st-" + esc(p.stance) : ""}" data-l="${k}" ${p && status === "done" ? 'role="button" tabindex="0" aria-expanded="false"' : ''}>
     <div class="cn-top">${icon(ic)}<span class="cn-n">JUDGE ${n}</span><span class="cn-st">${esc(s)}</span></div><b class="cn-name">${name}</b><span class="cn-role">${role}</span>
     ${p && status === "done" ? `<p class="cn-head">${esc(p.headline)}</p><div class="cn-more"><h4>${esc(q)}</h4><ul>${(p.points || []).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>${(p.risks || []).length ? `<h4>Risks to this view</h4><ul>${p.risks.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div><span class="cn-x">Details</span>` : `<p class="cn-q">${esc(q)}</p>`}</div>`;
 }
@@ -89,7 +105,7 @@ function report(r) {
   const P = (x) => (x ? `<p>${esc(x)}</p>` : ""), UL = (a) => (a && a.length ? `<ul>${a.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "");
   const agree = UL(c.agree), dissent = c.dissent && c.dissent.length ? `<ul>${c.dissent.map((d) => `<li><b>${esc(d.lens)}:</b> ${esc(d.reason)}</li>`).join("")}</ul>` : "<p>No material dissent recorded.</p>";
   return `<article class="cn-report"><header><p class="sim-eyebrow">LEKHA INVESTMENT INTELLIGENCE REPORT</p><h3>${esc(r.question)}</h3>
-    <p class="note">Scope: ${esc(r.scope === "portfolio" ? "whole portfolio" : r.scope)} · ${isDemo ? `sample report` : `generated ${esc((m.generatedAt || "").slice(0, 16).replace("T", " "))} UTC · ${m.cached ? "cached answer" : "1 model request"}${m.retries ? ` (${m.retries} transport retr${m.retries > 1 ? "ies" : "y"})` : ""}${m.fallback ? ` · ${esc(m.fallback)}` : ""}`}</p></header>
+    <p class="note">Scope: ${esc(r.scope === "portfolio" ? "whole portfolio" : r.scope)} · ${isDemo ? `sample report` : `generated ${esc((m.generatedAt || "").slice(0, 16).replace("T", " "))} UTC · ${m.cached ? "cached answer" : (m.llmRequests ? m.llmRequests + " model request" + (m.llmRequests === 1 ? "" : "s") : "generated report")}${m.retries ? ` (${m.retries} transport retr${m.retries > 1 ? "ies" : "y"})` : ""}${m.fallback ? ` · ${esc(m.fallback)}` : ""}`}</p></header>
     <div class="cn-exec"><span class="cn-verdict v-${esc((c.verdict || "").split(" ")[0].toLowerCase())}">${esc(c.verdict)}</span>${P(c.executive)}</div>
     <div class="cn-cols">${sec("Investment thesis", P(c.thesis))}${sec("Valuation assessment", P(c.valuation))}${sec("Bull case", P(c.bullCase))}${sec("Bear case", P(c.bearCase))}${sec("Portfolio implications", P(c.portfolio))}${sec("Council consensus", (agree ? "<h5>Agreement</h5>" + agree : "") + "<h5>Dissent</h5>" + dissent)}${sec("Confidence & evidence quality", P(c.evidenceQuality) + UL(c.limitations))}</div>
     <div class="cn-final"><h4>Final CEO verdict</h4>${P(c.final)}</div>
@@ -163,7 +179,7 @@ function playDemo(id) {
 async function convene() {
   if (!isLive()) return; /* never call the model outside Premium; the server enforces this too */
   const q = host.querySelector("#cn-q").value.trim(), scope = host.querySelector("#cn-scope").value;
-  if (q.length < 3) { st.err = "Type a research question first."; board(); return; }
+  if (q.length < 3) { st.phase = "error"; st.report = null; st.err = "Type a research question first."; board(); return; }
   clearTimers(); st.q = q; st.scope = scope; st.err = null; st.report = null; st.phase = "session"; board();
   host.querySelector("#cn-go").disabled = true;
   try {
@@ -171,7 +187,11 @@ async function convene() {
     const r = await PT_AUTH.fetch("/api/ai/council-v3", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, scope, evidence: evidence(), lang }) });
     const j = await r.json().catch(() => null);
     if (!r.ok || !j || !j.ceo) throw new Error((j && j.error) || "The council could not answer right now.");
-    st.report = { ...j, question: q, scope }; st.phase = "done"; store.add({ ...st.report, savedAt: new Date().toISOString() });
+    st.report = { ...j, question: q, scope }; st.phase = "done"; st.saveNote = "";
+    try {
+      const result = await store.add({ ...st.report, savedAt: new Date().toISOString() });
+      if (!result.ok) st.saveNote = "Saved in this browser. Account sync is pending.";
+    } catch { st.saveNote = "Unable to save this report. Keep this tab open."; }
     /* the saved report also becomes retrieval material for the research agent (owner-scoped) */
     try {
       const c = st.report.ceo || {}, P = st.report.perspectives || {};
@@ -188,7 +208,7 @@ async function convene() {
 function reports() {
   const el = document.getElementById("lekha-reports"); if (!el) return;
   const saved = store.get(), samples = (demo && demo.scenarios) || [];
-  el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">Live reports are kept in this browser (last 20). Samples show what a report looks like.</span></div>
+  el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">${esc(st.saveNote || "Your saved live reports sync to your account.")}</span></div>
     ${saved.length ? `<ul class="cn-list">${saved.map((r, i) => `<li><button class="btn" data-rep="${i}">${esc(r.ceo && r.ceo.verdict)} · ${esc(r.question)}</button><span class="note">${esc((r.savedAt || "").slice(0, 10))}</span></li>`).join("")}</ul>` : `<p class="note">No live Council reports yet${isLive() || window.PT_DEMO_MODE ? "." : " — live reports are a Premium feature."}</p>`}
     <h3>Sample reports</h3><ul class="cn-list">${samples.map((s) => `<li><button class="btn" data-sample="${esc(s.id)}">${esc(s.ceo.verdict)} · ${esc(s.question)}</button></li>`).join("")}</ul></section>`;
   el.querySelectorAll("[data-rep]").forEach((b) => (b.onclick = () => { clearTimers(); st.report = saved[+b.dataset.rep]; st.q = st.report.question; st.phase = "done"; st.shown = LENSES.length + 1; window.LEKHA_SHELL.go("analysis/council"); frame(); }));

@@ -116,16 +116,32 @@ async function plan(question, symbols, llm) {
 }
 
 // ---------- evidence + verification ----------
-const NUM = /-?\d[\d,]*\.?\d*/g;
-function numbersIn(text) { return (String(text).replace(/[$€£]/g, "").match(NUM) || []).map((x) => parseFloat(x.replace(/,/g, ""))).filter((x) => Number.isFinite(x)); }
-function evidenceNumbers(ev) { const set = []; for (const l of ev.lines) set.push(...numbersIn(l)); return set; }
-const close = (a, b) => Math.abs(a - b) <= Math.max(0.011, Math.abs(b) * 0.006);
-function checkNumbers(claim, byId) {
-  const nums = numbersIn(claim.text).filter((n) => !(Number.isInteger(n) && n >= 1900 && n <= 2100) && Math.abs(n) >= 0.01); if (!nums.length) return [];
-  const pool = claim.evidence.flatMap((id) => (byId[id] ? evidenceNumbers(byId[id]) : [])), bad = [];
-  for (const n of nums) if (!pool.some((p) => close(p, n) || close(p * 100, n) || close(p / 1e9, n) || close(p / 1e6, n) || close(Math.abs(p), Math.abs(n)))) bad.push(n);
-  return bad;
+function numbersIn(text) {
+  return (String(text).replace(/[$€£]/g, "").match(/-?\d[\d,]*\.?\d*/g) || [])
+    .map(x => parseFloat(x.replace(/,/g, ""))).filter(Number.isFinite);
 }
+
+// Compare figures in the units actually written. A bare price cannot become a percentage or a billion.
+function figures(text) {
+  const source = String(text).replace(/\bE\d+\b/g, "");
+  const values = [];
+  for (const match of source.matchAll(/[-+−]?\d[\d,]*(?:\.\d+)?(?:\s*(%|percent\b|billion\b|million\b|trillion\b|thousand\b|[BMKT]\b))?/gi)) {
+    const raw = Number.parseFloat(match[0].replace(/,/g, "").replace("−", "-"));
+    const suffix = (match[1] || "").toLowerCase();
+    const multiplier = {b:1e9, billion:1e9, m:1e6, million:1e6, t:1e12, trillion:1e12, k:1e3, thousand:1e3}[suffix] || 1;
+    const prefix = source.slice(0, match.index);
+    if (!suffix && raw >= 1900 && raw <= 2100 && !/[$€£]\s*$/.test(prefix)) continue;
+    const falling = /(?:fell|declined|down|lost|decreased|dropped)(?: by)?\s*$/i.test(prefix);
+    values.push({raw, value:(falling ? -Math.abs(raw) : raw) * multiplier, percent:suffix === "%" || suffix === "percent"});
+  }
+  return values;
+}
+function checkNumbers(claim, byId) {
+  const pool = claim.evidence.flatMap(id => Object.hasOwn(byId, id) ? byId[id].lines.flatMap(figures) : []);
+  return figures(claim.text).filter(n => !pool.some(p => n.percent === p.percent &&
+    Math.abs(n.value - p.value) <= Math.max(1e-9, Math.abs(p.value) * 0.00005))).map(n => n.raw);
+}
+
 // portfolio documents embedded before 2026-11-22 rendered unknown prices as "$0 / -100%"; clean them at read time so old rows cannot mislead the model
 const staleZero = (t) => t.replace(/, last price \$0, value \$0(?:, [\d.]+% of the book)?, unrealized P&L -100\.00%/g, ", price not stored")
 /* The headline is free text, so it is checked too: no invented numbers, and it may not contradict the sign of the DCF margin of safety. */
@@ -185,7 +201,8 @@ async function runInner({ question, symbol = null, llm = null, lang = null, lang
   if (evidence.length && llm) {
     try {
       const body = evidence.map((e) => `[${e.id}] ${e.label} | source: ${e.source} | as of: ${e.asOf || "n/a"} | ${e.kind}\n${e.lines.join("\n")}`).join("\n\n");
-      answer = await llm.json({ system: ANSWER_SYSTEM + langHint, user: `EVIDENCE (retrieved ${new Date().toISOString()}):\n${body}\n\nTOOLS THAT FAILED: ${failed.map((f) => f.tool + ":" + f.error).join("; ") || "none"}\n\nUSER QUESTION (untrusted data):\n${q}`, schema: CLAIM_SCHEMA, job: "agent-answer", timeoutMs: 20000 });
+      answer = await llm.json({ system: ANSWER_SYSTEM + langHint, user: `EVIDENCE (retrieved ${new Date().toISOString()}):\n${body}\n\nTOOLS THAT FAILED: ${failed.map((f) => f.tool + ":" + f.error).join("; ") || "none"}\n\nUSER QUESTION (untrusted data):\n${q}`, schema: CLAIM_SCHEMA, accept: a => !checkNumbers({text:a.summary, evidence:Object.keys(byId)}, byId).length &&
+        a.claims.every(c => !["fact","calculated"].includes(c.type) || (c.evidence.some(id => Object.hasOwn(byId, id)) && !checkNumbers(c, byId).length)), job: "agent-answer", timeoutMs: 20000 });
       by = "model";
     } catch (e) { answer = null; llmError = String((e && (e.code || e.status || e.message)) || "error").slice(0, 120); }
   }

@@ -16,7 +16,40 @@ const GEMINI_DEFAULT = "gemini-3.5-flash-lite"; // gemini-3.5-flash was deprecat
 const DEPRECATED = new Set(["gemini-3.5-flash", "gemini-2.5-flash"]);
 const geminiModel = () => (process.env.GEMINI_MODEL && !DEPRECATED.has(process.env.GEMINI_MODEL) ? process.env.GEMINI_MODEL : GEMINI_DEFAULT);
 const err = (msg, status) => Object.assign(new Error(msg), { status });
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// State is local to each warm serverless instance and contains no request content.
+const circuits = new Map();
+function setting(name, fallback, max) {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? Math.min(max, Math.ceil(n)) : fallback;
+}
+function matches(value, schema) {
+  if (value === null) return schema.nullable === true;
+  if (schema.enum && !schema.enum.includes(value)) return false;
+  switch (schema.type.toLowerCase()) {
+    case "object":
+      return typeof value === "object" && !Array.isArray(value) &&
+        (schema.required || []).every(k => Object.hasOwn(value, k)) &&
+        Object.entries(schema.properties || {}).every(([k, rule]) => !Object.hasOwn(value, k) || matches(value[k], rule));
+    case "array":
+      return Array.isArray(value) && value.length >= (schema.minItems || 0) &&
+        value.length <= (schema.maxItems ?? Infinity) && value.every(v => matches(v, schema.items));
+    case "number": return Number.isFinite(value);
+    case "integer": return Number.isSafeInteger(value);
+    case "string": return typeof value === "string";
+    case "boolean": return typeof value === "boolean";
+    default: return false;
+  }
+}
+function hasContent(value) {
+  if (typeof value === "string") return !!value.trim();
+  if (value && typeof value === "object") return Object.values(value).some(hasContent);
+  return value != null;
+}
+function readAnswer(text, schema) {
+  const value = stripPictographs(parseJsonLoose(text));
+  if (!matches(value, schema) || !hasContent(value)) throw err("invalid_response", 502);
+  return value;
+}
 
 // Gemini's OpenAPI-subset schema (uppercase types, nullable) -> plain JSON Schema for prompts / OpenAI-style APIs.
 function toJsonSchema(s) {
@@ -55,54 +88,55 @@ function stripPictographs(v) {
 
 async function timed(url, init, timeoutMs) {
   const ctl = new AbortController();
+  if (timeoutMs <= 0) throw err("aborted", 502);
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try { return await fetch(url, { ...init, signal: ctl.signal }); }
-  catch (e) { throw Object.assign(err(e && e.name === "AbortError" ? "aborted" : "network", 502), { cause: e && (e.cause && (e.cause.code || e.cause.message) || e.message) }); }
+  try {
+    const response = await fetch(url, { ...init, signal: ctl.signal });
+    const body = await response.json().catch(() => ({}));
+    ctl.signal.throwIfAborted();
+    return { ok: response.ok, status: response.status, body };
+  }
+  catch (e) { throw Object.assign(err(e && e.name === "AbortError" ? "aborted" : "network", 502), { cause: e?.cause?.code || e?.name }); }
   finally { clearTimeout(timer); }
 }
 
-// One Z.ai chat call returning parsed JSON. Retries "overloaded" (code 1305 / 429) a few times.
-async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000, maxTokens, info }) {
+// One Z.ai chat call returning validated JSON.
+async function zaiJson({ job, model, system, content, schema, timeoutMs = 50000, maxTokens }) {
   const key = process.env.ZAI_API_KEY;
   if (!key) throw err("not_configured", 503);
   const sys = system + PRO_STYLE + "\n\nReply with ONE JSON object only, no prose, matching this JSON Schema:\n" + JSON.stringify(toJsonSchema(schema));
-  const deadline = Date.now() + timeoutMs;
-  for (let attempt = 0; ; attempt++) {
-    const left = deadline - Date.now();
-    if (left < 3000) throw err("aborted", 502);
-    if (info) info.retries = attempt;
-    const r = await timed(`${ZAI}/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, temperature: 0.1, thinking: { type: "disabled" }, response_format: { type: "json_object" },
-        ...(maxTokens ? { max_tokens: maxTokens } : {}),
-        messages: [{ role: "system", content: sys }, { role: "user", content }] }),
-    }, left);
-    const j = await r.json().catch(() => ({}));
-    const code = j && j.error && String(j.error.code);
-    if ((r.status === 429 || code === "1305" || code === "1302") && attempt < 4) { await sleep(1500 * (attempt + 1)); continue; }
-    if (!r.ok || j.error) throw err("upstream_" + (code || r.status), r.status === 429 ? 429 : 502);
-    const u = j.usage || {};
-    await logUsage({ service: "Z.ai", job, model, inTok: u.prompt_tokens, outTok: u.completion_tokens });
-    const text = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    if (!text) throw err("empty", 502);
-    return stripPictographs(parseJsonLoose(text));
-  }
+  const end = Date.now() + timeoutMs;
+  const r = await timed(`${ZAI}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model, temperature: 0.1, thinking: { type: "disabled" }, response_format: { type: "json_object" },
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
+      messages: [{ role: "system", content: sys }, { role: "user", content }] }),
+  }, timeoutMs);
+  const j = r.body || {};
+  const code = j && j.error && String(j.error.code);
+  if (!r.ok || j.error) throw err("upstream_" + (code || r.status), r.status === 429 ? 429 : 502);
+  const u = j.usage || {};
+  await logUsage({ timeoutMs: Math.max(1, Math.min(1000, end - Date.now())), service: "Z.ai", job, model, inTok: u.prompt_tokens, outTok: u.completion_tokens });
+  const text = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  if (!text) throw err("empty", 502);
+  return readAnswer(text, schema);
 }
 
 // GLM-OCR: image/PDF -> markdown. Needs a Z.ai balance; callers treat failure as "skip OCR".
-async function zaiOcr({ mime, base64 }) {
+async function zaiOcr({ mime, base64 }, timeoutMs) {
   const key = process.env.ZAI_API_KEY;
   if (!key) throw err("not_configured", 503);
+  const end = Date.now() + timeoutMs;
   const r = await timed(`${ZAI}/layout_parsing`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: "glm-ocr", file: `data:${mime};base64,${base64}` }),
-  }, 40000);
-  const j = await r.json().catch(() => ({}));
+  }, timeoutMs);
+  const j = r.body || {};
   if (!r.ok || j.error || !j.md_results) throw err("ocr_failed", 502);
   const u = j.usage || {};
-  await logUsage({ service: "Z.ai", job: "import-ocr", model: "glm-ocr", inTok: u.prompt_tokens, outTok: u.completion_tokens, extra: { pages: j.data_info && j.data_info.num_pages } });
+  await logUsage({ timeoutMs: Math.max(1, Math.min(1000, end - Date.now())), service: "Z.ai", job: "import-ocr", model: "glm-ocr", inTok: u.prompt_tokens, outTok: u.completion_tokens, extra: { pages: j.data_info && j.data_info.num_pages } });
   return j.md_results;
 }
 
@@ -110,29 +144,21 @@ async function geminiJson({ job, model, system, parts, schema, temperature = 0.1
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw err("not_configured", 503);
   const m = model || geminiModel();
-  const deadline = Date.now() + timeoutMs;
-  let r;
-  for (let attempt = 0; ; attempt++) {
-    const left = deadline - Date.now();
-    if (left < 3000) throw err("aborted", 502);
-    r = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
+  const end = Date.now() + timeoutMs;
+  const r = await timed(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: system + PRO_STYLE }] }, contents: [{ role: "user", parts }],
         generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema, ...(maxTokens ? { maxOutputTokens: maxTokens } : {}) } }),
-    }, left);
-    // overloaded / rate-limited bursts are common on the free tier: wait and retry (twice) instead of failing the file
-    if ((r.status === 429 || r.status === 500 || r.status === 503) && attempt < 2) { await sleep(2000 * (attempt + 1)); continue; }
-    break;
-  }
+    }, timeoutMs);
   if (!r.ok) throw err("upstream_" + r.status, r.status === 429 ? 429 : 502);
-  const j = await r.json();
+  const j = r.body || {};
   const u = j.usageMetadata || {};
-  await logUsage({ service: "Gemini", job, model: m, inTok: u.promptTokenCount, outTok: (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0) });
+  await logUsage({ timeoutMs: Math.max(1, Math.min(1000, end - Date.now())), service: "Gemini", job, model: m, inTok: u.promptTokenCount, outTok: (u.candidatesTokenCount || 0) + (u.thoughtsTokenCount || 0) });
   const p = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-  const t = p && p[0] && p[0].text;
+  const t = Array.isArray(p) && p.filter(part => !part.thought).map(part => part.text || "").join("");
   if (!t) throw err(j.promptFeedback && j.promptFeedback.blockReason ? "blocked" : "empty", 502);
-  return stripPictographs(parseJsonLoose(t));
+  return readAnswer(t, schema);
 }
 
 const zaiReady = () => !!process.env.ZAI_API_KEY;
@@ -143,21 +169,22 @@ function importTries(input) {
   const ask = "Extract the holdings and cash from this statement as JSON.";
   const tries = [];
   if (zaiReady()) {
-    tries.push({ name: "zai", run: async () => {
+    tries.push({ name: "zai", run: async (budget) => {
+      const until = Date.now() + budget;
       let text = input.text;
-      if (text == null && process.env.LLM_OCR === "1") { try { text = await zaiOcr(input); } catch (e) { text = null; } }
+      if (text == null && process.env.LLM_OCR === "1") { try { text = await zaiOcr(input, Math.floor(budget / 3)); } catch (e) { text = null; } }
       if (text != null) {
-        return zaiJson({ job: "import", model: process.env.LLM_TEXT_MODEL || "glm-4.6v-flash", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, content: "Statement text:\n" + text + "\n\n" + ask });
+        return zaiJson({ job: "import", timeoutMs: until - Date.now(), model: process.env.LLM_TEXT_MODEL || "glm-4.6v-flash", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, content: "Statement text:\n" + text + "\n\n" + ask });
       }
       // scanned PDFs arrive as page images rendered in the browser (input.images); a raw PDF goes to the fallback
       const imgs = input.images || (/^image\//.test(input.mime) ? [{ mime: input.mime, base64: input.base64 }] : null);
       if (!imgs) throw err("pdf_needs_text", 502);
-      return zaiJson({ job: "import", model: process.env.LLM_VISION_MODEL || "glm-4.6v-flash", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA,
+      return zaiJson({ job: "import", timeoutMs: until - Date.now(), model: process.env.LLM_VISION_MODEL || "glm-4.6v-flash", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA,
         content: [...imgs.slice(0, 4).map((im) => ({ type: "image_url", image_url: { url: `data:${im.mime};base64,${im.base64}` } })), { type: "text", text: ask }] });
     } });
   }
   if (geminiReady()) {
-    tries.push({ name: "gemini", run: () => geminiJson({ job: "import", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, temperature: 0,
+    tries.push({ name: "gemini", run: (timeoutMs) => geminiJson({ timeoutMs, job: "import", system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, temperature: 0,
       parts: [...(input.text != null ? [{ text: "Statement text:\n" + input.text }]
         : (input.images || [{ mime: input.mime, base64: input.base64 }]).slice(0, 4).map((im) => ({ inline_data: { mime_type: im.mime, data: im.base64 } }))), { text: ask }] }) });
   }
@@ -171,7 +198,9 @@ function importTries(input) {
 
 async function extractStatement(input) {
   let last;
-  for (const t of importTries(input)) { try { const raw = await t.run(); if (isSparse(raw)) throw err("sparse", 502); return raw; } catch (e) { last = e; } }
+  const tries = importTries(input);
+  const end = Date.now() + 46000;
+  for (const [i, t] of tries.entries()) { try { const raw = await t.run(Math.floor((end - Date.now()) / (tries.length - i))); if (isSparse(raw)) throw err("sparse", 502); return raw; } catch (e) { last = e; } }
   throw last;
 }
 
@@ -180,34 +209,65 @@ async function extractStatement(input) {
 async function extractVerified(input) {
   const tries = importTries(input);
   if (tries.length < 2 || input.text != null) return { raw: await extractStatement(input), second: null };
-  const [a, b] = (await Promise.allSettled(tries.map((t) => t.run()))).map((r) => (r.status === "fulfilled" && isSparse(r.value) ? { status: "rejected", reason: err("sparse", 502) } : r));
+  const [a, b] = (await Promise.allSettled(tries.map((t) => t.run(46000)))).map((r) => (r.status === "fulfilled" && isSparse(r.value) ? { status: "rejected", reason: err("sparse", 502) } : r));
   if (a.status === "fulfilled") return { raw: a.value, second: b.status === "fulfilled" ? b.value : null };
   if (b.status === "fulfilled") return { raw: b.value, second: null };
   throw a.reason;
 }
 
-// Generic structured-JSON call for prompts whose facts are supplied inline (news briefing).
-// Optional (all off by default, so existing callers behave exactly as before):
-//   noFallback  use ONE provider only (Z.ai when configured, else Gemini); never a second provider call
-//   maxTokens   cap on output tokens (max_tokens / maxOutputTokens)
-//   deadlineMs  total time budget for the call, replacing the default 40 s (Z.ai) / 25 s (Gemini) caps
-//   info        object filled with {provider, model, retries} (retries = Z.ai overload re-sends)
-//   fallbackOn  with noFallback: a test (error -> bool); when it returns true for the Z.ai error, Gemini is tried once
-//   fallbackDeadlineMs  time budget for that Gemini call
-async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", noFallback = false, maxTokens, deadlineMs, info, fallbackOn, fallbackDeadlineMs }) {
-  let last;
-  const zm = model || process.env.NEWS_MODEL || "glm-4.6v-flash", gm = process.env.NEWS_GEMINI_MODEL || GEMINI_DEFAULT;
-  if (info) Object.assign(info, { provider: null, model: null, retries: 0 });
-  if (zaiReady()) {
-    if (info) Object.assign(info, { provider: "Z.ai", model: zm });
-    try { return await zaiJson({ job, model: zm, system, schema, content: user, timeoutMs: deadlineMs || Math.min(timeoutMs, 40000), maxTokens, info }); }
-    catch (e) { last = e; if (noFallback && !(fallbackOn && fallbackOn(e) && geminiReady())) throw e; if (info && noFallback) info.fallback = String(e && (e.code || e.status) || "error").slice(0, 40); }
+// Take one attempt per configured provider. Reserve time for the backup, including body reads.
+async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", maxTokens, deadlineMs, info = {}, accept }) {
+  const budget = Math.min(deadlineMs || timeoutMs, setting("LLM_DEADLINE_MS", 50000, 55000));
+  const end = Date.now() + budget;
+  const zm = model || process.env.NEWS_MODEL || "glm-4.6v-flash";
+  const gm = process.env.NEWS_GEMINI_MODEL;
+  const backup = geminiReady();
+  Object.assign(info, { provider: null, model: null, retries: 0, requests: 0, fallback: null });
+  // Per-job primary: LLM_GEMINI_FIRST_JOBS lists jobs (e.g. "ai-council-v3,agent-answer") whose structured output Z.ai
+  // repeatedly fails to validate. Those try Gemini first and keep Z.ai as the backup, with the same accept() check.
+  const geminiFirst = backup && zaiReady() && String(process.env.LLM_GEMINI_FIRST_JOBS || "").split(",").map((x) => x.trim()).includes(job);
+  if (geminiFirst) {
+    Object.assign(info, { provider: "Gemini", model: gm && !DEPRECATED.has(gm) ? gm : geminiModel(), requests: 1, routing: "gemini_first" });
+    try {
+      const first = await geminiJson({ job, model: info.model, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: Math.ceil(budget * 0.6), maxTokens });
+      if (accept && !accept(first)) throw err("unusable_response", 502);
+      return first;
+    } catch (error) {
+      info.fallback = error.message;
+      console.warn(JSON.stringify({ event: "ai_provider_fallback", from: "Gemini", to: "Z.ai", job }));
+      Object.assign(info, { provider: "Z.ai", model: zm, requests: 2 });
+      const answer = await zaiJson({ job, model: zm, system, schema, content: user, timeoutMs: Math.max(1000, end - Date.now()), maxTokens });
+      if (accept && !accept(answer)) throw err("unusable_response", 502);
+      return answer;
+    }
   }
-  if (geminiReady()) {
-    if (info) Object.assign(info, { provider: "Gemini", model: gm });
-    return geminiJson({ job, model: gm, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: (info && info.fallback && fallbackDeadlineMs) || deadlineMs || 25000, maxTokens });
+  const circuit = circuits.get(zm);
+  if (zaiReady() && (!backup || !circuit || Date.now() >= circuit.until)) {
+    Object.assign(info, { provider: "Z.ai", model: zm, requests: 1 });
+    try {
+      const primaryBudget = Math.min(setting("LLM_PRIMARY_TIMEOUT_MS", 30000, 50000), backup ? Math.ceil(budget * 0.6) : budget);
+      const answer = await zaiJson({ job, model: zm, system, schema, content: user, timeoutMs: primaryBudget, maxTokens });
+      if (accept && !accept(answer)) throw err("unusable_response", 502);
+      circuits.delete(zm);
+      return answer;
+    } catch (error) {
+      const failures = (circuits.get(zm)?.failures || 0) + 1;
+      if (!["invalid_response", "bad_json", "empty", "unusable_response"].includes(error.message))
+        circuits.set(zm, { failures, until: failures >= 3 ? Date.now() + 30000 : 0 });
+      if (!backup) throw error;
+      info.fallback = error.message;
+    }
+  } else if (zaiReady()) {
+    info.fallback = "circuit_open";
   }
-  throw last || err("not_configured", 503);
+  if (!backup) throw err("not_configured", 503);
+  if (info.fallback) console.warn(JSON.stringify({ event: "ai_provider_fallback", from: "Z.ai", to: "Gemini" }));
+  info.provider = "Gemini";
+  info.model = gm && !DEPRECATED.has(gm) ? gm : geminiModel();
+  info.requests++;
+  const answer = await geminiJson({ job, model: info.model, system, schema, parts: [{ text: user }], temperature: 0.2, timeoutMs: end - Date.now(), maxTokens });
+  if (accept && !accept(answer)) throw err("unusable_response", 502);
+  return answer;
 }
 
 // Which provider/model serves each job (shown on the Settings page; no secrets).

@@ -318,7 +318,7 @@
 
   /* ---- one tier card in the pricing grid: the "Revised pricing structure" table, one column per card ---- */
   var PLAN_ROWS = ["Market data", "Portfolio tracking", "Historical analysis", "Valuation coverage", "Advanced indicators",
-    "AI investment analyst", "Five-agent LLM Council", "Billion-path simulations", "Stress testing"];
+    "AI investment analyst", "Single-model LLM Council", "Monte Carlo simulations", "Stress testing"];
   var PLAN_VALS = {
     demo:    ["Simulated", "Simulated", "Simulated", "Simulated", "Demo", "Demo only", "Demo only", "Demo only", "Demo only"],
     free:    ["Real", "20 holdings", "5 years", "12 symbols", "Basic", "—", "—", "—", "—"],
@@ -384,7 +384,7 @@
     var planNote = DEMO() ? "<p class='note'>All four tiers run the <b>same</b> Portfolio Terminal — what changes is whether the data is simulated or real, how deep it goes, and (on Premium) your personal AI analyst.</p>" : "";
     var plans = "<div class='plan-grid'>" + ["demo", "free", "paid", "premium"].map(function (t) { return planCell(t, cur, signed); }).join("") + "</div>" + manage +
       "<div class='set-msg' id='set-dmsg' role='status'></div>" + planNote;
-    html += card("set-plan", "Plans & data", plans, "One terminal, four levels: Demo (simulated), Free (limited real data), Paid (full real data, unlimited valuation coverage), Premium (everything in Paid + AI analyst, LLM Council and billion-path simulations). Prices in Thai baht.");
+    html += card("set-plan", "Plans & data", plans, "One terminal, four levels: Demo (simulated), Free (limited real data), Paid (full real data, unlimited valuation coverage), Premium (everything in Paid + AI analyst, LLM Council and Monte Carlo simulations). Prices in Thai baht.");
 
     // display
     var langOpts = (window.PT_I18N ? PT_I18N.LANGS : []).map(function (l) { return "<option value='" + l.code + "'" + (l.code === (window.PT_I18N ? PT_I18N.lang : "en") ? " selected" : "") + ">" + l.native + "</option>"; }).join("");

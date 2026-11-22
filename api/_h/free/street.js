@@ -71,6 +71,7 @@ async function streetOne(sym, budget) {
 }
 
 async function headlinesOne(sym) {
+  if (!require("../../_licensing").allowed("yahoo")) return null;
   return cached("street/news/" + sym, M30, async () => {
     const r = await fetch(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(sym)}&region=US&lang=en-US`, { headers: { "User-Agent": "portfolio-terminal personal-dashboard" } });
     if (!r.ok) return null;

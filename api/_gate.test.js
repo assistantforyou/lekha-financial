@@ -50,6 +50,14 @@ const mkRes = () => ({ _c: 0, _j: null, setHeader() {}, status(c) { this._c = c;
   assert.strictEqual(res._j.tier, "free");
   assert.deepStrictEqual(res._j.need, ["premium"]);
 
+  // 2b. Free profile on a paid-or-premium gate -> the message names both plans.
+  res = mkRes();
+  p = await requireTier(req(), res, ["paid", "premium"]);
+  assert.strictEqual(p, null);
+  assert.strictEqual(res._c, 402);
+  assert.strictEqual(res._j.error, "Paid or Premium plan required.");
+  assert.deepStrictEqual(res._j.need, ["paid", "premium"]);
+
   // 3. Free profile allowed on the free gate -> profile returned.
   res = mkRes();
   p = await requireTier(req(), res, ["free", "paid", "premium"]);
@@ -91,25 +99,15 @@ const mkRes = () => ({ _c: 0, _j: null, setHeader() {}, status(c) { this._c = c;
   assert.strictEqual(res._c, 200);
   assert.ok(res._j.ok);
 
-  // 6. AI endpoints are open to every tier while the preview runs: a free or paid caller reaches
-  // the handler and is only stopped when there is no portfolio to talk about.
-  const ask = require("./_h/ai/ask");
-  res = mkRes();
-  await ask({ method: "POST", headers: { authorization: "Bearer t" }, body: { question: "Why did my portfolio fall today?" } }, res, {});
-  assert.strictEqual(res._c, 400);
-  assert.strictEqual(res._j.code, "no_holdings");
-
-  profileRow = { user_id: "u1", email: "user@example.com", plan: "paid", sub_status: "active", period_end: new Date(Date.now() + 864e5 * 10).toISOString() };
-  res = mkRes();
-  await ask({ method: "POST", headers: { authorization: "Bearer t" }, body: { question: "Am I too concentrated in technology?" } }, res, {});
-  assert.strictEqual(res._c, 400);
-  assert.strictEqual(res._j.code, "no_holdings");
-
-  const briefing = require("./_h/ai/briefing");
-  res = mkRes();
-  await briefing({ method: "GET", headers: { authorization: "Bearer t" } }, res, {});
-  assert.strictEqual(res._c, 400);
-  assert.strictEqual(res._j.code, "no_holdings");
+  for (const [name, method] of [["ai/ask", "POST"], ["ai/briefing", "GET"], ["ai/simulate", "POST"], ["ai/council", "POST"], ["data/agent-route", "POST"]]) {
+    const handler = require("./_h/" + name);
+    for (const tier of ["demo", "free", "paid"]) {
+      profileRow = { user_id: "u1", plan: tier, sub_status: "active", period_end: "2999-01-01" };
+      res = mkRes();
+      await handler({ method, headers: tier === "demo" ? {} : req().headers, body: { mode: "expert", question: "Review my portfolio" } }, res);
+      assert.strictEqual(res._c, tier === "demo" ? 401 : 402, name + "/" + tier);
+    }
+  }
 
   // Anonymous visitors get the public demo profile instead of a 401 on gates that allow "demo".
   res = mkRes();
@@ -121,13 +119,14 @@ const mkRes = () => ({ _c: 0, _j: null, setHeader() {}, status(c) { this._c = c;
   await requireTier({ headers: {} }, res, ["free", "paid", "premium"]);
   assert.strictEqual(res._c, 401);
 
-  // 7. Webhook price -> plan mapping: STRIPE_PRICE_PAID -> paid, anything else -> premium
-  //    (legacy $60/month subscribers keep everything they had).
-  const sub = (priceId) => ({ items: { data: [{ price: { id: priceId } }] } });
-  assert.strictEqual(planOf(sub(process.env.STRIPE_PRICE_PAID)), "paid");
-  assert.strictEqual(planOf(sub("price_legacy_60usd")), "premium");
-  assert.strictEqual(planOf(sub("price_1UcqQNQ0yLOm6KwFJRbgNC8n")), "premium"); // the live 1,299 THB premium price
-  assert.strictEqual(planOf({}), "premium"); // no price info at all -> safest mapping for an existing sub
+  process.env.STRIPE_PRICE_PREMIUM = "price_premium";
+  process.env.STRIPE_LEGACY_PREMIUM_PRICES = "price_legacy";
+  const sub = id => ({ items: { data: [{ price: { id } }] } });
+  assert.equal(planOf(sub(process.env.STRIPE_PRICE_PAID)), "paid");
+  assert.equal(planOf(sub("price_premium")), "premium");
+  assert.equal(planOf(sub("price_legacy")), "premium");
+  assert.throws(() => planOf(sub("other_product")), /Unmapped/);
+  assert.throws(() => planOf({}), /Missing/);
 
   console.log("gate ok");
 })().catch((e) => { console.error(e); process.exit(1); });

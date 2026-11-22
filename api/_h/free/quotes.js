@@ -68,6 +68,7 @@ async function alpacaSnapshots(symbols) {
 }
 
 async function yahooQuote(sym) {
+  if (!require("../../_licensing").allowed("yahoo")) return null;
   const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1m`, { headers: { "User-Agent": "Mozilla/5.0 (portfolio-terminal)" } });
   if (!r.ok) throw new Error("yahoo_" + r.status);
   const j = await r.json();
@@ -81,7 +82,7 @@ async function quotes(symbols) {
   for (const s of symbols) {
     const m = mem.get(s);
     const ttl = isIntl(s) ? INTL_TTL : US_TTL;
-    if (m && now - m.at < ttl) { if (m.q) out[s] = m.q; }
+    if (m && now - m.at < ttl) { if (m.q && (m.q.src !== "yahoo" || require("../../_licensing").allowed("yahoo"))) out[s] = m.q; }
     else (isIntl(s) ? needIntl : needUs).push(s);
   }
   const put = (s, q) => { if (mem.size >= MEM_MAX) mem.delete(mem.keys().next().value); mem.set(s, { at: Date.now(), q }); if (q) out[s] = q; };

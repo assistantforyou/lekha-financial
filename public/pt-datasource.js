@@ -15,19 +15,47 @@
   /* ---- account session (email + password via /api/auth; tokens kept in this browser) ---- */
   var SKEY = "ptpub.v1.session";
   function sess() { try { return JSON.parse(localStorage.getItem(SKEY) || "null"); } catch (e) { return null; } }
-  function setSess(v) { try { if (v) localStorage.setItem(SKEY, JSON.stringify(v)); else localStorage.removeItem(SKEY); } catch (e) {} }
+  function setSess(v) { try { if (v) localStorage.setItem(SKEY, JSON.stringify(v)); else localStorage.removeItem(SKEY); if (pageOwner && owner(v) !== pageOwner) location.reload(); } catch (e) {} }
+  function owner(s) {
+    if (!s) return null;
+    if (s.user_id) return s.user_id;
+    // Older sessions and email callbacks only carry the subject in the JWT.
+    try { return JSON.parse(atob(s.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).sub || null; }
+    catch (e) { return null; }
+  }
+  var pageOwner = owner(sess());
+  window.addEventListener("storage", function (event) {
+    if ((event.key === SKEY || event.key === null) && owner(sess()) !== pageOwner) location.reload();
+  });
   var refreshing = null;
   async function token() {
     var s = sess(); if (!s || !s.access_token) return null;
     if (s.expires_at && s.expires_at * 1000 - Date.now() > 60000) return s.access_token;
     if (!refreshing) refreshing = fetch("/api/auth/refresh", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: s.refresh_token }) })
-      .then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.session) { j.session.email = j.session.email || s.email; setSess(j.session); return j.session.access_token; } setSess(null); return null; })
+      .then(async function (r) {
+        var j = r.ok ? await r.json() : null;
+        if (sess()?.refresh_token !== s.refresh_token) return null;
+        if (j && j.session && owner(j.session) === pageOwner) { setSess(j.session); return j.session.access_token; }
+        if (r.status === 401) setSess(null);
+        return null;
+      })
       .catch(function () { return s.access_token; }).finally(function () { refreshing = null; });
     return refreshing;
   }
   async function authFetch(url, opts) {
-    opts = opts || {}; var t = await token(); var h = Object.assign({}, opts.headers || {});
-    if (t) h.Authorization = "Bearer " + t;
+    if (owner(sess()) !== pageOwner) return new Response(null, { status: 401 });
+    opts = opts || {}; var t = await token();
+    if (owner(sess()) !== pageOwner) return new Response(null, { status: 401 });
+    var h = Object.assign({}, opts.headers || {});
+    if (window.PT_DEMO_MODE && (url === "/api/data/agent" || url === "/api/rag")) {
+      var keyName = "lekha.demo.knowledgeKey";
+      var key = sessionStorage.getItem(keyName);
+      if (!key) {
+        key = Array.from(crypto.getRandomValues(new Uint8Array(32)), function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+        sessionStorage.setItem(keyName, key);
+      }
+      h["X-Lekha-Demo-Key"] = key;
+    } else if (t) h.Authorization = "Bearer " + t;
     return fetch(url, Object.assign({}, opts, { headers: h }));
   }
   window.PT_AUTH = { session: sess, setSession: setSess, token: token, fetch: authFetch };
@@ -35,7 +63,8 @@
   /* ---- mode: anonymous -> DEMO simulation; signed-in -> real data (?demo=1 forces DEMO) ---- */
   var q = location.search || "";
   var demoForced = /[?&]demo=1(?:&|$)/.test(q) || /^#demo/.test(location.hash || "");
-  window.PT_DEMO_MODE = demoForced || !sess();
+  window.PT_DEMO_MODE = demoForced || !pageOwner;
+  window.PT_STORAGE_NS = window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.account." + encodeURIComponent(pageOwner) + ".";
 
   /* ---- demo clock: in demo mode "now" is frozen at 18 Aug 2026 (after the US close). Every date the page
      shows in demo mode is followed by "(Outdated date used for DEMO only)"; other tiers see real time. ---- */
@@ -54,7 +83,7 @@
     if (h.cur === "THB" && !/\.BK$/.test(t)) return t + ".BK";
     return t;
   }
-  function ns() { return window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1."; }
+  function ns() { return window.PT_STORAGE_NS; }
   function holdingMap() {
     try {
       var v = JSON.parse(localStorage.getItem(ns() + "db.holdings/all") || "null"), m = {};
@@ -88,30 +117,6 @@
   }
 
 
-  /* The sample portfolio runs on REAL market data: the fixed sample tickers come from /api/free/demo (the same providers a signed-in
-     account uses), market-wide sets from the public /api/free endpoints. If any call fails, that one dataset falls back to the
-     local simulation so the page never breaks. */
-  function liveDemo(sim) {
-    var B = location.origin + "/api/free";
-    function txt(u) { return fetch(u).then(function (r) { return r.ok && r.status !== 204 ? r.text() : null; }); }
-    function js(u) { return fetch(u).then(function (r) { return r.ok ? r.json() : null; }); }
-    return {
-      fetchCsv: function (k) {
-        var personal = k === "HISTORY" || k === "FACTOR" || k === "VALIN";
-        return txt(personal ? B + "/demo?k=" + k : B + "/csv/" + encodeURIComponent(k)).then(function (t) {
-          if (!t) throw 0;
-          if (k === "HISTORY") computeLive(t, holdingSymbols(), holdingMap());
-          return t;
-        }).catch(function () { return sim.fetchCsv(k); });
-      },
-      getDoc: function (p) { return js(B + "/doc?path=" + encodeURIComponent(p)).then(function (v) { if (v && typeof v === "object" && !Array.isArray(v)) return v; throw 0; }).catch(function () { return sim.getDoc(p); }); },
-      getCollection: function (n) {
-        var u = n === "fund" || n === "rev" ? B + "/demo?k=" + n : B + "/collection/" + encodeURIComponent(n);
-        return js(u).then(function (v) { if (Array.isArray(v) && v.length) return v; throw 0; }).catch(function () { return sim.getCollection(n); });
-      }
-    };
-  }
-
   window.PT_TIER_READY = function () { return Promise.resolve({ tier: "premium" }); };
   if (window.PT_DEMO_MODE) {
     /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ----
@@ -119,10 +124,10 @@
        analyst, the council and the simulation engine render without an account. */
     window.PT_TIER = "premium";
     window.PT_LIMITS = { holdings: null, aiPerDay: null, simulationsPerDay: null, historyYears: null };
-    window.PT_SOURCE_LABEL = "Demo";
+    window.PT_SOURCE_LABEL = "Simulated sample portfolio";
     if (window.PT_DEMO && window.PT_DEMO.source) {
       try { window.PT_DEMO._seedDemo(); } catch (e) {}
-      window.PT_DATA_SOURCE = liveDemo(window.PT_DEMO.source());
+      window.PT_DATA_SOURCE = window.PT_DEMO.source();
     }
     return;
   }

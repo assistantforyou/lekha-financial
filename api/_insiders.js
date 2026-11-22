@@ -2,7 +2,7 @@
 // A daily job reads EDGAR's daily form index, fetches each S&P 500 issuer's Form 4 and stores that day's purchases
 // (free/f4/YYYY-MM-DD). The page's "cluster buys" are computed from the last 60 days: 2+ different insiders of the same
 // company buying within 7 days. SEC asks automated readers to identify themselves and stay under 10 requests/second.
-const { cacheGetMany, cacheSet } = require("./_lib");
+const { cacheGetMany, persistJobData } = require("./_lib");
 const CIK = require("./_data/sp500_cik.json");
 const SECTOR = Object.fromEntries(require("./_data/sp500.json").stocks);
 
@@ -93,7 +93,7 @@ async function processDay(date, deadline) {
     }
   };
   await Promise.all(Array.from({ length: 10 }, worker));
-  if (partial) { await cacheSet("free/f4part/" + date, { done: [...doneSet], rows: out }); return { partial: true }; }
+  if (partial) { await persistJobData("free/f4part/" + date, { done: [...doneSet], rows: out }); return { partial: true }; }
   return { rows: out };
 }
 
@@ -109,8 +109,8 @@ async function runInsiders({ budgetMs = 50000, days = 62 } = {}) {
     if (have["free/f4/" + date]) continue;
     if (Date.now() > deadline - 5000) break;
     const r = await processDay(date, deadline - 2000).catch((e) => ({ error: e.message }));
-    if (r.rows) { await cacheSet("free/f4/" + date, r.rows); done.push(date); }
-    else if (r.none) { await cacheSet("free/f4/" + date, []); skipped.push(date); }
+    if (r.rows) { await persistJobData("free/f4/" + date, r.rows); done.push(date); }
+    else if (r.none) { await persistJobData("free/f4/" + date, []); skipped.push(date); }
     else break; // partial or error: try again next run
   }
   return { done, skipped };

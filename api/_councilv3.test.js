@@ -2,7 +2,7 @@
 // V3 research council (POST /api/ai/council-v3), offline. The REAL auth/tier/lib/ctx modules run against a
 // stubbed global fetch (GoTrue + Supabase REST, with an in-memory pt_av_cache); only the LLM call is stubbed.
 // Covers: 403 for demo/free/paid with zero LLM calls and zero quota, one generateJson call for Premium with
-// noFallback/maxTokens/deadlineMs, five lenses + CEO after validation, clamping, and a zero-call cache hit.
+// schema validation, token and time limits, five lenses + CEO after validation, clamping, and a zero-call cache hit.
 process.env.SUPABASE_URL = "https://stub.example";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "stub-service-key";
 delete process.env.COUNCIL_V3_DAILY; delete process.env.COUNCIL_V3_MAX_TOKENS;
@@ -13,7 +13,7 @@ const Module = require("module");
 let llmCalls = [], llmReply = null;
 const origLoad = Module._load;
 Module._load = function (r) {
-  if (r === "../../_llm") return { generateJson: async (o) => { llmCalls.push(o); if (o.info) Object.assign(o.info, { provider: "Z.ai", model: "glm-test", retries: 1 }); return JSON.parse(JSON.stringify(llmReply)); } };
+  if (r === "../../_llm") return { generateJson: async (o) => { llmCalls.push(o); if (o.info) Object.assign(o.info, { provider: "Z.ai", model: "glm-test", retries: 0, requests: 2 }); return JSON.parse(JSON.stringify(llmReply)); } };
   if (r === "../../_news") return { newsDocs: async () => [] }; // keep marketBlock offline
   return origLoad.apply(this, arguments);
 };
@@ -92,9 +92,8 @@ const FULL = {
   assert.strictEqual(r._c, 200, JSON.stringify(r._j));
   assert.strictEqual(llmCalls.length, 1, "one LLM request"); assert.strictEqual(rateCalls, 1, "one quota hit");
   const o = llmCalls[0];
-  assert.strictEqual(o.noFallback, true); assert.strictEqual(o.maxTokens, 2400); assert.strictEqual(o.deadlineMs, 30000); assert.strictEqual(o.fallbackDeadlineMs, 24000);
-  /* fallback only on Z.ai overload / rate limit, never on other errors */
-  assert.strictEqual(o.fallbackOn({ status: 429 }), true); assert.strictEqual(o.fallbackOn({ code: "upstream_1305" }), true); assert.strictEqual(o.fallbackOn({ status: 500, code: "bad_json" }), false);
+  assert.equal(o.deadlineMs, 48000); assert.equal(o.maxTokens, 2400);
+  assert.equal(o.accept({}), false); assert.equal(o.accept(FULL), true);
   assert.ok(/Thai/.test(o.system), "language rule applied");
   assert.ok(/Kelly/.test(o.system) && /haircut/.test(o.system) && /do not repeat/i.test(o.system), "allocator Kelly + no-repeat rule");
   assert.ok(/4800 completed paths of 5000 requested/.test(o.user), "real completed path count reaches the prompt");
@@ -105,7 +104,7 @@ const FULL = {
   assert.deepStrictEqual(Object.keys(j.perspectives), ["investor", "analyst", "pessimist", "allocator", "optimist"]);
   assert.strictEqual(j.perspectives.pessimist.stance, "bearish"); assert.strictEqual(j.ceo.verdict, "Hold");
   assert.deepStrictEqual(j.ceo.dissent, [{ lens: "pessimist", reason: "tails" }]);
-  assert.strictEqual(j.meta.llmRequests, 1); assert.strictEqual(j.meta.retries, 1); assert.strictEqual(j.meta.cached, false);
+  assert.strictEqual(j.meta.llmRequests, 2); assert.strictEqual(j.meta.retries, 0); assert.strictEqual(j.meta.cached, false);
   assert.strictEqual(j.meta.model, "Z.ai glm-test"); assert.strictEqual(j.scope, "NVDA");
   assert.strictEqual(j.meta.dataAsOf.prices, "2026-11-18T21:00:00Z");
   assert.ok(!JSON.stringify(j).includes("confidence"), "no confidence field");
@@ -165,5 +164,11 @@ const FULL = {
   r = await call({ question: "Env override question?", scope: "portfolio", evidence: EVIDENCE });
   assert.strictEqual(r._c, 200); assert.strictEqual(llmCalls[llmCalls.length - 1].maxTokens, 1800);
 
+  llmReply = FULL; profileRow = PROF.premium; signedIn = true; rateAllow = true;
+  const callsBeforeRace = llmCalls.length, quotaBefore = rateCalls;
+  const simultaneous = await Promise.all([1, 2].map(() => call({question:"Concurrent question?", scope:"NVDA"})));
+  assert.deepEqual(simultaneous.map(r => r._c), [200, 200]);
+  assert.equal(llmCalls.length, callsBeforeRace + 1);
+  assert.equal(rateCalls, quotaBefore + 1);
   console.log("council-v3 ok");
 })().catch((e) => { console.error(e); process.exit(1); });

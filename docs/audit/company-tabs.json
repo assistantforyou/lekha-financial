@@ -1,0 +1,42 @@
+{
+  "fixture": "company data unavailable",
+  "tabs": [
+    {
+      "label": "Overview",
+      "route": "/company/SPY"
+    },
+    {
+      "label": "Financials",
+      "route": "/company/SPY?tab=financials"
+    },
+    {
+      "label": "Valuation",
+      "route": "/company/SPY?tab=valuation"
+    },
+    {
+      "label": "Growth",
+      "route": "/company/SPY?tab=growth"
+    },
+    {
+      "label": "News",
+      "route": "/company/SPY?tab=news"
+    },
+    {
+      "label": "Filings",
+      "route": "/company/SPY?tab=filings"
+    },
+    {
+      "label": "Earnings",
+      "route": "/company/SPY?tab=earnings"
+    },
+    {
+      "label": "Peers",
+      "route": "/company/SPY?tab=peers"
+    },
+    {
+      "label": "AI analyst",
+      "route": "/company/SPY?tab=ai"
+    }
+  ],
+  "page_errors": []
+}

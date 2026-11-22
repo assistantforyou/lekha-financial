@@ -35,16 +35,19 @@ async function userFrom(req) {
     const r = await gotrue("user", { headers: { Authorization: `Bearer ${tok}` } });
     if (!r.ok) return null;
     const u = await r.json();
+    if (u && u.id) req.__uid = u.id; // read by api/_audit.js (verified id only)
     return u && u.id ? { id: u.id, email: u.email, confirmed: !!(u.email_confirmed_at || u.confirmed_at) } : null;
   } catch (e) { return null; }
 }
 
 async function profile(user) {
   const r = await sb(`pt_profiles?user_id=eq.${user.id}&select=*`);
-  let p = r.ok ? (await r.json())[0] : null;
+  if (!r.ok) throw new Error("Account profile unavailable");
+  let p = (await r.json())[0];
   if (!p) {
     const ins = await sb("pt_profiles", { method: "POST", headers: { Prefer: "return=representation,resolution=merge-duplicates" }, body: JSON.stringify({ user_id: user.id, email: user.email }) });
-    p = ins.ok ? (await ins.json())[0] : { user_id: user.id, email: user.email, plan: "free", prefs: {} };
+    p = ins.ok && (await ins.json())[0];
+    if (!p) throw new Error("Account profile unavailable");
   }
   // premium only while the paid period is current (1-day grace for renewal webhooks)
   const premium = ["active", "trialing"].includes(p.sub_status) && !!p.period_end && Date.parse(p.period_end) + 864e5 > Date.now();
@@ -52,7 +55,10 @@ async function profile(user) {
 }
 
 async function updateProfile(userId, patch) {
-  return sb(`pt_profiles?user_id=eq.${userId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }) });
+  const r = await sb(`pt_profiles?user_id=eq.${encodeURIComponent(userId)}&select=user_id`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }) });
+  if (!r.ok) return false;
+  const rows = await r.json();
+  return rows.length === 1 && rows[0].user_id === userId;
 }
 
 // Guards for route handlers: return the user/profile, or send the error response and return null.
@@ -81,7 +87,8 @@ async function requireTier(req, res, allowed) {
   const p = await profile(u);
   const tier = tierOf(p);
   if (!list.includes(tier)) {
-    const want = list.includes("premium") ? "Premium" : "Paid";
+    // name the cheapest plan that unlocks this endpoint; a Paid-or-Premium gate must not read as Premium-only
+    const want = list.includes("paid") ? (list.includes("premium") ? "Paid or Premium" : "Paid") : "Premium";
     res.status(402).json({ error: `${want} plan required.`, tier, need: list });
     return null;
   }
@@ -107,6 +114,7 @@ const publicProfile = (p) => {
     plan: tier === "paid" || tier === "premium" ? tier : "free",
     tier,
     limits: LIMITS[tier],
+    can_manage_billing: !!p.stripe_customer_id,
     sub_status: p.sub_status || null,
     period_end: p.period_end || null,
     is_admin: !!p.is_admin,
