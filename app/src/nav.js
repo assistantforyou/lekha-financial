@@ -46,6 +46,7 @@ export const TREE = [
     { id: "layout", title: "Dashboard layout", icon: LayoutGrid, page: "layout", desc: "Show, hide and reorder panels on every screen." },
     { id: "data", title: "Data & import", icon: Upload, page: "data", desc: "Import statements, export your data and check sync status." },
     { id: "diagnostics", title: "Diagnostics (admin)", icon: Stethoscope, page: "diagnostics", admin: true, desc: "Provider health, latency, cache hit rate, tool failures, token use and running costs." },
+    { id: "audit", title: "Audit log (admin)", icon: ScrollText, page: "audit", admin: true, desc: "Traffic, failures, rate limits and the sign-up to AI funnel per route, from the audit table." },
   ] },
 ]
 export const FLAT = TREE.flatMap((g) => g.items.map((i) => ({ ...i, group: g.id, groupTitle: g.title, key: `${g.id}/${i.id}` })))
