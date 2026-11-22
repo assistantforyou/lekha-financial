@@ -35,6 +35,7 @@ async function userFrom(req) {
     const r = await gotrue("user", { headers: { Authorization: `Bearer ${tok}` } });
     if (!r.ok) return null;
     const u = await r.json();
+    if (u && u.id) req.__uid = u.id; // read by api/_audit.js (verified id only)
     return u && u.id ? { id: u.id, email: u.email, confirmed: !!(u.email_confirmed_at || u.confirmed_at) } : null;
   } catch (e) { return null; }
 }

@@ -14,10 +14,12 @@ function resolve(routes, rest) {
   return null;
 }
 
+const audit = require("./_audit");
+
 function group(name, routes, opts = {}) {
   const handler = async (req, res) => {
     const q = req.query || {};
-    const r = resolve(routes, q.__r);
+    const rest = String(q.__r || ""), r = resolve(routes, rest);
     if (!r) return res.status(404).json({ error: "Not found." });
     delete q.__r;
     req.query = { ...q, ...r.params };
@@ -28,7 +30,7 @@ function group(name, routes, opts = {}) {
       const t = Buffer.concat(chunks).toString("utf8");
       try { req.body = t ? JSON.parse(t) : {}; } catch (e) { req.body = {}; }
     }
-    return mod(req, res);
+    return audit.around(name, rest, req, res, () => mod(req, res));
   };
   if (opts.rawBody) handler.config = { api: { bodyParser: false } };
   return handler;

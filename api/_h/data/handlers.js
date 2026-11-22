@@ -61,6 +61,7 @@ function make(route) {
   };
   if (route === "agent") return require("./agent-route");
   if (route === "diag") return require("./diag");
+  if (route === "audit") return require("./audit");
   return null;
 }
-module.exports = { make, routes: [...Object.keys(GET), "quotes", "calc", "agent", "diag"] };
+module.exports = { make, routes: [...Object.keys(GET), "quotes", "calc", "agent", "diag", "audit"] };

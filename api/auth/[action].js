@@ -16,7 +16,8 @@ async function reauth(u, password, res) {
   return true;
 }
 
-module.exports = async (req, res) => {
+const audit = require("../_audit");
+const handle = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const route = String((req.query && req.query.action) || "");
   const action = route === "setup" && req.method === "POST" ? "signup" : route;
@@ -124,3 +125,4 @@ module.exports = async (req, res) => {
   }
   return res.status(404).json({ error: "Unknown action." });
 };
+module.exports = (req, res) => audit.around("auth", String((req.query && req.query.action) || ""), req, res, () => handle(req, res));

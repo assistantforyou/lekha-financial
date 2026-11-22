@@ -1,3 +1,4 @@
+process.env.AUDIT_DISABLED = "1"; // the test scripts every Supabase call in order; the audit write is covered by _audit.test.js
 const assert = require("node:assert/strict");
 const { createHmac } = require("node:crypto");
 const { Readable } = require("node:stream");
