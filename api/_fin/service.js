@@ -107,11 +107,11 @@ async function getFinancialStatements(symbol, { type = "annual", asOf } = {}) {
   const s = sym(symbol), t = type === "quarterly" ? "quarterly" : "annual";
   if (asOf) {
     // SEC companyfacts retains filing vintages. Apply the cutoff before selecting restatements.
-    const r = await cached("statements", `${s}/${t}/filed-by/${asOf}`,
+    const r = await cached("statements", `${P.sec.STATEMENT_SCHEMA}/${s}/${t}/filed-by/${asOf}`,
       () => chain("statements", [[P.sec, () => P.sec.statements(s, { type: t, asOf })]]));
     return { data: r.data, meta: { ...r.meta, asOf } };
   }
-  return cached("statements", `${s}/${t}`, () => chain("statements", [[P.sec, () => P.sec.statements(s, { type: t })], [P.fmp, () => P.fmp.statements(s, { type: t })]]), { ttl: 6 * 36e5, shared: true });
+  return cached("statements", `${P.sec.STATEMENT_SCHEMA}/${s}/${t}`, () => chain("statements", [[P.sec, () => P.sec.statements(s, { type: t })], [P.fmp, () => P.fmp.statements(s, { type: t })]]), { ttl: 6 * 36e5, shared: true });
 }
 async function getCompanyFacts(symbol, { asOf } = {}) {
   const s = sym(symbol), cik = await P.sec.cikFor(s); if (!cik) throw Object.assign(new Error("no_cik"), { status: 404 });

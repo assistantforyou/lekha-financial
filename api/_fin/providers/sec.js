@@ -140,4 +140,4 @@ async function statements(symbol, { type = "annual", asOf } = {}) {
   return value;
 }
 
-module.exports = { name, configured: () => true, license: "Public domain (US government). Declared User-Agent required.", directory, cikFor, submissions, companyFacts, profile, filings, statements, buildStatements };
+module.exports = { STATEMENT_SCHEMA, name, configured: () => true, license: "Public domain (US government). Declared User-Agent required.", directory, cikFor, submissions, companyFacts, profile, filings, statements, buildStatements };
