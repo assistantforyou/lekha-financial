@@ -129,12 +129,14 @@ function buildStatements(facts, symbol, type, asOf) {
   return out;
 }
 
+// Bump when buildStatements output changes, so rows normalized by older code (up to 7 days in the shared cache) are ignored.
+const STATEMENT_SCHEMA = "v2-fiscal-labels";
 // Statements are cached by the latest accession number, so they live until a new filing appears.
 async function statements(symbol, { type = "annual", asOf } = {}) {
   const cik = await cikFor(symbol); if (!cik) return [];
   const sub = await submissions(cik).catch(() => null);
   const latest = sub && sub.filings && sub.filings.recent && (sub.filings.recent.accessionNumber || [])[0] || "na";
-  const { value } = await cacheFetch("statements", `${cik}/${type}/${latest}/${asOf || "latest"}`, async () => buildStatements(await companyFacts(cik), String(symbol).toUpperCase(), type, asOf), { shared: true });
+  const { value } = await cacheFetch("statements", `${STATEMENT_SCHEMA}/${cik}/${type}/${latest}/${asOf || "latest"}`, async () => buildStatements(await companyFacts(cik), String(symbol).toUpperCase(), type, asOf), { shared: true });
   return value;
 }
 
