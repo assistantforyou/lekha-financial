@@ -47,6 +47,12 @@
     show("This link is no longer valid", "It has expired or has already been used. Return to sign in and request a new link.", toLogin);
     return;
   }
+  // secure email change: the first of the two links returns only a notice; say so instead of silently leaving
+  var notice = h.get("message") || q.get("message") || "";
+  if (!token && notice) {
+    show("One more step", /other email/i.test(notice) ? "The first address is confirmed. Open the link sent to your other address to finish changing your sign-in email." : notice, toLogin);
+    return;
+  }
   if (!token) { location.replace("/"); return; }
 
   if (type === "recovery") {

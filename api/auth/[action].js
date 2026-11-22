@@ -99,7 +99,7 @@ const handle = async (req, res) => {
     if (!EMAIL.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
     if (!(await reauth(u, String(b.password || ""), res))) return;
     const r = await gotrue(withRedirect("user", callbackUrl(req)), { method: "PUT", headers: { Authorization: `Bearer ${bearer(req)}` }, body: JSON.stringify({ email }) });
-    return r.ok ? res.status(200).json({ ok: true, message: "Check the new address for a confirmation link. Your sign-in email changes when you confirm it." }) : res.status(400).json({ error: "Could not start the email change." });
+    return r.ok ? res.status(200).json({ ok: true, message: "Confirmation links are on their way to your current and your new address. Your sign-in email changes once both are confirmed." }) : res.status(400).json({ error: "Could not start the email change." });
   }
   // permanently delete the account and its stored state. Re-checks the password, requires the typed word DELETE, and refuses while a paid plan is active.
   if (action === "delete") {
