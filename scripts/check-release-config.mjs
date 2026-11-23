@@ -62,7 +62,7 @@ export async function stripePriceIssues(env, fetchImpl = globalThis.fetch) {
     const shouldBeLive = env.VERCEL_ENV === "production";
     if (typeof price.livemode === "boolean" && price.livemode !== shouldBeLive) issues.push(name + " (wrong Stripe mode)");
     if (!price.recurring || price.recurring.interval !== "month" || price.recurring.interval_count !== 1) issues.push(name + " (must recur monthly)");
-    const amount = name === "STRIPE_PRICE_PAID" ? 39900 : 69900;
+    const amount = name === "STRIPE_PRICE_PAID" ? 39900 : 59900; // THB 399 / THB 599 in satang (api/_tiers.js PRICING)
     if (!price.active || price.currency !== "thb" || price.unit_amount !== amount || price.billing_scheme !== "per_unit" || price.recurring?.usage_type !== "licensed") {
       issues.push(name + " (must match the active advertised THB subscription price)");
     }

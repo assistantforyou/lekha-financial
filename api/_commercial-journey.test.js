@@ -69,6 +69,7 @@ global.fetch = async (url, options = {}) => {
   }
   if (u.hostname === 'api.stripe.com') {
     const params = new URLSearchParams(body);
+    if (path.endsWith('/prices/price_P')) return json({id:'price_P',active:true,currency:'thb',unit_amount:39900,recurring:{interval:'month',interval_count:1,usage_type:'licensed'}});
     if (path.endsWith('/customers')) { assert.equal(params.get('metadata[user_id]'),'a'); return json({id:'cus_a'}); }
     if (path.endsWith('/checkout/sessions')) {
       assert.equal(params.get('line_items[0][price]'),'price_P');

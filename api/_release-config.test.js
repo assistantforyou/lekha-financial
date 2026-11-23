@@ -24,8 +24,20 @@ test("price ids are checked against the configured Stripe account", async () => 
   const reply = (status, body) => ({ ok: status < 400, status, json: async () => body });
   const monthly = { active: true, currency: "thb", livemode: false, billing_scheme: "per_unit", recurring: { interval: "month", interval_count: 1, usage_type: "licensed" } };
 
-  assert.deepEqual(await stripePriceIssues(env, async url => reply(200, { ...monthly, unit_amount: url.endsWith("price_paid") ? 39900 : 69900 })), []);
-  assert.ok((await stripePriceIssues(env, async () => reply(200, { ...monthly, unit_amount: 69900 }))).some(entry => entry.startsWith("STRIPE_PRICE_PAID")));
+  // Paid THB 399 (39,900 satang), Premium THB 599 (59,900 satang): the same amounts api/_tiers.js advertises
+  const { PRICING } = require("./_tiers");
+  assert.equal(PRICING.paid.thb * 100, 39900);
+  assert.equal(PRICING.premium.thb * 100, 59900);
+  assert.deepEqual(await stripePriceIssues(env, async url => reply(200, { ...monthly, unit_amount: url.endsWith("price_paid") ? 39900 : 59900 })), []);
+  assert.ok((await stripePriceIssues(env, async () => reply(200, { ...monthly, unit_amount: 59900 }))).some(entry => entry.startsWith("STRIPE_PRICE_PAID")));
+  // the retired Premium amounts (THB 699 and THB 1,299) are no longer the advertised price: the deployment is held
+  for (const old of [69900, 129900]) {
+    const held = await stripePriceIssues(env, async url => reply(200, { ...monthly, unit_amount: url.endsWith("price_paid") ? 39900 : old }));
+    assert.deepEqual(held, ["STRIPE_PRICE_PREMIUM (must match the active advertised THB subscription price)"]);
+  }
+  // wrong currency or an inactive price is held too
+  assert.ok((await stripePriceIssues(env, async url => reply(200, { ...monthly, currency: "usd", unit_amount: url.endsWith("price_paid") ? 39900 : 59900 }))).length === 2);
+  assert.ok((await stripePriceIssues(env, async url => reply(200, { ...monthly, active: false, unit_amount: url.endsWith("price_paid") ? 39900 : 59900 }))).length === 2);
   assert.deepEqual(await stripePriceIssues(env, async () => { throw new Error("network"); }), []);
   assert.deepEqual(await stripePriceIssues({ ...env, STRIPE_SECRET_KEY: "" }, async () => { throw new Error("should not be called"); }), []);
 
