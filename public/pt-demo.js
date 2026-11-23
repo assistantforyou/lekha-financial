@@ -697,13 +697,7 @@
   }
 
   /* ---- the PT_DATA_SOURCE-compatible adapter ---- */
-  /* The demo is a non-billable preview with Free-level screens. Datasets that feed only Paid or
-     Premium screens resolve to "not available" here, exactly like the server's 402 for a Free
-     account, so no older shell (/v2, /v3) can render a restricted panel from the sample data.
-     build() below keeps every dataset for the deterministic tests. */
-  var LOCKED_CSV = { ROTATION: 1, RISK: 1, BREADTH: 1, OBOS: 1, FACTOR: 1, VOLATILITY: 1, VALIN: 1, PEER: 1 };
-  var LOCKED_DOC = { "meta/vixeq_hist": 1, "meta/valin": 1, "meta/factor_val": 1 };
-  var LOCKED_COL = { fund: 1, rev: 1, news: 1 };
+  /* The demo is a full preview: every dataset below is simulated locally for the sample portfolio, nothing is locked. */
   function source() {
     currentHoldings();
     return {
@@ -722,7 +716,6 @@
           setTimeout(reapply, 400); setTimeout(reapply, 1500);
           return Promise.resolve(csv);
         }
-        if (LOCKED_CSV[k]) return Promise.reject({ code: "plan_required", message: "Included in the Paid and Premium plans" });
         if (k === "ROTATION") return Promise.resolve(buildRotation());
         if (k === "RISK") return Promise.resolve(buildRisk());
         if (k === "BREADTH") return Promise.resolve(buildBreadth());
@@ -735,7 +728,6 @@
       },
       getDoc: function (p) {
         var d = null;
-        if (LOCKED_DOC[p]) return Promise.resolve(null);
         if (p === "meta/macro") d = macroDoc();
         else if (p === "meta/fredhist") d = fredHistDoc();
         else if (p === "meta/regime_val") d = regimeValDoc();
@@ -750,7 +742,6 @@
       },
       getCollection: function (n) {
         var v = [];
-        if (LOCKED_COL[n]) return Promise.resolve([]);
         if (n === "fund") v = fundCollection();
         else if (n === "rev") v = revCollection();
         else if (n === "news") v = newsCollection();

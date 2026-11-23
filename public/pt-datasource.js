@@ -123,11 +123,12 @@
   window.PT_TIER_READY = function () { return Promise.resolve({ tier: "demo" }); };
   if (window.PT_DEMO_MODE) {
     /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ----
-       A preview, not a plan: it reports tier "demo", which no restricted feature includes, so the analyst,
-       the council, the simulation engine and the Paid screens stay locked (pt-demo.js serves no data for them).
-       This holds for ?demo=1 on a signed-in account too: the demo never borrows the account's plan. */
+       A preview, not a plan, with nothing locked (owner decision, 23 Nov 2026): every panel, the analyst, the council
+       and the simulation engine run on the simulated sample portfolio. It reports tier "demo" and never a paid tier,
+       so no server endpoint is opened by it; real accounts stay enforced server-side. This holds for ?demo=1 on a
+       signed-in account too: the demo never borrows the account's plan or data. */
     window.PT_TIER = "demo";
-    window.PT_LIMITS = { holdings: 14, ai: false, simulations: false, briefing: false };
+    window.PT_LIMITS = { holdings: null, aiPerDay: null, simulationsPerDay: null, historyYears: null };
     window.PT_SOURCE_LABEL = "Simulated sample portfolio";
     if (window.PT_DEMO && window.PT_DEMO.source) {
       try { window.PT_DEMO._seedDemo(); } catch (e) {}

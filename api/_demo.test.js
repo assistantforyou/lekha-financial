@@ -24,18 +24,10 @@ const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
 
   const src = D.source();
 
-  // 3. The demo is a Free-level preview: datasets that feed only Paid/Premium screens are NOT served
-  //    by the page's data source (same answer as the server's 402), so no shell can render them.
-  for (const k of ["ROTATION", "RISK", "BREADTH", "OBOS", "FACTOR", "VOLATILITY", "VALIN", "PEER"]) {
-    await assert.rejects(src.fetchCsv(k), (e) => e && e.code === "plan_required", k + " must be locked in the demo");
-  }
-  for (const p of ["meta/vixeq_hist", "meta/valin", "meta/factor_val"]) assert.strictEqual(await src.getDoc(p), null, p + " must be locked in the demo");
-  for (const n of ["fund", "rev", "news"]) assert.deepStrictEqual(await src.getCollection(n), [], n + " must be locked in the demo");
-
-  //    The deterministic builders still produce every dataset (test hook) and pass the page's parser gates.
-  const built = D.build();
-  const csv = { HISTORY: await src.fetchCsv("HISTORY"), ROTATION: built.rotation, RISK: built.risk, BREADTH: built.breadth, OBOS: built.obos,
-    FACTOR: built.factor, VOLATILITY: built.volatility, VALIN: built.valin, PEER: built.peer };
+  // 3. The demo is a full preview (owner decision, 23 Nov 2026): the page's data source serves every dataset,
+  //    all simulated locally for the sample portfolio, and each passes the page's parser gates.
+  const csv = {};
+  for (const k of ["HISTORY", "ROTATION", "RISK", "BREADTH", "OBOS", "FACTOR", "VOLATILITY", "VALIN", "PEER"]) csv[k] = await src.fetchCsv(k);
   for (const k of Object.keys(csv)) assert.ok(typeof csv[k] === "string" && csv[k].length > 100, k + " missing");
 
   // BREADTH: >400 stocks with sector + above-50d/200d flags
@@ -111,12 +103,12 @@ const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
   const f13 = await src.getDoc("meta/f13");
   assert.ok(f13.latest && f13.latest.one && f13.backtest && f13.sample.length > 30);
 
-  const news = built.news;
+  const news = await src.getCollection("news");
   assert.strictEqual(news.length, 4);
   assert.ok(/imulated/.test(news[0].data.macro), "demo news is labelled simulated");
-  const fund = built.fund;
+  const fund = await src.getCollection("fund");
   assert.strictEqual(fund.length, 13); // 10 US stocks + SMH(nav) + PTT.BK/0700.HK missing-docs
-  const rev = built.rev;
+  const rev = await src.getCollection("rev");
   assert.strictEqual(rev.length, 3); // today + -35d + -91d (revision trend needs the old snapshots)
   const etf = await src.getCollection("etf");
   assert.strictEqual(etf.length, 30);

@@ -298,8 +298,8 @@
     var sec = section(); if (!sec) return Promise.resolve();
     return tierNow().then(function (tier) {
       /* Premium feature (simulation): demo, Free and Paid see the locked card; unknown tier (sign-in lookup failed) shows nothing */
-      if (tier === "premium") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; return mountFull(); }
-      if (tier === "demo" || tier === "free" || tier === "paid") { LOCK_TIER = tier; sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; mountLocked(); return; }
+      if (tier === "premium" || tier === "demo") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; return mountFull(); }
+      if (tier === "free" || tier === "paid") { LOCK_TIER = tier; sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; mountLocked(); return; }
       sec.remove();
     });
   }

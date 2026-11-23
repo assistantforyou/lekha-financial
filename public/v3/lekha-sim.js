@@ -225,8 +225,8 @@ function dl(name, type, text) { const a = document.createElement("a"); a.href = 
 export async function mount(el) {
   host = el;
   const account = await window.PT_TIER_READY();
-  /* Premium only (feature "simulation"); the demo is a preview, not a plan, and never runs it */
-  if (demo() || !(account && account.features && account.features.simulation === true)) {
+  /* Premium only (feature "simulation"); the demo runs it on the simulated sample portfolio */
+  if (!demo() && !(account && account.features && account.features.simulation === true)) {
     host.innerHTML = '<section class="panel"><h2>Monte Carlo simulations</h2><p>Portfolio simulations are included in the Premium plan (฿599/month).</p><a href="/#/account/plans">Compare plans</a></section>';
     return;
   }

@@ -1,9 +1,10 @@
 # LEKHA Financials — plans and feature access (23 Nov 2026)
 
 Exactly three commercial plans: **Free ฿0**, **Paid ฿399/month**, **Premium ฿599/month**.
-The **Demo** is a non-billable preview for visitors without an account. It is not a plan: it shows
-the Free screens on a sample portfolio and never unlocks a Paid or Premium feature, including for a
-signed-in account opened with `?demo=1`.
+The **Demo** is a non-billable preview for visitors without an account. It is not a plan, and nothing
+in it is locked (owner decision, 23 Nov 2026): every screen, the analyst, the Council and the
+simulation engine run on a simulated sample portfolio computed in the browser. It reports tier `demo`
+and never a paid tier, so no server endpoint is opened by it; real accounts stay enforced server-side.
 
 The feature matrix lives in one file, `api/_data/entitlements.json`. The server reads it through
 `api/_tiers.js` (`FEATURES`, `featureOfRoute`, `canUse`, `quota`) and enforces it. The React shell
@@ -117,10 +118,11 @@ protected. See `docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md`.
 ## Demo architecture
 
 Anonymous visitors enter demo mode. The browser seeds sample holdings and uses a separate storage
-namespace. Account document sync is disabled. The demo shows Free screens on the sample portfolio;
-every restricted route shows the lock screen, the analyst panel shows its locked card, and the
-Projection Lab, Council and Simulation modules are not mounted. The cited research agent keeps its
-demo allowance (15 questions per day per browser).
+namespace. Account document sync is disabled. Every route is open: the data comes from `public/pt-demo.js`,
+which simulates each dataset locally for the sample portfolio, and the analyst, Council and Monte Carlo run
+in the browser on that data (the Council plays its pre-written sample reports; no model is called). The
+server-side `/api/free/demo` endpoint still serves only HISTORY, quotes and street for the sample tickers.
+The cited research agent keeps its demo allowance (15 questions per day per browser).
 
 ## Stripe
 

@@ -10,9 +10,10 @@ const slots = [
   ["lekha-deep", "/v3/lekha-deep.js", "Holdings Deep Analysis", "deepAnalysis", "Paid", "฿399/month"],
 ];
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-/* the demo is a preview, never a plan; a signed-in account is entitled only when its /api/auth/me record says so */
+/* the demo is a full preview on simulated data (nothing locked); a signed-in account is entitled only when its
+   /api/auth/me record says so */
 async function entitled(feature) {
-  if (window.PT_DEMO_MODE) return false;
+  if (window.PT_DEMO_MODE) return true;
   try { const me = window.PT_TIER_READY ? await window.PT_TIER_READY() : null; return !!(me && me.features && me.features[feature] === true); }
   catch (e) { return false; }
 }

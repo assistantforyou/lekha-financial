@@ -13,9 +13,10 @@ export function featureOfRoute(key) {
   const k = String(key || "")
   return ENT.routes[k] || ENT.groups[k.split("/")[0]] || null
 }
-/* tier: "demo" | "free" | "paid" | "premium". Demo is a preview, never in a feature list. */
+/* tier: "demo" | "free" | "paid" | "premium". The demo is a full preview on simulated data: nothing is locked
+   (owner decision, 23 Nov 2026). It is display only; the server never grants the demo a paid endpoint. */
 export function allows(tier, feature) {
-  if (!feature) return true
+  if (!feature || tier === "demo") return true
   const f = ENT.features[feature]
   return !!f && f.tiers.includes(tier)
 }
