@@ -1,7 +1,10 @@
 // Price table for metered services (USD). Used to turn logged usage into cost rows for the admin Costs page.
 // Per-1M-token prices; check the provider pages when they change:
-//   Z.ai https://docs.z.ai/guides/overview/pricing   Gemini https://ai.google.dev/gemini-api/docs/pricing
+//   DeepSeek https://api-docs.deepseek.com/quick_start/pricing   Gemini https://ai.google.dev/gemini-api/docs/pricing
 const TOKENS = {
+  // DeepSeek: peak-hour list prices. Off-peak (outside 01:00-04:00 and 06:00-10:00 UTC, Mon-Fri) is half of these.
+  "deepseek-flash": { in: 0.3, out: 1.2 },
+  "deepseek-v4-pro": { in: 1.32, out: 3.96 },
   "glm-4.7-flash": { in: 0, out: 0 },
   "glm-4.5-flash": { in: 0, out: 0 },
   "glm-4.6v-flash": { in: 0, out: 0 },
@@ -18,7 +21,7 @@ const FIXED_DEFAULTS = [
   { service: "Alpha Vantage", usd_month: 0, note: "Free key (25 calls/day). Premium 75/min is $49.99/mo." },
   { service: "Supabase", usd_month: 0, note: "Free plan. Pro is $25/mo." },
   { service: "Vercel", usd_month: 0, note: "Hobby plan. Pro is $20/user/mo." },
-  { service: "Z.ai", usd_month: 0, note: "Pay as you go; GLM-OCR $0.03 per 1M tokens, Flash models free." },
+  { service: "DeepSeek", usd_month: 0, note: "Pay as you go, charged per token; off-peak hours cost half." },
   { service: "Twelve Data / Alpaca / SEC / FRED", usd_month: 0, note: "Free tiers." },
 ];
 

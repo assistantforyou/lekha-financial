@@ -35,59 +35,48 @@ assert.strictEqual(stripPictographs("\u0E01\u0E32\u0E23\u0E25\u0E07\u0E17\u0E38\
 assert.strictEqual(stripPictographs(42), 42);
 console.log("pictograph scrub ok");
 
-// Forced fallback: Z.ai answers 500, so the same job is served by Gemini and the switch is recorded.
-// Both keys are present but fake; global fetch is stubbed, so no request leaves the machine.
+// Single provider: DeepSeek serves every JSON job. Overload is retried inside the transport; a bad
+// answer is an error, never a silent empty result. The key is fake and fetch is stubbed, so no
+// request leaves the machine.
 const { generateJson } = require("./_llm");
-process.env.ZAI_API_KEY = "test-zai-key";
-process.env.GEMINI_API_KEY = "test-gemini-key";
+process.env.DEEPSEEK_API_KEY = "test-deepseek-key";
 process.env.SUPABASE_URL = "";
+const S = { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] };
+const ok = (content) => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1 } }) });
 const seen = [];
-global.fetch = async (url) => {
+global.fetch = async (url, init) => {
   seen.push(String(url));
-  if (String(url).includes("/chat/completions"))
-    return { ok: false, status: 500, json: async () => ({ error: { message: "upstream down", code: "server_error" } }) };
-  return {
-    ok: true, status: 200,
-    json: async () => ({ candidates: [{ content: { parts: [{ text: '{"answer":"from gemini"}' }] } }], usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 } }),
-  };
+  const body = JSON.parse(init.body);
+  assert.strictEqual(body.response_format.type, "json_object");
+  assert.strictEqual(body.thinking.type, "disabled");
+  return ok('{"answer":"from deepseek"}');
 };
 (async () => {
   const info = {};
-  const out = await generateJson({
-    system: "system", user: "user", info,
-    schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] },
-  });
-  assert.strictEqual(out.answer, "from gemini");
-  assert.strictEqual(info.provider, "Gemini");
-  assert.strictEqual(info.fallback, "upstream_server_error");
-  assert.ok(seen.some((u) => u.includes("/chat/completions")), "Z.ai was tried first");
-  assert.ok(seen.some((u) => u.includes("generativelanguage.googleapis.com")), "Gemini was used as fallback");
-  // With no Gemini key the same failure surfaces as 503 instead of a silent empty answer.
-  delete process.env.GEMINI_API_KEY;
-  await assert.rejects(() => generateJson({
-    system: "system", user: "user",
-    schema: { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] },
-  }), (e) => e.message === "upstream_server_error");
-  // Per-job routing: a listed job asks Gemini first; when Gemini's answer fails accept(), Z.ai is the backup and is
-  // validated by the same check. Unlisted jobs keep Z.ai first.
-  process.env.GEMINI_API_KEY = "test-gemini-key"; process.env.LLM_GEMINI_FIRST_JOBS = "ai-council-v3, agent-answer";
-  const order = []; let zaiOk = true;
-  global.fetch = async (url) => {
-    const u = String(url); order.push(u.includes("/chat/completions") ? "zai" : "gemini");
-    if (u.includes("/chat/completions")) return zaiOk ? { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '{"answer":"from zai"}' } }], usage: {} }) } : { ok: false, status: 500, json: async () => ({ error: { code: "server_error" } }) };
-    return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"answer":"from gemini"}' }] } }], usageMetadata: {} }) };
-  };
-  const S1 = { type: "object", properties: { answer: { type: "string" } }, required: ["answer"] };
-  let i1 = {}; let o1 = await generateJson({ system: "s", user: "u", schema: S1, job: "ai-council-v3", info: i1 });
-  assert.strictEqual(o1.answer, "from gemini"); assert.deepStrictEqual(order, ["gemini"]); assert.strictEqual(i1.provider, "Gemini"); assert.strictEqual(i1.fallback, null);
-  order.length = 0; i1 = {};
-  o1 = await generateJson({ system: "s", user: "u", schema: S1, job: "agent-answer", info: i1, accept: (a) => a.answer !== "from gemini" });
-  assert.strictEqual(o1.answer, "from zai"); assert.deepStrictEqual(order, ["gemini", "zai"]); assert.strictEqual(i1.provider, "Z.ai"); assert.strictEqual(i1.fallback, "unusable_response");
-  order.length = 0; zaiOk = false;
-  await assert.rejects(() => generateJson({ system: "s", user: "u", schema: S1, job: "agent-answer", accept: () => false }), (e) => e.message === "upstream_server_error");
-  order.length = 0; zaiOk = true; i1 = {};
-  o1 = await generateJson({ system: "s", user: "u", schema: S1, job: "agent-expert", info: i1 });
-  assert.strictEqual(o1.answer, "from zai"); assert.deepStrictEqual(order, ["zai"], "unlisted jobs stay Z.ai-first");
-  delete process.env.LLM_GEMINI_FIRST_JOBS;
-  console.log("llm fallback ok");
+  const out = await generateJson({ system: "s", user: "u", info, schema: S });
+  assert.strictEqual(out.answer, "from deepseek");
+  assert.strictEqual(info.provider, "DeepSeek");
+  assert.strictEqual(info.fallback, null);
+  assert.strictEqual(info.requests, 1);
+  assert.ok(seen[0].startsWith("https://api.deepseek.com/"), "one provider only");
+  // A throttled first attempt is retried, not surfaced.
+  let n = 0;
+  global.fetch = async () => (++n === 1 ? { ok: false, status: 503, text: async () => "busy", json: async () => ({}) } : ok('{"answer":"after retry"}'));
+  const retryInfo = {};
+  assert.deepStrictEqual(await generateJson({ system: "s", user: "u", schema: S, info: retryInfo }), { answer: "after retry" });
+  assert.strictEqual(n, 2);
+  assert.strictEqual(retryInfo.requests, 2);
+  assert.strictEqual(retryInfo.retries, 1);
+  // An answer that fails accept() is rejected as unusable rather than shown.
+  global.fetch = async () => ok('{"answer":"wrong"}');
+  await assert.rejects(() => generateJson({ system: "s", user: "u", schema: S, accept: (a) => a.answer !== "wrong" }), (e) => e.message === "unusable_response");
+  // Schema violations and empty content are errors.
+  global.fetch = async () => ok('{"other":1}');
+  await assert.rejects(() => generateJson({ system: "s", user: "u", schema: S }), (e) => e.message === "invalid_response");
+  global.fetch = async () => ok("");
+  await assert.rejects(() => generateJson({ system: "s", user: "u", schema: S }), (e) => e.message === "empty");
+  // Without a key every job fails closed instead of pretending to have an answer.
+  delete process.env.DEEPSEEK_API_KEY;
+  await assert.rejects(() => generateJson({ system: "s", user: "u", schema: S }), (e) => e.message === "not_configured");
+  console.log("deepseek json ok");
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -30,7 +30,7 @@ export function releaseIssues(env) {
     need("COMMERCIAL_DATA_APPROVAL"); // Owner's evidence reference covering all retained providers, caches and static datasets.
     https("VITE_TERMS_URL");
     https("VITE_PRIVACY_URL");
-    for (const key of ["CRON_SECRET", "ZAI_API_KEY", "GEMINI_API_KEY"]) need(key);
+    for (const key of ["CRON_SECRET", "DEEPSEEK_API_KEY"]) need(key);
     if (!/^(sk|rk)_live_/.test(env.STRIPE_SECRET_KEY || "")) issues.push("production Stripe configuration");
   }
   return issues;

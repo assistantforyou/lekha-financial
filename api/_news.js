@@ -16,7 +16,7 @@ const FEEDS = [
 ];
 const TICKERS = new Set([...SP500.map((s) => s[0]), "SPY", "QQQ", "IWM", "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB", "XLC", "XLRE", "SMH", "ITA"]);
 const H6 = 90 * 6e4 /* refreshed on the first visit after 90 minutes */, MAX_AGE = 36 * 36e5, KEEP_DAYS = 7;
-const DISCLOSURE = "AI-written summary of public headlines (CNBC, MarketWatch, Federal Reserve, BBC, Nasdaq, Seeking Alpha) by an AI model (Z.ai GLM, Gemini as fallback). Each story links to its source; the headline and link come from the feed, the summary and impact label are the model's reading. Verify before acting.";
+const DISCLOSURE = "AI-written summary of public headlines (CNBC, MarketWatch, Federal Reserve, BBC, Nasdaq, Seeking Alpha) by DeepSeek. Each story links to its source; the headline and link come from the feed, the summary and impact label are the model's reading. Verify before acting.";
 
 const ENT = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&#x27;": "'", "&apos;": "'", "&nbsp;": " " };
 const decode = (s) => String(s || "").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]+>/g, " ")

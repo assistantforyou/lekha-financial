@@ -5,7 +5,7 @@ const svc = require("../../_fin/service");
 const obs = require("../../_fin/obs");
 const cache = require("../../_fin/cache");
 
-const KEYS = ["SEC_USER_AGENT", "FMP_API_KEY", "FINNHUB_API_KEY", "AV_API_KEY", "TWELVEDATA_API_KEY", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY", "ZAI_API_KEY", "GEMINI_API_KEY", "SUPABASE_URL", "STRIPE_SECRET_KEY", "FRED_API_KEY", "MASSIVE_API_KEY", "NEWS_API_KEY"];
+const KEYS = ["SEC_USER_AGENT", "FMP_API_KEY", "FINNHUB_API_KEY", "AV_API_KEY", "TWELVEDATA_API_KEY", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY", "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "SUPABASE_URL", "STRIPE_SECRET_KEY", "FRED_API_KEY", "MASSIVE_API_KEY", "NEWS_API_KEY"];
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (!(await requireAdmin(req, res))) return;

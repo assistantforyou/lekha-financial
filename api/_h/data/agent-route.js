@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
   }
   const who = p.demo ? "d-" + clientId(req) : p.user_id, limit = p.demo ? 15 : tierOf(p) === "premium" ? 80 : 30;
   if (!(await rateHit(`ai/agent/${who}/${Math.floor(Date.now() / DAY)}`, limit).catch(() => false))) return res.status(429).json({ error: `Daily research limit reached (${limit}/day).`, code: "ai_limit" });
-  const lang = langOf(b.lang), hasLlm = !!(process.env.ZAI_API_KEY || process.env.GEMINI_API_KEY);
+  const lang = langOf(b.lang), hasLlm = !!process.env.DEEPSEEK_API_KEY;
   const llm = hasLlm ? { json: (o) => generateJson(o) } : null;
   /* signed-in users get their own knowledge base; demo visitors get one built from their browser
      snapshot, keyed to this client so nothing is shared between visitors */

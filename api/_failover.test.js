@@ -1,79 +1,70 @@
-// Transport fixtures exercise the real adapters without external credentials or network.
+// Transport resilience: one provider (DeepSeek), retried on overload, failing closed on everything else.
+// Fetch is stubbed, so no request leaves the machine and no key is real.
 const assert = require("node:assert/strict");
 const { generateJson } = require("./_llm");
-process.env.ZAI_API_KEY = "fixture";
-process.env.GEMINI_API_KEY = "fixture";
-process.env.LLM_PRIMARY_TIMEOUT_MS = "35";
+
+process.env.DEEPSEEK_API_KEY = "fixture-deepseek-key";
+process.env.SUPABASE_URL = "";
 const schema = { type: "OBJECT", properties: { answer: { type: "STRING" } }, required: ["answer"] };
-const prompt = { system: "Summarize cited evidence", user: "Filing E1 as of 2026-03-01", schema, deadlineMs: 750 };
+const prompt = { system: "Summarize cited evidence", user: "Filing E1 as of 2026-03-01", schema, deadlineMs: 5000 };
 const valid = { answer: "See E1." };
-const primary = (content) => Response.json({ choices: [{ message: { content } }] });
-const fallback = () => Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(valid) }] } }] });
-const stall = (signal) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true }));
+const ok = (content) => new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 4 } }), { status: 200 });
+
+let calls = 0;
+const stub = (fn) => {
+  calls = 0;
+  global.fetch = async (url, init) => {
+    assert.equal(String(url), "https://api.deepseek.com/chat/completions");
+    assert.equal(init.headers.Authorization, "Bearer fixture-deepseek-key");
+    calls++;
+    return fn(JSON.parse(init.body), calls);
+  };
+};
 
 (async () => {
-  for (const [scenario, fail] of Object.entries({
-    timeout: (init) => stall(init.signal),
-    stalledBody: init => ({ok:true, status:200, json:() => stall(init.signal)}),
-    unauthorized: () => new Response(null, { status: 401 }),
-    limited: () => new Response(null, { status: 429 }),
-    error: () => new Response(null, { status: 500 }),
-    unavailable: () => new Response(null, { status: 503 }),
-    invalid: () => primary("broken"), schema: () => primary('{"other":1}'),
-    empty: () => primary('{"answer":"  "}'), wrongType: () => primary('{"answer":1}')
-  })) {
-    const calls = [];
-    global.fetch = async (url, init) => {
-      if (!String(url).startsWith("https://")) return new Response(null);
-      const body = JSON.parse(init.body);
-      calls.push(url);
-      if (url.includes("api.z.ai")) {
-        assert.equal(body.messages[1].content, prompt.user);
-        return fail(init);
-      }
-      assert.deepEqual(body.contents[0].parts, [{ text: prompt.user }]);
-      assert.deepEqual(body.generationConfig.responseSchema, schema);
-      return fallback();
-    };
-    const info = {};
-    const start = Date.now();
-    assert.deepEqual(await generateJson({ ...prompt, model: scenario, info }), valid);
-    assert.ok(Date.now() - start < prompt.deadlineMs);
-    assert.equal(calls.length, 2);
-    assert.equal(info.provider, "Gemini");
-    assert.equal(info.requests, 2);
-  }
-  let primaryCalls = 0, backupCalls = 0;
-  global.fetch = async (url) => {
-    if (url.includes("api.z.ai")) primaryCalls++;
-    else backupCalls++;
-    return new Response(null, { status: 503 });
-  };
-  for (let i = 0; i < 4; i++) await assert.rejects(generateJson({ ...prompt, model: "outage" }), /upstream/);
-  assert.equal(primaryCalls, 3);
-  assert.equal(backupCalls, 4);
-  delete process.env.GEMINI_API_KEY;
-  await assert.rejects(generateJson({ ...prompt, model: "missing" }), /upstream/);
-  assert.equal(backupCalls, 4);
-  process.env.GEMINI_API_KEY = "fixture";
-  const now = Date.now;
-  let probes = 0;
-  try {
-    Date.now = () => now() + 31000;
-    global.fetch = async url => {
-      if (!String(url).startsWith("https://")) return new Response(null);
-      assert.ok(url.includes("api.z.ai"));
-      probes++;
-      return primary(JSON.stringify(valid));
-    };
-    const info = {};
-    assert.deepEqual(await generateJson({ ...prompt, model: "outage", info }), valid);
-    assert.equal(info.provider, "Z.ai");
-    assert.equal(info.fallback, null);
-    assert.equal(probes, 1);
-  } finally { Date.now = now; }
-  delete process.env.GEMINI_API_KEY;
-  delete process.env.ZAI_API_KEY;
-  await assert.rejects(generateJson(prompt), /not_configured/);
-  console.log("structured failover, evidence preservation, attempt limits and circuit checks passed");
-})().catch(e => { console.error(e); process.exitCode = 1; });
+  // Throttled once, then answers: the user sees the answer, not the throttle.
+  stub((body, n) => (n === 1 ? new Response("rate limited", { status: 429 }) : ok(JSON.stringify(valid))));
+  const info = {};
+  assert.deepEqual(await generateJson({ ...prompt, info }), valid);
+  assert.equal(calls, 2);
+  assert.equal(info.provider, "DeepSeek");
+  assert.equal(info.requests, 2);
+  assert.equal(info.retries, 1);
+
+  // Overloaded twice then answers.
+  stub((body, n) => (n < 3 ? new Response("upstream busy", { status: 503 }) : ok(JSON.stringify(valid))));
+  assert.deepEqual(await generateJson({ ...prompt }), valid);
+  assert.equal(calls, 3);
+
+  // Persistent outage: three attempts, then a typed error (502 to the caller).
+  stub(() => new Response("down", { status: 500 }));
+  await assert.rejects(() => generateJson({ ...prompt }), (e) => e.message === "upstream_500" && e.status === 502);
+  assert.equal(calls, 3, "one attempt plus two retries");
+
+  // A bad request is not retried: repeating it wastes the deadline.
+  stub(() => new Response("bad model", { status: 400 }));
+  await assert.rejects(() => generateJson({ ...prompt }), (e) => e.message === "upstream_400");
+  assert.equal(calls, 1);
+
+  // A 200 without a usable body is an error, never an empty answer.
+  stub(() => new Response(JSON.stringify({ choices: [] }), { status: 200 }));
+  await assert.rejects(() => generateJson({ ...prompt }), (e) => e.message === "empty");
+
+  // The request carries the JSON contract and no thinking budget for structured jobs.
+  stub(() => ok(JSON.stringify(valid)));
+  await generateJson({ ...prompt });
+  stub((body) => {
+    assert.equal(body.messages[0].role, "system");
+    assert.ok(body.messages[0].content.includes("JSON Schema"));
+    assert.equal(body.response_format.type, "json_object");
+    assert.equal(body.thinking.type, "disabled");
+    assert.equal(body.stream, false);
+    return ok(JSON.stringify(valid));
+  });
+  assert.deepEqual(await generateJson({ ...prompt }), valid);
+
+  // No key: fail closed with not_configured, which the routes surface as 503.
+  delete process.env.DEEPSEEK_API_KEY;
+  await assert.rejects(() => generateJson({ ...prompt }), (e) => e.message === "not_configured" && e.status === 503);
+  console.log("deepseek retry, fail-closed and request-shape checks passed");
+})().catch((e) => { console.error(e); process.exitCode = 1; });

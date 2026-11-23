@@ -20,7 +20,7 @@ function buildEvent({ grp, route, req, status, ms, seen = {}, userId = null, cli
   const sym = String(q.symbol || "").toUpperCase();
   const providerErrors = Array.isArray(seen.attempts) ? seen.attempts.filter((a) => a && a.status === "error").map((a) => String(a.provider || "").slice(0, 24)).filter(Boolean).slice(0, 8) : [];
   const meta = {};
-  if (grp === "ai" && route === "council-v3" && ["Z.ai", "Gemini"].includes(seen.provider)) {
+  if (grp === "ai" && route === "council-v3" && ["DeepSeek"].includes(seen.provider)) {
     meta.provider = seen.provider;
     meta.fallback = !!seen.fallback;
     meta.generation = seen.cached ? "cached" : seen.shared ? "shared" : "fresh";

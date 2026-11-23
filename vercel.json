@@ -2,6 +2,9 @@
   "buildCommand": "npm run build:app",
   "outputDirectory": "public",
   "functions": {
+    "api/ai.js": {
+      "maxDuration": 300
+    },
     "api/**/*.js": {
       "maxDuration": 60
     }
