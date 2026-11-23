@@ -1,6 +1,6 @@
 // Stripe webhook: keeps pt_profiles.sub_status / period_end in step with the subscription. Signature-verified.
 const { sb } = require("../../_lib");
-const { stripe, verifySignature, periodEnd } = require("../../_stripe");
+const { stripe, verifySignature, periodEnd, priceMap } = require("../../_stripe");
 
 const raw = (req) => new Promise((resolve, reject) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => resolve(Buffer.concat(c).toString("utf8"))); req.on("error", reject); });
 
@@ -8,9 +8,12 @@ const raw = (req) => new Promise((resolve, reject) => { const c = []; req.on("da
 function planOf(sub) {
   const price = sub.items?.data?.[0]?.price?.id;
   if (!price) throw new Error("Missing subscription price");
-  const list = (name) => (process.env[name] || "").split(",").map(s => s.trim()).filter(Boolean);
-  if (price === process.env.STRIPE_PRICE_PAID || list("STRIPE_LEGACY_PAID_PRICES").includes(price)) return "paid";
-  if (price === process.env.STRIPE_PRICE_PREMIUM || list("STRIPE_LEGACY_PREMIUM_PRICES").includes(price)) return "premium";
+  const { grants } = priceMap();
+  const paid = grants.paid.has(price), premium = grants.premium.has(price);
+  // a price mapped to both plans is a configuration error: grant nothing and let Stripe retry after it is fixed
+  if (paid && premium) throw new Error("Ambiguous subscription price");
+  if (paid) return "paid";
+  if (premium) return "premium";
   throw new Error("Unmapped subscription price");
 }
 

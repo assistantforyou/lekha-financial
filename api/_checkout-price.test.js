@@ -143,6 +143,43 @@ const subOf = (price, status = "active") => ({ id: "sub_a", status, customer: "c
   assert.equal(tierOf(profile), "free");
   assert.equal(tierOf({ plan: "premium", sub_status: "active", period_end: new Date(Date.now() - 2 * DAY).toISOString() }), "free");
 
+  // REGRESSION (cross-plan cache reuse): a price verified as Paid THB 399 must never pass Premium's THB 599 check,
+  // even inside the 10-minute cache window on the same instance.
+  fresh();
+  r = await call(checkout, { plan: "paid" });
+  assert.equal(r.code, 200, "THB 399 verified for Paid");
+  {
+    const keep = { paid: process.env.STRIPE_PRICE_PAID, premium: process.env.STRIPE_PRICE_PREMIUM };
+    // no checkout._resetPriceCache() here: the Paid verification above is still cached
+    profile = { user_id: "a", email: "a@example.test", plan: "free" }; stripeCalls = [];
+    process.env.STRIPE_PRICE_PAID = "price_paid_new"; process.env.STRIPE_PRICE_PREMIUM = "price_paid_399";
+    r = await call(checkout, { plan: "premium" });
+    assert.equal(r.code, 503); assert.equal(r.data.code, "price_mismatch", "the cached Paid result is not reused for Premium");
+    assert.deepEqual(stripeCalls, ["/v1/prices/price_paid_399"], "Premium re-reads the price and creates nothing");
+    // identical Paid and Premium price IDs: both plans refuse before any Stripe call
+    process.env.STRIPE_PRICE_PAID = "price_paid_399"; process.env.STRIPE_PRICE_PREMIUM = "price_paid_399";
+    for (const plan of ["paid", "premium"]) {
+      profile = { user_id: "a", email: "a@example.test", plan: "free" }; stripeCalls = [];
+      r = await call(checkout, { plan });
+      assert.equal(r.code, 503, plan); assert.equal(r.data.code, "price_conflict");
+      assert.deepEqual(stripeCalls, [], "no Stripe request with an ambiguous price map");
+    }
+    // the current Paid price listed as a legacy Premium price is the same conflict
+    Object.assign(process.env, { STRIPE_PRICE_PAID: keep.paid, STRIPE_PRICE_PREMIUM: keep.premium });
+    const legacy = process.env.STRIPE_LEGACY_PREMIUM_PRICES;
+    process.env.STRIPE_LEGACY_PREMIUM_PRICES = legacy + "," + keep.paid;
+    profile = { user_id: "a", email: "a@example.test", plan: "free" }; stripeCalls = [];
+    r = await call(checkout, { plan: "premium" });
+    assert.equal(r.data.code, "price_conflict");
+    // and the webhook grants nothing for an ambiguous price (Stripe retries after the configuration is fixed)
+    Object.assign(profile, { stripe_customer_id: "cus_a" });
+    assert.equal(await deliver("customer.subscription.updated", subOf(keep.paid)), 500);
+    assert.equal(profile.plan, "free");
+    process.env.STRIPE_LEGACY_PREMIUM_PRICES = legacy;
+    assert.equal(await deliver("customer.subscription.updated", subOf(keep.paid)), 200);
+    assert.equal(profile.plan, "paid");
+  }
+
   // the portal returns with a marker so the app re-reads the verified plan (the marker itself grants nothing)
   fresh(); Object.assign(profile, { stripe_customer_id: "cus_a" });
   global.fetch = ((inner) => async (url, o) => {

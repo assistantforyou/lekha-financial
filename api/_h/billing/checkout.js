@@ -4,22 +4,25 @@
 // One active subscription at a time: switching plans goes through the Stripe billing portal.
 const { callbackUrl, requireUser, profile, updateProfile } = require("../../_auth");
 const { rateHit } = require("../../_lib");
-const { stripe } = require("../../_stripe");
+const { stripe, priceMap } = require("../../_stripe");
 const { PRICING } = require("../../_tiers");
 
 // The configured Stripe price must be exactly the advertised plan price (api/_tiers.js PRICING): active,
-// THB, monthly, licensed. The deployment checker (scripts/check-release-config.mjs) is not part of the
-// Vercel build, so this is checked again before a customer is ever sent to Checkout. A mismatch fails
-// closed (503, nothing created, nobody charged). Verified prices are remembered for 10 minutes per instance.
+// THB, monthly, licensed. This is checked again here, before a customer is ever sent to Checkout, because a
+// build-time check cannot see a price edited in Stripe afterwards. A mismatch fails closed (503, nothing
+// created, nobody charged). A verified result is remembered for 10 minutes per instance, keyed by plan, price
+// ID and expected amount together, so a price verified for one plan can never satisfy another plan's check.
 const verified = new Map();
 async function priceMatches(plan, priceId) {
-  const until = verified.get(priceId);
+  const amount = PRICING[plan].thb * 100;
+  const key = `${plan}|${priceId}|${amount}`;
+  const until = verified.get(key);
   if (until && until > Date.now()) return true;
   const p = await stripe("GET", "prices/" + encodeURIComponent(priceId));
-  const ok = !!p && p.active === true && p.currency === "thb" && p.unit_amount === PRICING[plan].thb * 100
+  const ok = !!p && p.id === priceId && p.active === true && p.currency === "thb" && p.unit_amount === amount
     && !!p.recurring && p.recurring.interval === "month" && p.recurring.interval_count === 1
     && (p.recurring.usage_type == null || p.recurring.usage_type === "licensed");
-  if (ok) verified.set(priceId, Date.now() + 10 * 60e3);
+  if (ok) verified.set(key, Date.now() + 10 * 60e3);
   return ok;
 }
 
@@ -37,8 +40,14 @@ module.exports = async (req, res) => {
   }
   const plan = req.body?.plan ?? "premium";
   if (plan !== "paid" && plan !== "premium") return res.status(400).json({ error: "Choose Paid or Premium." });
-  const priceId = process.env[PLANS[plan].env];
+  const prices = priceMap();
+  const priceId = prices[plan];
   if (!process.env.STRIPE_SECRET_KEY || !priceId) return res.status(503).json({ error: `Payments for the ${PLANS[plan].label} plan are not set up on this site yet.` });
+  if (prices.issues.length) {
+    // one price granting two plans would let a buyer pay one plan's price for the other: refuse both plans
+    console.error(JSON.stringify({ event: "billing_price_conflict", plan }));
+    return res.status(503).json({ error: `Checkout for the ${PLANS[plan].label} plan is paused while its price is updated. Nothing was charged.`, code: "price_conflict" });
+  }
   try {
     const p = await profile(u);
     if (p.stripe_subscription_id && !["canceled", "incomplete_expired"].includes(p.sub_status)) {
