@@ -83,7 +83,7 @@ export function Preferences({ item, navigate }) {
 }
 
 /* ---------------- Plans & billing ---------------- */
-const PRICE = { demo: "Free", free: "Free", paid: "฿299/mo", premium: "฿599/mo" }
+const PRICE = { demo: "Free", free: "Free", paid: "฿399/mo", premium: "฿699/mo" }
 const TIERS = [
   {
     id: "demo", name: "Demo", tagline: "Everything unlocked, no account.",

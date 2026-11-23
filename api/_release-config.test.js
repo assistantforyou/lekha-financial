@@ -24,8 +24,8 @@ test("price ids are checked against the configured Stripe account", async () => 
   const reply = (status, body) => ({ ok: status < 400, status, json: async () => body });
   const monthly = { active: true, currency: "thb", livemode: false, billing_scheme: "per_unit", recurring: { interval: "month", interval_count: 1, usage_type: "licensed" } };
 
-  assert.deepEqual(await stripePriceIssues(env, async url => reply(200, { ...monthly, unit_amount: url.endsWith("price_paid") ? 29900 : 59900 })), []);
-  assert.ok((await stripePriceIssues(env, async () => reply(200, { ...monthly, unit_amount: 59900 }))).some(entry => entry.startsWith("STRIPE_PRICE_PAID")));
+  assert.deepEqual(await stripePriceIssues(env, async url => reply(200, { ...monthly, unit_amount: url.endsWith("price_paid") ? 39900 : 69900 })), []);
+  assert.ok((await stripePriceIssues(env, async () => reply(200, { ...monthly, unit_amount: 69900 }))).some(entry => entry.startsWith("STRIPE_PRICE_PAID")));
   assert.deepEqual(await stripePriceIssues(env, async () => { throw new Error("network"); }), []);
   assert.deepEqual(await stripePriceIssues({ ...env, STRIPE_SECRET_KEY: "" }, async () => { throw new Error("should not be called"); }), []);
 
