@@ -177,10 +177,13 @@ async function runInner({ question, symbol = null, llm = null, lang = null, lang
   /* personal knowledge base: the user's own holdings/settings, embedded in pgvector, retrieved for this question */
   if (owner) {
     try {
-      let docs = await rag.retrieve(owner, q, 4);
-      if (!docs.length) { await rag.sync(owner).catch(() => {}); docs = await rag.retrieve(owner, q, 4); }
-      /* saved LLM council reports belong to the Council entitlement: without it they are never retrieval material */
+      /* saved LLM council reports belong to the Council entitlement: without it they are never retrieval material.
+         Fetch extra candidates when they are hidden, so filtered reports do not crowd out the account's other documents. */
+      const k = hideReports ? 8 : 4;
+      let docs = await rag.retrieve(owner, q, k);
+      if (!docs.length) { await rag.sync(owner).catch(() => {}); docs = await rag.retrieve(owner, q, k); }
       if (hideReports) docs = docs.filter((d) => d && !/^reports?$/.test(String(d.kind)) && !/^reports?$/.test(String(d.doc_type)));
+      docs = docs.slice(0, 4);
       for (const d of docs) evidence.push({ id: "E" + ++n, tool: "account_knowledge", args: {}, label: "Your account · " + (d.title || d.kind), source: "Your saved data (embedded)", asOf: null, kind: "fact", url: null, lines: [staleZero(String(d.content)).slice(0, 1600)] });
     } catch (e) { /* the knowledge base is optional: never fail the question because of it */ }
   }

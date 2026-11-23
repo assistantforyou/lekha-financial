@@ -235,5 +235,41 @@ const rag = require("./rag");
   const ds = fs.readFileSync(path.join(__dirname, "../public/pt-datasource.js"), "utf8");
   assert.ok(!/PT_TIER = "premium"/.test(ds), "the demo never reports the Premium tier in the browser");
 
+  // ---- 9. downgrade: the same account goes Premium -> Paid (a Stripe update), then every report path closes at once
+  stateRows = [
+    { key: "holdings/all", data: { items: [] }, updated_at: "2026-11-23T00:00:00Z" },
+    { key: "reports/0a1b", data: { ceo: { verdict: "Hold" }, question: "q" }, updated_at: "2026-11-23T00:00:00Z" },
+  ];
+  r = await call(state, "premium", { method: "GET" });
+  assert.ok(r._j.docs.some((d) => d.key === "reports/0a1b"), "Premium sees its report");
+  PROFILES.downgraded = { ...PROFILES.premium, plan: "paid" };
+  r = await call(state, "downgraded", { method: "GET" });
+  assert.deepStrictEqual(r._j.docs.map((d) => d.key), ["holdings/all"], "after the downgrade the report is withheld");
+  assert.strictEqual(r.h["cache-control"], "no-store", "state responses are never cached, so no earlier Premium answer can be replayed");
+  r = await call(rag, "downgraded", ingest);
+  assert.strictEqual(r._c, 402, "cannot re-index a report after the downgrade");
+  seen.length = 0; rateCalls.length = 0;
+  r = await call(council3, "downgraded", { method: "POST", body: { question: "Is my portfolio too concentrated?" } });
+  assert.strictEqual(r._c, 403, "council-v3 refuses the downgraded account");
+  assert.ok(!seen.some((u) => /council3|pt_cache|pt_av_cache/.test(u)), "no cached Council answer is even looked up");
+  stateRows = [];
+
+  // the research agent's real retrieval path: report chunks never reach the model for an account without the
+  // entitlement, and they do not crowd out the account's own documents
+  {
+    const ragMod = require("./_fin/rag"), keep = { retrieve: ragMod.retrieve, sync: ragMod.sync, archiveNews: ragMod.archiveNews };
+    ragMod.retrieve = async (o, q, k) => [1, 2, 3, 4, 5].map((i) => ({ kind: "reports", doc_type: "reports", title: "reports/r" + i, content: "SECRET REPORT " + i }))
+      .concat([1, 2, 3].map((i) => ({ kind: "holdings", doc_type: "holdings", title: "holdings/all", content: "holding " + i }))).slice(0, k);
+    ragMod.sync = async () => ({}); ragMod.archiveNews = async () => null;
+    const prompts = [];
+    const llm = { json: async (o) => { if (o.job === "agent-plan") return { calls: [] }; prompts.push(o.user); throw new Error("stop"); } };
+    const seenBy = async (hide) => { prompts.length = 0; const out = await agent.run({ question: "What is in my portfolio?", owner: "u1", llm, hideReports: hide }); return prompts.join(" ") + JSON.stringify(out); };
+    const hidden = await seenBy(true);
+    assert.ok(!/SECRET REPORT/.test(hidden), "no report text reaches the model or the answer");
+    assert.ok(/holding 1/.test(hidden) && /holding 3/.test(hidden), "the account's own documents still answer");
+    assert.ok(/SECRET REPORT/.test(await seenBy(false)), "an entitled account still retrieves its reports");
+    Object.assign(ragMod, keep);
+  }
+
   console.log("entitlements ok");
 })().catch((e) => { console.error(e); process.exit(1); });
