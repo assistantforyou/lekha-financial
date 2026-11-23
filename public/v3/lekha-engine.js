@@ -1186,7 +1186,7 @@ function vShares(f,lv){if(f.shareMode==="gf")return lv.sh;const derived=lv.mcap/
   if(isFinite(lv.sh)&&lv.sh>0&&isFinite(derived)&&(derived/lv.sh>1e3||derived/lv.sh<1e-3))return lv.sh;return derived}
 /* ctx: {rf, erp, sbc, mos:{quality,growth,cyclical,speculative}, L (live inputs)} */
 function valueOne(f,ctx){const t=f.t;const lv=vLive(ctx.L,t);
-  const r={t,method:f.method,cls:f.cls,sector:f.sector,ai:!!f.ai,notes:[],iv:null,px:lv?lv.px:null,asOf:f.asOf};
+  const r={t,method:f.method,cls:f.cls,sector:f.sector,ai:!!f.ai,notes:[],iv:null,px:lv?lv.px:null,cur:lv?lv.cur:null,asOf:f.asOf};
   if(f.method==="nav"){r.conf="Fund (NAV)";r.notes.push("Fund: valued at net asset value. A DCF of an index or commodity fund is not meaningful, so no margin of safety is computed.");return r}
   if(!lv||!lv.px||!lv.mcap){r.conf="Waiting for price";r.notes.push("Live price or market cap missing from the inputs sheet.");return r}
   const FX=ctx.L.fx;const ba=vBeta(lv.beta);r.beta=lv.beta;r.ba=ba;
@@ -1284,8 +1284,10 @@ function renderValKpis(){const el=$("val-kpis");if(!S.vres){el.innerHTML="";retu
 function vTip(box,html,x,y){let tip=box.querySelector(".tip");if(!tip){tip=document.createElement("div");tip.className="tip";box.appendChild(tip)}
   if(html==null){tip.style.display="none";return}tip.innerHTML=html;tip.style.display="block";const bw=box.clientWidth;tip.style.left="0px";tip.style.top="0px";
   const tw=tip.offsetWidth;let lx=Math.min(Math.max(x+12,4),bw-tw-4);tip.style.left=lx+"px";tip.style.top=Math.max(0,y-tip.offsetHeight-8)+"px";tip.style.transform="none"}
+// A value in a non-USD listing is already in that currency: format it as such instead of pretending it is dollars.
+const valFmt=(v,cur)=>cur&&cur!=="USD"?priceFmt(v,cur):usd(v);
 function tipFor(r){if(!r.iv){return `<b>${esc(r.t)}</b> · ${r.method==="nav"?"fund, valued at NAV":"no intrinsic value"}<br>${r.conf==="Waiting for price"?"No live price or market cap":""}${r.implied?"Price implies "+r.implied.margin.toFixed(1)+"% FCF margin":r.rev?"Needs "+compact(r.rev.needFcf10/ (S.cur==="THB"?1:1))+" FCF in year 10":""}`}
-  return `<b>${esc(r.t)}</b> · price ${usd(r.px)}<br>Bear ${usd(r.iv.bear)} · Base ${usd(r.iv.base)} · Bull ${usd(r.iv.bull)}<br>Buy below ${usd(r.buy)} (required MOS ${pu(r.reqMos)})<br>MOS ${pc(r.mos)} · ${esc(r.conf)} confidence · ${esc(V_CLS[r.cls]||r.cls)}`}
+  return `<b>${esc(r.t)}</b> · price ${valFmt(r.px,r.cur)}<br>Bear ${valFmt(r.iv.bear,r.cur)} · Base ${valFmt(r.iv.base,r.cur)} · Bull ${valFmt(r.iv.bull,r.cur)}<br>Buy below ${valFmt(r.buy,r.cur)} (required MOS ${pu(r.reqMos)})<br>MOS ${pc(r.mos)} · ${esc(r.conf)} confidence · ${esc(V_CLS[r.cls]||r.cls)}`}
 function valHeld(){return S.rows.filter(r=>r.ticker&&r.ticker!=="CASH").map(r=>r.ticker)}
 function valEmptyHtml(){const held=valHeld();const E=(m,btn,act)=>`<div class="empty"><b>${m[0]}</b><br>${m[1]}${btn?`<br><button class="btn" data-act="${act}" style="margin-top:8px">${btn}</button>`:""}</div>`;
   if(!S.rows.length)return E(["No holdings yet.","Intrinsic value is calculated for the stocks you hold. Add your positions on the Overview tab and this tab fills in."],"Go to Overview","ov");
@@ -1327,7 +1329,7 @@ function renderValA(){const box=$("val-a");if(!box)return;
       if(capped&&nz(r,r.iv.bull)>hi)s+=`<path d="M${b2-2} ${cy-6} l7 6 l-7 6 z" fill="${col}"/>`;
       s+=`<line x1="${bb}" x2="${bb}" y1="${cy-9}" y2="${cy+9}" stroke="${col}" stroke-width="3"/>`;
       if(isFinite(r.buy)&&r.buy>0){const bp=X(nz(r,r.buy));s+=`<path d="M${bp} ${cy-5} l4 5 l-4 5 l-4 -5z" fill="var(--panel)" stroke="var(--fg)" stroke-width="1.3"/>`}
-      s+=`<text x="${w-4}" y="${cy+4}" text-anchor="end" class="rv" fill="${col}">${mob?pm(r.mos):"Base "+usd(r.iv.base)+" · MOS "+pm(r.mos)}</text>`}
+      s+=`<text x="${w-4}" y="${cy+4}" text-anchor="end" class="rv" fill="${col}">${mob?pm(r.mos):"Base "+valFmt(r.iv.base,r.cur)+" · MOS "+pm(r.mos)}</text>`}
     else if(r.method==="nav")s+=`<text x="${PL+4}" y="${cy+4}" class="na">${mob?"Fund · NAV":"Fund · valued at NAV, no DCF"}</text>`;
     else s+=`<text x="${PL+4}" y="${cy+4}" class="na">${isFinite(r.px)&&r.px>0?(mob?"No value · reverse DCF":"Insufficient confidence · reverse DCF only"):"No live price, so no range"}</text>`;
     s+=`</g>`});
@@ -1361,7 +1363,7 @@ function renderValC(){const box=$("val-c"),sel=$("val-sel");if(!S.vres){box.inne
   sel.onchange=()=>{S.vSel=sel.value;S.vCustom=null;renderValAll(true)};
   const r=S.vres.res[S.vSel];const f=S.fund[S.vSel];if(!r||!f){box.innerHTML='<div class="empty">Pick a holding.</div>';return}
   const ctx=S.vres.ctx;let h=`<div class="vc-head"><div><b class="vc-t">${esc(r.t)}</b> <span class="muted">${esc(r.sector||"")} · ${esc(V_CLS[r.cls]||"")} · ${esc(r.conf)} confidence</span></div>`;
-  if(r.iv)h+=`<div class="vc-big"><span>Price <b>${usd(r.px)}</b></span><span>Bear <b>${usd(r.iv.bear)}</b></span><span>Base <b>${usd(r.iv.base)}</b></span><span>Bull <b>${usd(r.iv.bull)}</b></span><span>Buy below <b>${usd(r.buy)}</b></span><span>MOS <b style="color:${V_STAT[r.status]}">${pc(r.mos)}</b> <span class="muted">needs ${pu(r.reqMos)}</span></span></div>`;
+  if(r.iv)h+=`<div class="vc-big"><span>Price <b>${valFmt(r.px,r.cur)}</b></span><span>Bear <b>${valFmt(r.iv.bear,r.cur)}</b></span><span>Base <b>${valFmt(r.iv.base,r.cur)}</b></span><span>Bull <b>${valFmt(r.iv.bull,r.cur)}</b></span><span>Buy below <b>${valFmt(r.buy,r.cur)}</b></span><span>MOS <b style="color:${V_STAT[r.status]}">${pc(r.mos)}</b> <span class="muted">needs ${pu(r.reqMos)}</span></span></div>`;
   h+=`</div>`;
   if(f.method==="dcf"&&r.iv){
     const P=VAL_SC.base;if(!S.vCustom)S.vCustom={g1:+(r.g1.base*100).toFixed(1),m:+r.sm.base.toFixed(1),W:+r.Ws.base.toFixed(2),gT:P.gT};const c=S.vCustom;const cu=vCustom(r,f,c);

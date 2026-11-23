@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { LineChart } from "@/components/common"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
 import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
@@ -74,6 +75,8 @@ function Answer({ m, live }) {
   const tools = (m.parts || []).filter((p) => p.type === "tool")
   const evidence = (m.parts || []).filter((p) => p.type === "evidence").flatMap((p) => p.items || [])
   const error = (m.parts || []).find((p) => p.type === "error")
+  // Charts arrive as their own parts, drawn server-side from the same feed the evidence quotes.
+  const charts = (m.parts || []).filter((p) => p.type === "chart" && Array.isArray(p.points) && p.points.length > 1)
   return (
     <div className="space-y-2">
       <Reasoning text={reasoning} live={live && !m.content} />
@@ -85,6 +88,15 @@ function Answer({ m, live }) {
       ) : live ? (
         <div className="flex items-center gap-2 text-sm text-[var(--muted)]"><Loader2 className="size-4 animate-spin" /> Working</div>
       ) : null}
+      {charts.map((c, i) => (
+        <figure key={`${c.symbol}-${i}`} className="rounded-lg border border-border bg-[var(--panel)] p-2.5">
+          <figcaption className="mb-1 flex items-baseline justify-between gap-2 text-[11.5px]">
+            <span className="font-medium">{c.symbol} · last {c.points.length} sessions</span>
+            <span className="text-muted-foreground">{c.asOf}</span>
+          </figcaption>
+          <LineChart points={c.points} height={148} format={(v) => `${c.currency === "THB" ? "฿" : c.currency === "HKD" ? "HK$" : c.currency === "USD" ? "$" : ""}${Number(v).toFixed(2)}`} xLabel={(d) => String(d).slice(0, 7)} />
+        </figure>
+      ))}
       <Evidence items={evidence} />
       {error && <Alert variant="warn"><AlertDescription>{error.message}</AlertDescription></Alert>}
     </div>

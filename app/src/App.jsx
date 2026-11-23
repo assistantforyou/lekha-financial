@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronRight, FlaskConical } from "lucide-react"
+import { ChevronRight, FlaskConical, PanelLeftOpen } from "lucide-react"
 import { Toaster, toast } from "sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Sheet } from "@/components/ui/sheet-root"
@@ -33,6 +33,9 @@ initialHash()
 export default function App() {
   const [route, setRoute] = useState(() => parseHash(location.hash))
   const [menu, setMenu] = useState(false), [search, setSearch] = useState(false), [theme, setTheme] = useState(false), [lang, setLang] = useState(false)
+  /* The desktop tree can be collapsed to give a wide screen entirely to the data. The choice is remembered. */
+  const [nav, setNav] = useState(() => { try { return localStorage.getItem("ptpub.v1.app.nav") !== "closed" } catch (e) { return true } })
+  const toggleNav = useCallback(() => setNav((v) => { try { localStorage.setItem("ptpub.v1.app.nav", v ? "closed" : "open") } catch (e) {} return !v }), [])
   const me = useMe(), sess = useSession()
   const navigate = useCallback((path) => { const h = "#/" + path.replace(/^#?\/?/, ""); if (location.hash === h) window.dispatchEvent(new HashChangeEvent("hashchange")); else location.hash = h }, [])
   useEffect(() => { window.LEKHA_SHELL && window.LEKHA_SHELL._register(navigate) }, [navigate])
@@ -87,10 +90,10 @@ export default function App() {
   return (
     <TooltipProvider>
       <div className="shell min-h-dvh bg-background text-foreground">
-        <Banner onMenu={() => setMenu(true)} onSearch={() => setSearch(true)} onTheme={() => setTheme(true)} onLang={() => setLang(true)} navigate={navigate} customizable={isPane && !gated && !gateLoading && !item.analyst && !["tab-sim", "tab-sim-proj", "tab-an-deep", "tab-an-council", "lekha-reports", "v3-ai-host"].some((p) => item.panes.includes(p))} />
+        <Banner onMenu={() => setMenu(true)} onSearch={() => setSearch(true)} onTheme={() => setTheme(true)} onLang={() => setLang(true)} navigate={navigate} navOpen={nav} onNavToggle={toggleNav} customizable={isPane && !gated && !gateLoading && !item.analyst && !["tab-sim", "tab-sim-proj", "tab-an-deep", "tab-an-council", "lekha-reports", "v3-ai-host"].some((p) => item.panes.includes(p))} />
         {demo && <div className="border-b border-[color-mix(in_srgb,var(--warn)_40%,var(--border))] bg-[color-mix(in_srgb,var(--warn)_10%,var(--background))] px-3 py-1 text-[12px]"><div className="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-3 gap-y-1"><FlaskConical className="size-3.5 text-[var(--warn)]" /><b className="font-mono text-[11px] tracking-wider text-[var(--warn)]">DEMO</b><span className="text-muted-foreground">{demoAsOf()}</span>{signedIn ? <a className="ml-auto text-primary hover:underline" href={location.pathname}>Exit demo</a> : <a className="ml-auto text-primary hover:underline" href="/login.html">Create a free account to save your own holdings</a>}</div></div>}
         <div className="mx-auto flex max-w-[1700px]">
-          <aside data-tour="nav" className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border lg:block">{side}</aside>
+          <aside data-tour="nav" className={`sticky top-14 h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border ${nav ? "hidden lg:block" : "hidden"}`}>{side}</aside>
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">
             <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[12px] text-muted-foreground"><span>{group}</span><ChevronRight className="size-3" /><span className="text-foreground">{item.title}{route.param ? ` · ${route.param}` : ""}</span></nav>
             <PageHelp routeKey={route.key} />
@@ -103,6 +106,7 @@ export default function App() {
         </div>
         <Sheet open={menu} onOpenChange={setMenu}><SheetContent side="left" className="p-0" onOpenAutoFocus={(e) => e.preventDefault()}>{side}</SheetContent></Sheet>
         <CommandPalette open={search} onOpenChange={setSearch} navigate={navigate} />
+        {!nav && <button type="button" onClick={toggleNav} aria-label="Show navigation" title="Show navigation" className="fixed bottom-16 right-4 z-40 hidden size-9 items-center justify-center rounded-full border border-border bg-[var(--panel)] text-muted-foreground shadow-lg transition hover:text-foreground lg:flex"><PanelLeftOpen className="size-4" /></button>}
         <Tour navigate={navigate} />
         <ThemeDialog open={theme} onOpenChange={setTheme} />
         <LangDialog open={lang} onOpenChange={setLang} />

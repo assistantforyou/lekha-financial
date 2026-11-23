@@ -333,7 +333,14 @@
     JPM: { cls: "cyclical", sector: "Financials", eps: 18.7, pe: 13, sh: 2790, fc: { g: 0.06 } },
     XOM: { cls: "cyclical", sector: "Energy", eps: 8.1, pe: 14, sh: 4340, fc: { g: 0.03 } },
     JNJ: { cls: "quality", sector: "Health Care", eps: 9.96, pe: 15, sh: 2410, fc: { g: 0.045 } },
-    PEP: { cls: "quality", sector: "Consumer Staples", eps: 8.16, pe: 19, sh: 1370, fc: { g: 0.055 } }
+    PEP: { cls: "quality", sector: "Consumer Staples", eps: 8.16, pe: 19, sh: 1370, fc: { g: 0.055 } },
+    /* SET listings. Simulated fundamentals in baht, so the demo can value them the way the real terminal
+       values any listing it has statements for. ps is the simulated price-to-sales the history is scaled to. */
+    "PTT.BK": { cls: "cyclical", sector: "Energy", eps: 3.0, pe: 11, sh: 28563, ps: 4.0, cur: "THB", fc: { g: 0.02 } },
+    "CPALL.BK": { cls: "quality", sector: "Consumer Staples", eps: 2.4, pe: 26, sh: 8983, ps: 2.9, cur: "THB", fc: { g: 0.06 } },
+    "SCB.BK": { cls: "quality", sector: "Financials", eps: 12.6, pe: 10, sh: 3367, ps: 2.4, cur: "THB", fc: { g: 0.04 } },
+    "AOT.BK": { cls: "quality", sector: "Industrials", eps: 1.9, pe: 29, sh: 14286, ps: 2.1, cur: "THB", fc: { g: 0.09 } },
+    "DELTA.BK": { cls: "growth", sector: "Information Technology", eps: 20, pe: 47, sh: 1247, ps: 1.4, cur: "THB", fc: { g: 0.14 } }
   };
   function betaVsSpy(sym) {
     var wk = weeklyFrom(seriesOf(sym)).slice(-104), sp = weeklyFrom(seriesOf("SPY")).slice(-104);
@@ -352,13 +359,15 @@
       var t = holdingMap()[s], px = closesOf(s)[closesOf(s).length - 1];
       var f = FUND_CFG[t];
       if (t === "SMH") { lines.push("SMH," + px + "," + Math.round(px * 505e6) + ",505000000,1.25,,,USD,ETF"); return; }
-      if (/\.BK$|\.HK$/.test(s)) return;
+      // A listing is only skipped when the demo has no fundamentals for it. SET names in FUND_CFG carry
+      // simulated baht statements, so they are valued like any other holding.
+      if (!f && /\.BK$|\.HK$/.test(s)) return;
       if (!f) {
         var r = mulberry32(hash("val:" + t)), sh = Math.round((300 + r() * 8000)) * 1e6, pe = Math.round(8 + r() * 40);
         lines.push([t, px.toFixed(2), Math.round(px * sh), sh, (0.7 + r() * 1.3).toFixed(3), pe, (px / pe).toFixed(2), "USD", "Common Stock"].join(","));
         return;
       }
-      lines.push([t, px.toFixed(2), Math.round(px * f.sh * 1e6), f.sh * 1e6, betaVsSpy(s).toFixed(3), f.pe, f.eps, "USD", "Common Stock"].join(","));
+      lines.push([t, px.toFixed(2), Math.round(px * f.sh * 1e6), f.sh * 1e6, betaVsSpy(s).toFixed(3), f.pe, f.eps, f.cur || "USD", "Common Stock"].join(","));
     });
     lines.push("UPDATED," + at);
     return lines.join("\n");
@@ -396,7 +405,7 @@
     var rev3 = rev.slice(-3), g = +(Math.pow(rev3[2] / rev3[0], 1 / 2) - 1).toFixed(3);
     return {
       t: t, method: "dcf", cls: cfg.cls, clsAuto: true, sector: cfg.sector, ai: false,
-      cur: "USD", bsCur: "USD", basis: "fcf", shareMode: "mc", asOf: daysAgoIso(4),
+      cur: cfg.cur || "USD", bsCur: cfg.bsCur || cfg.cur || "USD", basis: "fcf", shareMode: "mc", asOf: daysAgoIso(4),
       cols: cols, ends: ends, rev: rev, fcf: fcf, ocf: ocf, da: da, sbc: sbc,
       debt: Math.round(rev[0] * (0.2 + rnd() * 0.5)), netcash: Math.round(rev[0] * (rnd() * 0.8 - 0.2)),
       rev_ttm: rev[6], fcf_ttm: fcf[6],
@@ -418,11 +427,12 @@
         });
         return;
       }
-      if (/\.BK$|\.HK$/.test(s)) {
-        out.push({ id: s, data: { t: t, missing: "Non-US listing: the demo simulates SEC filings, so it quotes " + t + " and shows it in the portfolio, risk and sector screens, but cannot model its intrinsic value. Real SET filings need the SET feed, which this demo does not carry.", ai: false } });
+      var thaiCfg = FUND_CFG[t];
+      if (!thaiCfg && /\.BK$|\.HK$/.test(s)) {
+        out.push({ id: s, data: { t: t, missing: "Non-US listing: the demo has no simulated statements for " + t + ", so it quotes it and shows it in the portfolio, risk and sector screens, but does not publish an intrinsic value for it.", ai: false } });
         return;
       }
-      var cfg = FUND_CFG[t];
+      var cfg = thaiCfg;
       if (cfg) out.push({ id: s, data: fundDoc(t, cfg) });
       else {
         var r = mulberry32(hash("fund:gen:" + t));

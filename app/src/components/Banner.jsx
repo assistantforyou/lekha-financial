@@ -1,4 +1,4 @@
-import { Bot, Menu, Palette, RefreshCw, Search, SlidersHorizontal, Languages, CircleUser, LogIn } from "lucide-react"
+import { Bot, Menu, Palette, PanelLeftClose, PanelLeftOpen, RefreshCw, Search, SlidersHorizontal, Languages, CircleUser, LogIn } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip } from "@/components/ui/tooltip"
@@ -9,7 +9,7 @@ const tone = (cls) => (/err/.test(cls) ? "bg-[var(--down)]" : /stale/.test(cls) 
 function Pill({ p, label }) { if (!p.text) return null; return <span className="hidden items-center gap-1.5 rounded-full border border-white/15 px-2.5 py-1 text-[11px] text-white/80 xl:inline-flex" title={p.text}><i className={cn("size-1.5 rounded-full", tone(p.cls))} /><span className="max-w-[26ch] truncate">{p.text.replace(/^Prices: |^News: /, "")}</span></span> }
 
 /* The LEKHA banner: always navy, white logo, like V3. Everything global lives here: search, status, currency, refresh, theme, language, AI, account. */
-export default function Banner({ onMenu, onSearch, onTheme, onLang, navigate, customizable }) {
+export default function Banner({ onMenu, onSearch, onTheme, onLang, navigate, customizable, navOpen, onNavToggle }) {
   const prices = usePricePill(), news = useNewsPill(), cur = useCurrency(), tier = useTier(), sess = useSession(), customizing = useCustomizing()
   const who = sess && sess.access_token && !isDemo() ? (sess.email || "Account").split("@")[0] : null
   return (
@@ -20,6 +20,7 @@ export default function Banner({ onMenu, onSearch, onTheme, onLang, navigate, cu
           <img src="/v3/brand/lekha-logo-white.png" srcSet="/v3/brand/lekha-logo-white.png 1x, /v3/brand/lekha-logo-white@2x.png 2x" alt="LEKHA Financials" width="561" height="162" className="h-6 w-auto sm:h-8" />
         </a>
         {tier && <span className="hidden rounded-full border border-[#D9A441] px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-[#D9A441] sm:inline">{tier}</span>}
+        <Tooltip content={navOpen ? "Hide navigation" : "Show navigation"}><Button variant="ghost" size="icon" className="ml-1 hidden text-white/70 hover:bg-white/10 hover:text-white lg:inline-flex" onClick={onNavToggle} aria-label={navOpen ? "Hide navigation" : "Show navigation"} aria-pressed={!!navOpen}>{navOpen ? <PanelLeftClose /> : <PanelLeftOpen />}</Button></Tooltip>
         <button onClick={onSearch} data-tour="search" className="mx-2 hidden h-9 min-w-40 flex-1 items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 text-left text-sm text-white/60 transition hover:bg-white/10 md:flex md:max-w-md" aria-label="Search companies, filings, news and pages">
           <Search className="size-4" /><span className="truncate">Search companies, tickers, filings, news…</span><kbd className="ml-auto rounded border border-white/20 px-1.5 text-[10px] text-white/60">⌘K</kbd>
         </button>

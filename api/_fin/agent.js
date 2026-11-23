@@ -75,12 +75,48 @@ const TOOLS = {
 const toolList = () => Object.entries(TOOLS).map(([name, t]) => `${name}(${Object.entries(t.args).map(([k, v]) => `${k}: ${v}`).join(", ")}) - ${t.desc}`).join("\n");
 
 // ---------- symbol resolution ----------
-const STOP = new Set(["I", "A", "WHY", "THE", "AND", "FOR", "ARE", "WAS", "HOW", "WHAT", "DID", "DO", "IS", "IT", "OF", "ON", "TO", "IN", "AT", "BY", "MY", "ME", "US", "AI", "PE", "EPS", "FCF", "CEO", "GDP", "CPI", "FED", "SEC", "ETF", "DCF", "ROE", "ROIC", "USD", "THB", "YOY", "QOQ", "TTM", "Q1", "Q2", "Q3", "Q4", "NEW", "TODAY", "FALL", "DROP"]);
+const STOP = new Set(["I", "A", "WHY", "THE", "AND", "FOR", "ARE", "WAS", "HOW", "WHAT", "DID", "DO", "IS", "IT", "OF", "ON", "TO", "IN", "AT", "BY", "MY", "ME", "US", "AI", "PE", "EPS", "FCF", "CEO", "GDP", "CPI", "FED", "SEC", "ETF", "DCF", "ROE", "ROIC", "USD", "THB", "YOY", "QOQ", "TTM", "Q1", "Q2", "Q3", "Q4", "NEW", "TODAY", "FALL", "DROP",
+  // Ordinary English words that also happen to be, or look like, listed symbols. Without these,
+  // "what is the current state of nvda" resolved to CURRENT.NS and the quote tool came back empty.
+  "CURRENT", "CUR", "STATE", "LATEST", "PRICE", "PRICES", "STOCK", "STOCKS", "MARKET", "VALUE", "VALUES", "COMPANY", "SHARE", "SHARES", "PLEASE", "TELL", "ABOUT", "NOW", "GOING", "DOING", "LOOK", "LOOKING", "NEWS", "GOOD", "BAD", "BEST", "WORST", "BUY", "SELL", "HOLD", "LONG", "SHORT", "RISK", "VIEW", "REVIEW", "CHECK", "SHOW", "GIVE", "MAKE", "THINK", "KNOW", "GET", "WITH", "FROM", "THIS", "THAT", "HAVE", "HAS", "BEEN", "WILL", "WOULD", "COULD", "SHOULD", "CAN", "MAY", "MIGHT", "NOT", "ANY", "ALL", "SOME", "MORE", "LESS", "OVER", "UNDER", "THAN", "THEN", "ALSO", "JUST", "ONLY", "VERY", "MUCH", "MANY", "SINCE", "STILL", "YOUR", "THEIR", "OUR", "ITS", "ONE", "TWO", "BIG", "SMALL", "TOP", "UP", "DOWN", "OUT", "OFF", "SET", "PUT", "OWN", "WELL", "BACK", "NEXT", "LAST", "WEEK", "MONTH", "YEAR", "DAY", "DAYS", "TIME", "ONCE", "EVER", "BEEN"]);
 async function resolveSymbols(question, hint) {
   const out = []; if (hint) out.push(String(hint).toUpperCase());
   const caps = (question.match(/\$?\b[A-Z]{1,5}(?:[.-][A-Z]{1,2})?\b/g) || []).map((x) => x.replace("$", "")).filter((x) => !STOP.has(x));
   for (const c of caps) if (!out.includes(c) && (SP[c] || /^\$/.test(c) || c.length >= 3)) out.push(c);
-  if (out.length < 1) { const words = question.replace(/[^A-Za-z0-9 .&-]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w.toUpperCase())).slice(0, 6); for (const w of words) { try { const r = await svc.search(w, { limit: 3 }); const top = r.data.results.find((x) => x.type === "equity" || x.type === "etf"); if (top && top.name.toLowerCase().includes(w.toLowerCase())) { out.push(top.symbol); break; } } catch (e) { /* ignore */ } } }
+  // People write tickers in lower case ("nvda", "aapl"): a word that is already a listed symbol is
+  // taken as one, which is stronger evidence than a name search and needs no provider call.
+  if (!out.length) {
+    for (const w of question.replace(/[^A-Za-z0-9 .&-]/g, " ").split(/\s+/)) {
+      const u = w.toUpperCase();
+      if (u.length >= 3 && u.length <= 5 && !STOP.has(u) && SP[u] && !out.includes(u)) out.push(u);
+      if (out.length >= 3) break;
+    }
+  }
+  if (out.length < 1) {
+    // Two-word company names are the commonest miss: "state street" and "general motors" both begin
+    // with an ordinary English word, so a single-word pass throws them away before the pair exists
+    // (and "general" alone matches GENERAL ...). Pairs come first, built from the raw tokens, then
+    // single words filtered against STOP.
+    const raw = question.replace(/[^A-Za-z0-9 .&-]/g, " ").split(/\s+/).filter((w) => w.length > 2).slice(0, 8);
+    const NOT_A_NAME = new Set(["WHAT", "WHATS", "HOW", "WHY", "WHEN", "WHICH", "WHO", "IS", "ARE", "WAS", "WERE", "THE", "OF", "FOR", "AND", "SHOULD", "COULD", "WOULD", "CAN", "DOES", "DID", "GIVE", "TELL", "SHOW", "PLEASE", "ABOUT", "TODAY"]);
+    const pairs = [];
+    for (let i = 0; i + 1 < raw.length; i++) if (!NOT_A_NAME.has(raw[i].toUpperCase())) pairs.push(`${raw[i]} ${raw[i + 1]}`);
+    const singles = raw.filter((w) => !STOP.has(w.toUpperCase()));
+    const tries = [...pairs, ...singles];
+    for (const w of tries) {
+      try {
+        const r = await svc.search(w, { limit: 5 }), want = w.toLowerCase(), one = want.split(" ").pop();
+        const rows = r.data.results.filter((x) => x.type === "equity" || x.type === "etf");
+        // Require a real tie to the words: the symbol itself, a symbol starting with them, or a name
+        // that begins with them. A name that merely contains a word ("CURRENT INFRAPROJECTS" for
+        // "current") is not what the user meant.
+        const top = rows.find((x) => String(x.symbol).split(".")[0].toLowerCase() === one)
+          || rows.find((x) => String(x.symbol).toLowerCase().startsWith(one))
+          || rows.find((x) => String(x.name || "").toLowerCase().startsWith(want));
+        if (top) { out.push(top.symbol); break; }
+      } catch (e) { /* ignore */ }
+    }
+  }
   return [...new Set(out)].slice(0, 3);
 }
 

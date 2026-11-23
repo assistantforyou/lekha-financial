@@ -97,15 +97,18 @@ async function run(name, args, { timeoutMs = 25000 } = {}) {
       data: r.data == null ? null : r.data,
     };
   } catch (e) {
+    const code = String(e.code || e.message || "error");
     return {
       ok: false,
       name,
       args: input,
-      error: String(e.code || e.message || "error"),
+      error: code,
       label: name,
       source: "tool",
       kind: "calculated",
-      lines: [],
+      // A failed tool must still say why. An empty line list makes the model report "a reference with
+      // no data", which reads like a bug in the answer rather than a missing feed.
+      lines: [`${name} could not return data (${code}). Say this figure is unavailable; do not substitute one.`],
     };
   }
 }
@@ -118,8 +121,28 @@ function evidenceOf(list) {
 function evidenceBlock(evidence) {
   if (!evidence.length) return "EVIDENCE: none retrieved.";
   return "EVIDENCE\n" + evidence
-    .map((e) => [`[${e.id}] ${e.label} — ${e.source}${e.asOf ? `, as of ${e.asOf}` : ""}${e.kind ? `, ${e.kind}` : ""}`, ...e.lines.map((l) => `  ${l}`)].join("\n"))
+    .map((e) => [
+      `[${e.id}] ${e.ok === false ? `${e.name || e.label} (unavailable)` : e.label} — ${e.source}${e.asOf ? `, as of ${e.asOf}` : ""}${e.ok === false ? "" : e.kind ? `, ${e.kind}` : ""}`,
+      ...(e.ok === false && !e.lines.length ? [`  This feed did not answer. Treat the figure as unavailable.`] : e.lines.map((l) => `  ${l}`)),
+    ].join("\n"))
     .join("\n\n");
 }
 
-module.exports = { schemas, names, catalog, run, parseArgs, evidenceOf, evidenceBlock };
+// The currency a listing trades in, from its suffix. Used only to label a chart.
+const currencyOf = (s) => (/\.BK$/.test(s) ? "THB" : /\.HK$/.test(s) ? "HKD" : /\.(T|TO|AX|L|PA|DE|AS|SW|MI|MC|SI|KS)$/.test(s) ? null : "USD");
+
+// A price chart for the answer, drawn from the same feed the evidence quotes. This is not a model tool:
+// the model does not choose the data, it only writes the sentence that goes above the picture.
+async function chartFor(symbol, { days = 180 } = {}) {
+  try {
+    const { data: bars } = await svc.getHistoricalPrices(String(symbol).toUpperCase(), { days });
+    const pts = (bars || [])
+      .filter((b) => Number.isFinite(b[4]) && b[4] > 0)
+      .slice(-120)
+      .map((b) => [String(b[0]).slice(0, 10), Number(b[4].toFixed(4))]);
+    if (pts.length < 5) return null;
+    return { type: "chart", symbol: String(symbol).toUpperCase(), currency: currencyOf(String(symbol).toUpperCase()), points: pts, asOf: pts[pts.length - 1][0], source: "market data" };
+  } catch (e) { return null; }
+}
+
+module.exports = { schemas, names, catalog, run, parseArgs, evidenceOf, evidenceBlock, chartFor };
