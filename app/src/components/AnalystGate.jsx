@@ -9,7 +9,7 @@ import { compact, date, num, pct, tone } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
 
 const TIER = { free: "Free", paid: "Paid" }
-const PREMIUM = "฿1,299/month"
+const PREMIUM = "฿599/month"
 
 /* The three analyst screens (Ask, Daily briefing, Stress test) used to show ONE identical "go Premium" panel to Free and Paid users.
    Each now says what it is, what Premium adds, and gives something real that works on the user's current plan. */

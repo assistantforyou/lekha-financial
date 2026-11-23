@@ -1,5 +1,5 @@
 // POST /api/billing/checkout {plan:"paid"|"premium"} (signed in) -> {url} of a Stripe Checkout page.
-// Paid = ฿699/month (STRIPE_PRICE_PAID), Premium = ฿1,299/month (STRIPE_PRICE_PREMIUM).
+// Paid = ฿299/month (STRIPE_PRICE_PAID), Premium = ฿599/month (STRIPE_PRICE_PREMIUM).
 // One active subscription at a time: switching plans goes through the Stripe billing portal.
 const { callbackUrl, requireUser, profile, updateProfile } = require("../../_auth");
 const { rateHit } = require("../../_lib");
