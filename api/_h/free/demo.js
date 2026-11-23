@@ -1,15 +1,17 @@
-// GET /api/free/demo?k=HISTORY|FACTOR|VALIN|fund|rev|quotes|street
+// GET /api/free/demo?k=HISTORY|quotes|street
 // The sample portfolio on REAL data, for visitors who have not signed in. The ticker list is fixed on the server (nothing comes
 // from the request), so this is one shared, cached answer for everybody: prices, history, valuations, analysts and earnings
 // dates all come from the same providers as a signed-in account. It calls the normal per-user handlers on a synthetic request
 // (`__demoPublic`, a property only this file can set), so there is no second code path to keep in step.
+// The demo is a non-billable preview with Free-level screens: datasets that feed only Paid/Premium screens
+// (valuation inputs, fundamentals, factor history, analyst revisions) are not served here, and requireFeature
+// refuses the synthetic request outright.
 const { rateHit } = require("../../_lib");
 const { clientId } = require("../../_history");
 const { fxRates } = require("../../_intl");
-const { estimatesFor, revDoc } = require("../../_estimates");
 
 const SYMBOLS = ["NVDA", "AMD", "AVGO", "SMH", "MSFT", "AAPL", "0700.HK", "TSLA", "JPM", "XOM", "PTT.BK", "JNJ", "PEP"];
-const TTL = { HISTORY: 10 * 6e4, FACTOR: 30 * 6e4, VALIN: 30 * 6e4, fund: 6 * 36e5, rev: 6 * 36e5, street: 30 * 6e4, quotes: 4000 };
+const TTL = { HISTORY: 10 * 6e4, street: 30 * 6e4, quotes: 4000 };
 const mem = new Map(), flight = new Map();
 
 // run a handler (req,res) -> {code, body|json|empty, type}
@@ -23,10 +25,6 @@ function call(handler, body = {}) {
 async function build(k) {
   const b = { symbols: SYMBOLS };
   if (k === "HISTORY") return call((q, s) => require("../../_history").history(q, s, { days: null }), b);
-  if (k === "FACTOR") return call(require("../../_factor").factor, b);
-  if (k === "VALIN") return call((q, s) => require("../../_valuation").valinCsvHandler(q, s, { max: null }), b);
-  if (k === "fund") return call((q, s) => require("../../_valuation").fundCollection(q, s, { max: null }), b);
-  if (k === "rev") { const doc = revDoc(await estimatesFor(SYMBOLS.filter((s) => !/\.(HK|BK)$/.test(s)), { fresh: 2, overview: false })); return { code: 200, json: doc ? [doc] : [] }; }
   if (k === "street") return call(require("./street"), b);
   if (k === "quotes") { const r = await call(require("./quotes"), b); if (r.json) r.json.fx = await fxRates().catch(() => null); return r; }
   return { code: 404, empty: true };

@@ -166,7 +166,7 @@ const ANSWER_SYSTEM = [
 ].join("\n");
 
 async function run(opts) { return scope.run({ asOf: opts && opts.asOf || null }, () => runInner(opts)); }
-async function runInner({ question, symbol = null, llm = null, lang = null, langHint = "", owner = null }) {
+async function runInner({ question, symbol = null, llm = null, lang = null, langHint = "", owner = null, hideReports = true }) {
   const t0 = Date.now(), q = String(question || "").slice(0, 600).trim(); if (q.length < 3) throw Object.assign(new Error("empty_question"), { status: 400 });
   const symbols = await resolveSymbols(q, symbol), pl = await plan(q, symbols, llm), results = [];
   await Promise.all(pl.calls.map(async ({ tool, args }, i) => {
@@ -179,6 +179,8 @@ async function runInner({ question, symbol = null, llm = null, lang = null, lang
     try {
       let docs = await rag.retrieve(owner, q, 4);
       if (!docs.length) { await rag.sync(owner).catch(() => {}); docs = await rag.retrieve(owner, q, 4); }
+      /* saved LLM council reports belong to the Council entitlement: without it they are never retrieval material */
+      if (hideReports) docs = docs.filter((d) => d && !/^reports?$/.test(String(d.kind)) && !/^reports?$/.test(String(d.doc_type)));
       for (const d of docs) evidence.push({ id: "E" + ++n, tool: "account_knowledge", args: {}, label: "Your account · " + (d.title || d.kind), source: "Your saved data (embedded)", asOf: null, kind: "fact", url: null, lines: [staleZero(String(d.content)).slice(0, 1600)] });
     } catch (e) { /* the knowledge base is optional: never fail the question because of it */ }
   }

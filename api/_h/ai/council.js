@@ -1,8 +1,8 @@
-// POST /api/ai/council — Premium only. Explains ONE council persona's simulated outcome in plain words.
+// POST /api/ai/council — Premium only (feature "council"). Explains ONE council persona's simulated outcome in plain words.
 // The numbers come from the browser's own Monte Carlo run, so every field is validated here (fixed persona
 // list, finite clamped numbers, tickers that must be in the caller's real holdings). Nothing free-text from the
 // request ever reaches the prompt. Answers are written in the language the user picked.
-const { requirePremium } = require("../../_auth");
+const { requireFeature } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { userContext, marketBlock, cleanTk } = require("./_ctx");
@@ -35,7 +35,7 @@ const clean = (s, m) => String(s || "").replace(/[\u0000-\u001f]/g, " ").trim().
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
-  const p = await requirePremium(req, res);
+  const p = await requireFeature(req, res, "council");
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   try {

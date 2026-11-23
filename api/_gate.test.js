@@ -99,13 +99,17 @@ const mkRes = () => ({ _c: 0, _j: null, setHeader() {}, status(c) { this._c = c;
   assert.strictEqual(res._c, 200);
   assert.ok(res._j.ok);
 
+  // AI endpoints follow the feature matrix (api/_data/entitlements.json): the analyst chat (ask, expert mode) and the
+  // daily briefing are Paid and Premium; simulations and the Council are Premium only. Demo is never entitled.
+  const NEED = { "ai/ask": ["paid", "premium"], "ai/briefing": ["paid", "premium"], "ai/simulate": ["premium"], "ai/council": ["premium"], "data/agent-route": ["paid", "premium"] };
   for (const [name, method] of [["ai/ask", "POST"], ["ai/briefing", "GET"], ["ai/simulate", "POST"], ["ai/council", "POST"], ["data/agent-route", "POST"]]) {
     const handler = require("./_h/" + name);
     for (const tier of ["demo", "free", "paid"]) {
       profileRow = { user_id: "u1", plan: tier, sub_status: "active", period_end: "2999-01-01" };
       res = mkRes();
       await handler({ method, headers: tier === "demo" ? {} : req().headers, body: { mode: "expert", question: "Review my portfolio" } }, res);
-      assert.strictEqual(res._c, tier === "demo" ? 401 : 402, name + "/" + tier);
+      if (NEED[name].includes(tier)) assert.ok(![401, 402].includes(res._c), name + "/" + tier + " must pass the gate, got " + res._c);
+      else assert.strictEqual(res._c, tier === "demo" ? 401 : 402, name + "/" + tier);
     }
   }
 

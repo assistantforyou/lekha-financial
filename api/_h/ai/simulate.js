@@ -1,9 +1,9 @@
-// POST /api/ai/simulate — Premium only. Deterministic Monte Carlo + stress tests on the user's
+// POST /api/ai/simulate — Premium only (feature "simulation"). Deterministic Monte Carlo + stress tests on the user's
 // REAL holdings: per-holding weekly returns and betas come from the same price series the app
 // serves (Alpaca/Twelve Data + intl sources, via _history.seriesFor), the RNG is seeded from
 // user + day + symbols so the same request always returns the same paths. Math is free; the
 // short narrative is one budgeted LLM call and is optional.
-const { requirePremium } = require("../../_auth");
+const { requireFeature } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { langOf, withLang } = require("./_lang");
@@ -66,7 +66,7 @@ const STRESS = [
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
-  const p = await requirePremium(req, res);
+  const p = await requireFeature(req, res, "simulation");
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   try {

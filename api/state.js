@@ -5,7 +5,7 @@
 // valuations, quant runs, snapshots). Nothing here is public: each call is scoped to the caller.
 // Tier limits (holdings count) are enforced here, server-side, from the caller's subscription state.
 const { requireTier } = require("./_auth");
-const { limitsOf } = require("./_tiers");
+const { limitsOf, canUse } = require("./_tiers");
 const { validDoc, listState, putState, delState, MAX_BATCH } = require("./_state");
 
 module.exports = async (req, res) => {
@@ -29,7 +29,12 @@ module.exports = async (req, res) => {
 
   try {
     if (req.method === "GET") {
-      return res.status(200).json({ docs: await listState(p.user_id), server_time: new Date().toISOString() });
+      // Saved LLM council reports (reports/*) belong to the Council entitlement. Without it they are
+      // withheld from the response, not deleted: they return if the account is Premium again.
+      // The browser's hydrate only adds missing keys, so withholding never deletes a local copy.
+      const all = await listState(p.user_id);
+      const docs = canUse(p, "councilReports") ? all : all.filter((d) => !/^reports\//.test(String(d && d.key)));
+      return res.status(200).json({ docs, server_time: new Date().toISOString(), ...(docs.length !== all.length ? { withheld: { reports: all.length - docs.length, feature: "councilReports" } } : {}) });
     }
 
     if (req.method === "POST" || req.method === "PUT") {

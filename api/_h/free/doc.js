@@ -4,6 +4,7 @@ const { fetchCftc, fetchTic } = require("../../_flows");
 const { macroFromFred, fredHistFrom } = require("../../_mappers");
 const { volData, backtestDoc } = require("../../_vol");
 const { fetchFgi } = require("../../_fgi");
+const { requireFeature, lockCache } = require("../../_auth");
 
 const H12 = 12 * 36e5;
 // the monthly series the regime model reads (FRED ids)
@@ -13,8 +14,9 @@ const REGIME = ["SAHMREALTIME", "UNRATE", "CPIAUCNS", "CPILFENS", "FEDFUNDS", "G
 const unavailable = (res) => { res.setHeader("Cache-Control", "no-store"); return res.status(502).json({ error: "upstream_unavailable" }); };
 
 module.exports = async (req, res) => {
-  // Shared macro docs (FRED/CFTC/TIC/F&G/VIX history) — identical for every account,
-  // public and CDN-cacheable. Nothing here is per-user.
+  // Shared macro docs (FRED/CFTC/TIC/F&G) — identical for every account, public and CDN-cacheable,
+  // and read by Free screens (macro regime, overview summary). Nothing here is per-user.
+  // meta/vixeq_hist is the exception: it needs the Risk appetite feature (below).
   res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
   const path = String((req.query && req.query.path) || "");
   try {
@@ -37,6 +39,9 @@ module.exports = async (req, res) => {
     if (path === "meta/tic") return res.status(200).json((await cached("free/meta/tic", H12, fetchTic)) || null);
     if (path === "meta/fgi") return res.status(200).json((await cached("free/meta/fgi", 3 * 36e5, fetchFgi)) || null);
     if (path === "meta/vixeq_hist") {
+      // VIXEQ history feeds only the Risk appetite screen (Paid and Premium)
+      lockCache(res);
+      if (!(await requireFeature(req, res, "riskAppetite"))) return;
       const d = await volData();
       return res.status(200).json((d && backtestDoc(d.vixeq)) || null);
     }
