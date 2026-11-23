@@ -61,8 +61,8 @@ assert.strictEqual(LIMITS.premium.simulations, true);
 assert.strictEqual(LIMITS.premium.briefing, true);
 
 // pricing as configured in Stripe (THB)
-assert.strictEqual(PRICING.paid.thb, 299);
-assert.strictEqual(PRICING.premium.thb, 599);
+assert.strictEqual(PRICING.paid.thb, 399);
+assert.strictEqual(PRICING.premium.thb, 699);
 
 // limitsOf/has derive from tierOf of the same profile
 const freeProfile = { plan: "free" };

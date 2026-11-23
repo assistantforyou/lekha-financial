@@ -279,7 +279,7 @@
     var b = body(); if (!b) return;
     b.innerHTML = '<div class="lk-locked"><svg class="lk-ghost" viewBox="0 0 600 220" aria-hidden="true" preserveAspectRatio="none"><path d="M0 190 C60 180 90 170 140 160 S230 150 280 120 S380 110 430 70 S540 40 600 20 L600 220 L0 220 Z" fill="var(--chart)" fill-opacity=".18"/><path d="M0 190 C60 180 90 170 140 160 S230 150 280 120 S380 110 430 70 S540 40 600 20" fill="none" stroke="var(--chart)" stroke-width="4"/></svg>' +
       '<div class="lk-lock-c"><div class="lk-lock-t">Illustrative Projection Lab · Premium</div><p class="note">An interactive growth-scenario lab with five horizons, scenario bands, dated catalysts and an outcome silhouette. Available on the Premium plan.</p>' +
-      '<button class="btn pri" type="button" id="lk-upgrade">Go Premium — ฿599/month</button><div class="set-msg" id="lk-lock-msg" role="status"></div></div></div>';
+      '<button class="btn pri" type="button" id="lk-upgrade">Go Premium — ฿699/month</button><div class="set-msg" id="lk-lock-msg" role="status"></div></div></div>';
     var up = document.getElementById("lk-upgrade");
     up.onclick = function () {
       var msg = document.getElementById("lk-lock-msg"); msg.textContent = "Opening secure checkout…";

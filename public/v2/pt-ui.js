@@ -1,5 +1,5 @@
 /* Portfolio Terminal UI layer: Settings tab, display preferences, customizable layout, plain-language panel
-   subtitles, account (email + password), plans (Free / Paid ฿299 / Premium ฿599), admin Costs, and extra charts.
+   subtitles, account (email + password), plans (Free / Paid ฿399 / Premium ฿699), admin Costs, and extra charts.
    Loaded after index.html's main script; uses its globals (S, $, esc, setTab, render*) and pt-datasource.js
    (PT_AUTH, PT_DEMO_MODE, PT_TIER). Preferences are stored in this browser and, when signed in, synced to the account. */
 (function () {
@@ -329,8 +329,8 @@
     var C = {
       demo: { name: "Demo", price: "Free" },
       free: { name: "Free", price: "Free" },
-      paid: { name: "Paid", price: "฿299<span class='per'>/mo</span>" },
-      premium: { name: "Premium", price: "฿599<span class='per'>/mo</span>" },
+      paid: { name: "Paid", price: "฿399<span class='per'>/mo</span>" },
+      premium: { name: "Premium", price: "฿699<span class='per'>/mo</span>" },
     }[tier];
     var rows = PLAN_ROWS.map(function (label, i) {
       var v = PLAN_VALS[tier][i];

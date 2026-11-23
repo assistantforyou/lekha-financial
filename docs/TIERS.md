@@ -4,7 +4,7 @@ One product, four levels. The terminal is the same for everyone; what changes is
 **whether the data is simulated or real, how deep it goes, and (on Premium) the AI layer.**
 Some panels preview higher tiers. The server checks account entitlements for restricted operations.
 
-| | Demo | Free | Paid ฿299/mo | Premium ฿599/mo |
+| | Demo | Free | Paid ฿399/mo | Premium ฿699/mo |
 |---|---|---|---|---|
 | Sign-in | none | account | account | account |
 | Data | sample portfolio; some research routes use historical provider data | real (public sources) | real + Alpha Vantage layer | real + Alpha Vantage layer |
@@ -62,10 +62,11 @@ The cited research endpoint allows 15 questions per day in demo, 30 per signed-i
 One product per plan, THB monthly prices, created live 18 Nov 2026:
 
 ```
-STRIPE_PRICE_PAID=price_1UesDJQ0yLOm6KwFIldZbquM     # ฿299/month
-STRIPE_LEGACY_PAID_PRICES=price_1UcqQNQ0yLOm6KwFb5qMhW1q   # old ฿699/month, existing subscribers
-STRIPE_PRICE_PREMIUM=price_1UesDNQ0yLOm6KwFfD77FGmK   # ฿599/month
-# STRIPE_LEGACY_PREMIUM_PRICES also lists price_1UcqQNQ0yLOm6KwFJRbgNC8n (old ฿1,299/month)
+STRIPE_PRICE_PAID=price_1UesoyQ0yLOm6KwFuYZbTz9J     # ฿399/month
+STRIPE_PRICE_PREMIUM=price_1UesqhQ0yLOm6KwFvcO9Owwh   # ฿699/month
+# Earlier prices stay active so existing subscribers keep their plan:
+STRIPE_LEGACY_PAID_PRICES=price_1UcqQNQ0yLOm6KwFb5qMhW1q,price_1UesDJQ0yLOm6KwFIldZbquM   # ฿699 (18 Nov), ฿299 (23 Nov)
+STRIPE_LEGACY_PREMIUM_PRICES=price_1UcqQNQ0yLOm6KwFJRbgNC8n,price_1UesDNQ0yLOm6KwFfD77FGmK # ฿1,299 (18 Nov), ฿599 (23 Nov)
 ```
 
 - Checkout: `POST /api/billing/checkout {plan:"paid"|"premium"}` → Stripe Checkout.

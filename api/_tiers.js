@@ -1,5 +1,5 @@
 // Tier entitlements — the single source of truth for what each plan gets.
-// Tiers: demo (public, simulated data), free, paid (฿299/mo), premium (฿599/mo).
+// Tiers: demo (public, simulated data), free, paid (฿399/mo), premium (฿699/mo).
 // Pure module: no network, no imports — trivially testable. The browser only ever sees
 // its tier through /api/auth/me; every restricted endpoint re-resolves it server-side.
 
@@ -32,8 +32,8 @@ const LIMITS = {
 
 // Public pricing copy (THB, monthly, no invented discounts). Display only.
 const PRICING = {
-  paid: { thb: 299, label: "299 THB/month" },
-  premium: { thb: 599, label: "599 THB/month" },
+  paid: { thb: 399, label: "399 THB/month" },
+  premium: { thb: 699, label: "699 THB/month" },
 };
 
 // Resolve the tier from a pt_profiles row. Server-authoritative: an inactive or
@@ -44,7 +44,7 @@ function tierOf(p) {
   const active = ["active", "trialing"].includes(p.sub_status)
     && !!p.period_end && Date.parse(p.period_end) + 864e5 > Date.now();
   if (!active) return "free";
-  // legacy $60/mo subscribers keep plan "premium" from the old webhook; the ฿299
+  // legacy $60/mo subscribers keep plan "premium" from the old webhook; the ฿399
   // price writes plan "paid". Unknown plans fall back to free.
   if (p.plan === "premium") return "premium";
   if (p.plan === "paid") return "paid";

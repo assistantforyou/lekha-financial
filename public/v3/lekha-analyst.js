@@ -354,7 +354,7 @@
       '<li><b>Daily briefing</b> — a short written summary of what moved, what changed, and what to watch in your portfolio.</li>' +
       '<li><b>Monte Carlo &amp; stress simulations</b> — forward return distributions and rate-shock / tech-drawdown / recession scenarios computed from your holdings’ own history.</li>' +
       '</ul>' +
-      '<p class="ai-cta-row"><button class="btn" id="ai-up">' + (tier === "paid" ? "Upgrade to Premium — ฿599/month" : "Go Premium — ฿599/month") + '</button></p>' +
+      '<p class="ai-cta-row"><button class="btn" id="ai-up">' + (tier === "paid" ? "Upgrade to Premium — ฿699/month" : "Go Premium — ฿699/month") + '</button></p>' +
       '<p class="note">Everything else in the terminal keeps working on your current plan — Premium adds the intelligence layer on top.</p>' +
       '</div>'
     );
