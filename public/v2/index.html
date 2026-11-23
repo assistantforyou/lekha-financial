@@ -2196,7 +2196,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   else if(c==="needs_reauth")msg="data source needs re-authentication";
   else if(c==="not_in_manifest"||c==="approval_required")msg="Google Drive not allowed for this page";
   else if(c==="server_unavailable")msg="Google Drive did not answer, retrying";
-  else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else if(c==="rate_limited")msg="too many requests to the "+what+" source; wait a few minutes and retry";else if(c==="no_data")msg="the price source returned nothing for your holdings";else if(/^source_http_/.test(c||""))msg=what+" source error (HTTP "+c.slice(12)+")";else msg="Live "+what+" unavailable";return msg}
+  else if(c==="plan_required")msg="included in the Paid and Premium plans";else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else if(c==="rate_limited")msg="too many requests to the "+what+" source; wait a few minutes and retry";else if(c==="no_data")msg="the price source returned nothing for your holdings";else if(/^source_http_/.test(c||""))msg=what+" source error (HTTP "+c.slice(12)+")";else msg="Live "+what+" unavailable";return msg}
 (async()=>{
   mcp=await PT_ADAPTER.use("mcp");
   if(!mcp){if(S.source!=="snapshot")setPill("st-prices","Prices: live feed unavailable in this view","stale");return}
