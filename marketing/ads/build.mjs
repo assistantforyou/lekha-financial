@@ -16,18 +16,25 @@ const LOGO = "data:image/png;base64," + readFileSync(join(here, "assets", "lekha
 const FX = 32.7; // THB per USD (Stripe checkout conversion, docs/LAUNCH_GAP_PLAN.md)
 const PAID = 299, PREM = 599;
 const usd = (thb) => (Math.round((thb / FX) * 100) / 100).toFixed(2);
+const baht = (n) => "฿" + Math.round(n).toLocaleString("en-US");
 const money = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
 // Monthly USD. Bloomberg $31,980 a year per third-party reports (one terminal); Seeking Alpha $299 a year (own site).
 const PLATFORMS = [
-  { n: "Bloomberg Terminal", v: 31980 / 12 },
-  { n: "Koyfin Premium", v: 79 },
-  { n: "TradingView Premium", v: 69.95 },
-  { n: "Koyfin Plus", v: 39 },
-  { n: "Seeking Alpha Premium", v: 299 / 12 },
-  { n: "LEKHA Premium", v: Number(usd(PREM)), us: 1, thb: PREM },
-  { n: "LEKHA Paid", v: Number(usd(PAID)), us: 1, thb: PAID },
+  { n: "Bloomberg Terminal", list: "$31,980 / yr", v: 31980 / 12, focus: "Institutional terminal" },
+  { n: "Koyfin Premium", list: "$79 / mo", v: 79, focus: "Research and dashboards" },
+  { n: "TradingView Premium", list: "$69.95 / mo", v: 69.95, focus: "Charting and screening" },
+  { n: "TIKR Pro", list: "$54.95 / mo", v: 54.95, focus: "Global financials and valuation" },
+  { n: "Finviz Elite", list: "$39.50 / mo", v: 39.5, focus: "Screening and charts" },
+  { n: "Koyfin Plus", list: "$39 / mo", v: 39, focus: "Research and dashboards" },
+  { n: "Morningstar Investor", list: "$34.95 / mo", v: 34.95, focus: "Ratings and portfolio tools" },
+  { n: "TIKR Plus", list: "$24.95 / mo", v: 24.95, focus: "Global financials and valuation" },
+  { n: "Seeking Alpha Premium", list: "$299 / yr", v: 299 / 12, focus: "Analyst ratings and news" },
+  { n: "LEKHA Premium", list: "฿599 / mo", v: Number(usd(PREM)), us: 1, thb: PREM, focus: "Portfolio, filings, valuation, macro, AI" },
+  { n: "Stock Analysis Pro", list: "$9.99 / mo", v: 9.99, focus: "Financial statements and data" },
+  { n: "LEKHA Paid", list: "฿299 / mo", v: Number(usd(PAID)), us: 1, thb: PAID, focus: "Portfolio, filings, valuation, macro, AI" },
 ];
-const SRC_NOTE = `Monthly USD at list price, checked 23 Nov 2026. Koyfin and TradingView at monthly billing; Seeking Alpha $299 a year divided by 12; Bloomberg $31,980 a year per third-party reports, one terminal. LEKHA at 1 USD = ${FX.toFixed(2)} THB.`;
+for (const p of PLATFORMS) p.t = p.us ? p.thb : Math.round(p.v * FX);
+const SRC_NOTE = `Monthly price in baht at list price on monthly billing, checked 23 Nov 2026. USD list prices converted at 1 USD = ${FX.toFixed(2)} THB. Seeking Alpha is $299 a year and Bloomberg is $31,980 a year per third-party reports (one terminal), both divided by 12. Annual billing lowers several competitor prices.`;
 const DISC = "Analysis software, not investment advice. Data may be delayed. Prices in THB, billed monthly through Stripe, renew until cancelled.";
 
 /* ---------- Design tokens: LEKHA Light ---------- */
@@ -51,7 +58,7 @@ h2{font-size:58px;line-height:1.1;font-weight:700;letter-spacing:-.025em}
 .btn{display:inline-block;background:var(--fg);color:#FCF7F0;font-weight:600;font-size:30px;padding:24px 44px;letter-spacing:.01em}
 table{width:100%;border-collapse:collapse}
 th{font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500;text-align:left;padding:0 0 14px;border-bottom:1.5px solid var(--fg)}
-td{padding:22px 0;border-bottom:1px solid var(--line);font-size:27px;vertical-align:top}
+td{padding:13px 0;border-bottom:1px solid var(--line);font-size:23px;vertical-align:top;line-height:1.25}
 .num{font-variant-numeric:tabular-nums}
 .def{display:grid;grid-template-columns:96px 1fr;gap:0 24px;padding:38px 0;border-bottom:1px solid var(--line)}
 .def .n{font-size:22px;color:var(--accent);font-weight:600;letter-spacing:.08em;padding-top:8px}
@@ -61,67 +68,63 @@ td{padding:22px 0;border-bottom:1px solid var(--line);font-size:27px;vertical-al
 `;
 const page = (w, h, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>LEKHA ad</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>${CSS}body{width:${w}px;height:${h}px}</style></head><body>${body}</body></html>`;
+<style>${CSS}body{width:${w}px;height:${h}px}</style></head><body>${body}<script>document.querySelectorAll(".pad[data-center]").forEach(function(p){var k=Array.prototype.slice.call(p.children),top=k[0],foot=k.filter(function(x){return x.classList.contains("foot")})[0],mid=k.filter(function(x){return x!==top&&x!==foot&&!x.classList.contains("grow")});k.filter(function(x){return x.classList.contains("grow")}).forEach(function(x){x.remove()});var e=function(x){return x&&!x.textContent.trim()&&!x.querySelector("img,svg,table")&&x.style.height};while(mid.length&&e(mid[0])){mid[0].remove();mid.shift()}while(mid.length&&e(mid[mid.length-1])){mid[mid.length-1].remove();mid.pop()}var w=document.createElement("div");w.style.cssText="flex:1;display:flex;flex-direction:column;justify-content:center";mid.forEach(function(x){w.appendChild(x)});top.after(w)});</script></body></html>`;
 const head = (tag) => `<div class="top"><img class="logo" src="${LOGO}" alt="LEKHA Financials"><span class="tag">${tag}</span></div>`;
 const sp = (n) => `<div style="height:${n}px"></div>`;
 
 /* ---------- Chart: monthly price, log axis, every axis labelled ---------- */
-function chart(W, rowH = 68) {
+function chart(W, rowH = 68, fs = 23) {
   const L = 330, PW = W - L - 140, top = 54, n = PLATFORMS.length, ph = rowH * n, H = top + ph + 96;
-  const X = (v) => L + (Math.log10(v) / 4) * PW; // 1 .. 10,000
-  const ticks = [1, 10, 100, 1000, 10000];
-  const grid = ticks.map((t) => `<line x1="${X(t)}" y1="${top - 8}" x2="${X(t)}" y2="${top + ph}" stroke="#E3DCCF" stroke-width="1.5"/><text x="${X(t)}" y="${top + ph + 34}" text-anchor="middle" font-size="21" fill="#6E685C" font-family="Inter">${money(t)}</text><line x1="${X(t)}" y1="${top + ph}" x2="${X(t)}" y2="${top + ph + 8}" stroke="#17223B" stroke-width="1.5"/>`).join("");
+  const X = (v) => L + ((Math.log10(v) - 2) / 3) * PW; // 100 .. 100,000
+  const ticks = [100, 1000, 10000, 100000];
+  const grid = ticks.map((t) => `<line x1="${X(t)}" y1="${top - 8}" x2="${X(t)}" y2="${top + ph}" stroke="#E3DCCF" stroke-width="1.5"/><text x="${X(t)}" y="${top + ph + 34}" text-anchor="middle" font-size="21" fill="#6E685C" font-family="Inter">${baht(t)}</text><line x1="${X(t)}" y1="${top + ph}" x2="${X(t)}" y2="${top + ph + 8}" stroke="#17223B" stroke-width="1.5"/>`).join("");
   const rows = PLATFORMS.map((p, i) => {
-    const y = top + i * rowH, bh = rowH * 0.56, by = y + (rowH - bh) / 2, x1 = X(p.v);
-    const label = p.us ? `${money(p.v)}  (฿${p.thb})` : money(p.v);
-    return `<text x="${L - 20}" y="${y + rowH / 2 + 8}" text-anchor="end" font-size="23" font-weight="${p.us ? 700 : 500}" fill="${p.us ? "#0A7A6A" : "#17223B"}" font-family="Inter">${p.n}</text>
+    const y = top + i * rowH, bh = rowH * 0.6, by = y + (rowH - bh) / 2, x1 = X(p.t);
+    const label = baht(p.t);
+    return `<text x="${L - 20}" y="${y + rowH / 2 + fs * 0.34}" text-anchor="end" font-size="${fs}" font-weight="${p.us ? 700 : 500}" fill="${p.us ? "#0A7A6A" : "#17223B"}" font-family="Inter">${p.n}</text>
 <rect x="${L}" y="${by}" width="${x1 - L}" height="${bh}" fill="${p.us ? "#0A7A6A" : "#B9B3A6"}"/>
-<text x="${x1 + 14}" y="${y + rowH / 2 + 8}" font-size="23" font-weight="${p.us ? 700 : 500}" fill="${p.us ? "#0A7A6A" : "#17223B"}" font-family="IBM Plex Mono">${label}</text>`;
+<text x="${x1 + 14}" y="${y + rowH / 2 + fs * 0.34}" font-size="${fs}" font-weight="${p.us ? 700 : 500}" fill="${p.us ? "#0A7A6A" : "#17223B"}" font-family="IBM Plex Mono">${label}</text>`;
   }).join("");
-  const axes = `<line x1="${L}" y1="${top - 8}" x2="${L}" y2="${top + ph}" stroke="#17223B" stroke-width="2"/><line x1="${L}" y1="${top + ph}" x2="${X(10000)}" y2="${top + ph}" stroke="#17223B" stroke-width="2"/>
+  const axes = `<line x1="${L}" y1="${top - 8}" x2="${L}" y2="${top + ph}" stroke="#17223B" stroke-width="2"/><line x1="${L}" y1="${top + ph}" x2="${X(100000)}" y2="${top + ph}" stroke="#17223B" stroke-width="2"/>
 <text x="${L - 20}" y="22" text-anchor="end" font-size="17" letter-spacing="2" fill="#6E685C" font-family="Inter">PLAN</text>
-<text x="${(L + W) / 2}" y="${top + ph + 80}" text-anchor="middle" font-size="20" fill="#6E685C" font-family="Inter">US dollars per month, logarithmic scale</text>`;
+<text x="${(L + W) / 2}" y="${top + ph + 80}" text-anchor="middle" font-size="20" fill="#6E685C" font-family="Inter">Thai baht per month, logarithmic scale</text>`;
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${grid}${axes}${rows}</svg>`;
 }
 
 const S = {};
-const add = (name, w, h, set, body) => (S[name] = { w, h, set, html: page(w, h, body) });
+const CENTER = new Set(["A4-plans", "A6-agent", "B2-sources", "B3-reach", "A-story1", "C-story3", "B-story2"]);
+const add = (name, w, h, set, body) => (S[name] = { w, h, set, html: page(w, h, CENTER.has(name) ? body.replace('class="pad"', 'class="pad" data-center') : body) });
 const W = 1080, H = 1350, SH = 1920;
 const sPad = (inner) => `<div class="pad" style="padding:250px 84px 270px">${inner}</div>`;
 
 /* ================= SET A: paid subscription ================= */
-add("A1-hook", W, H, "A", `<div class="pad">${head("Investment intelligence")}${sp(110)}
+add("A1-hook", W, H, "A", `<div class="pad">${head("Investment intelligence")}${sp(170)}
 <h1>Institutional-grade research.<br><span class="acc">From ฿${PAID} a month.</span></h1>${sp(40)}
 <p class="lead">Portfolio, filings, valuation, macro data and a cited AI analyst in one workspace.</p><div class="grow"></div>
 <div style="display:flex;gap:0;border-top:1.5px solid var(--fg)">
-${[["29", "research pages"], ["13", "data tools in the AI agent"], ["10", "languages"]].map(([a, b], i) => `<div style="flex:1;padding:26px 0 0 ${i ? 28 : 0}px;${i ? "border-left:1px solid var(--line)" : ""}"><div class="fig" style="font-size:78px">${a}</div><div style="font-size:23px;color:var(--muted);margin-top:8px;line-height:1.3">${b}</div></div>`).join("")}</div>
+${[["29", "research pages"], ["13", "data tools in the AI agent"], ["10", "languages"]].map(([a, b], i) => `<div style="flex:1;padding:26px 0 0 ${i ? 28 : 0}px;${i ? "border-left:1px solid var(--line)" : ""}"><div class="fig" style="font-size:104px">${a}</div><div style="font-size:24px;color:var(--muted);margin-top:10px;line-height:1.3;padding-bottom:14px">${b}</div></div>`).join("")}</div>
 <div class="foot">${DISC}</div></div>`);
 
-add("A2-problem", W, H, "A", `<div class="pad">${head("The problem")}${sp(110)}<h2>A professional terminal costs</h2>
-<div class="fig" style="font-size:168px;margin:30px 0 24px">$31,980</div><h2>a year.</h2>${sp(40)}
+add("A2-problem", W, H, "A", `<div class="pad">${head("The problem")}<div class="grow"></div><h2>A professional terminal costs</h2>
+<div class="fig" style="font-size:128px;letter-spacing:-.02em;margin:30px 0 24px">฿1,045,746</div><h2>a year.</h2>${sp(40)}
 <p class="lead">Most independent investors never get that depth of data and analysis. LEKHA Financials is built to close the gap at a fraction of the price.</p>
-<div class="grow"></div><div class="foot">Bloomberg Terminal, one terminal, per third-party reports. Bloomberg does not publish a rate card.</div></div>`);
+<div class="grow"></div><div class="foot">Bloomberg Terminal, one terminal, $31,980 a year per third-party reports, converted at 1 USD = ${FX.toFixed(2)} THB. Bloomberg does not publish a rate card.</div></div>`);
 
-add("A3-prices", W, H, "A", `<div class="pad">${head("Monthly price compared")}${sp(50)}<h2>Priced below<br><span class="acc">every platform shown.</span></h2>${sp(34)}
-${chart(W - 168, 74)}<div class="grow"></div><div class="foot">${SRC_NOTE}</div></div>`);
+add("A3-prices", W, H, "A", `<div class="pad">${head("Monthly price compared")}${sp(50)}<h2>LEKHA Paid is priced below<br><span class="acc">every platform shown.</span></h2>${sp(24)}
+${chart(W - 168, 55, 21)}<div class="grow"></div><div class="foot">${SRC_NOTE}</div></div>`);
 
 add("A4-plans", W, H, "A", `<div class="pad">${head("Plans")}${sp(56)}<h2>Two plans.<br>One clear monthly price.</h2>${sp(40)}
 <div style="display:flex;gap:28px">
 ${[["Paid", PAID, ["Unlimited holdings", "Full price history", "Unlimited valuation symbols", "Cited research agent", "SEC filings, news and macro", "Sector rotation analysis"]],
    ["Premium", PREM, ["Everything in Paid", "AI analyst and daily briefing", "Monte Carlo, up to 1M paths", "Stress tests", "LLM council reports", "80 research requests a day"]]].map(([nm, p, li], i) => `
 <div style="flex:1;background:var(--panel);border:1px solid ${i ? "var(--accent)" : "var(--line)"};border-top:4px solid ${i ? "var(--accent)" : "var(--fg)"};padding:34px 32px 28px">
-<div class="eyebrow">${nm}</div><div class="fig" style="font-size:84px;margin:14px 0 4px">฿${p}</div><div style="font-size:22px;color:var(--muted)">per month · $${usd(p)}</div>
+<div class="eyebrow">${nm}</div><div class="fig" style="font-size:84px;margin:14px 0 4px">฿${p}</div><div style="font-size:22px;color:var(--muted)">per month</div>
 <div class="rule" style="margin:24px 0 8px"></div>${li.map((t) => `<div style="font-size:24px;line-height:1.35;padding:11px 0;border-bottom:1px solid var(--line)">${t}</div>`).join("")}</div>`).join("")}</div>
 <div class="grow"></div><div class="foot">${DISC}</div></div>`);
 
-add("A5-compare", W, H, "A", `<div class="pad">${head("How they compare")}${sp(50)}<h2>Different tools.<br><span class="acc">One workspace.</span></h2>${sp(34)}
-<table><tr><th>Platform</th><th>Primary focus</th><th style="text-align:right">Per month</th></tr>
-<tr><td>Bloomberg Terminal</td><td>Institutional terminal</td><td class="num" style="text-align:right">${money(31980 / 12)}</td></tr>
-<tr><td>Koyfin Premium</td><td>Research and dashboards</td><td class="num" style="text-align:right">$79</td></tr>
-<tr><td>TradingView Premium</td><td>Charting and screening</td><td class="num" style="text-align:right">$69.95</td></tr>
-<tr><td>Seeking Alpha Premium</td><td>Analyst ratings and news</td><td class="num" style="text-align:right">${money(299 / 12)}</td></tr>
-<tr style="color:var(--accent);font-weight:700"><td>LEKHA Premium</td><td>Everything below, plus the AI analyst</td><td class="num" style="text-align:right">$${usd(PREM)}</td></tr>
-<tr style="color:var(--accent);font-weight:700"><td>LEKHA Paid</td><td>Portfolio, filings, valuation, macro, cited AI</td><td class="num" style="text-align:right">$${usd(PAID)}</td></tr></table>
+add("A5-compare", W, H, "A", `<div class="pad">${head("How they compare")}${sp(40)}<h2>Different tools.<br><span class="acc">One workspace.</span></h2>${sp(26)}
+<table><tr><th>Platform</th><th>Primary focus</th><th style="text-align:right">List price</th><th style="text-align:right">THB / month</th></tr>
+${PLATFORMS.map((p) => `<tr${p.us ? ' style="color:var(--accent);font-weight:700"' : ""}><td style="width:290px;padding-right:16px">${p.n}</td><td style="color:${p.us ? "inherit" : "var(--muted)"};font-size:19px;padding-right:12px">${p.focus}</td><td class="num" style="text-align:right;width:140px;font-size:19px">${p.list}</td><td class="num" style="text-align:right;width:120px">${baht(p.t)}</td></tr>`).join("")}</table>
 <div class="grow"></div><div class="foot">${SRC_NOTE} Focus areas are summaries, not complete feature lists.</div></div>`);
 
 add("A6-agent", W, H, "A", `<div class="pad">${head("Cited AI research")}${sp(60)}<h1 style="font-size:72px">An analyst that<br>shows its work.</h1>${sp(30)}
@@ -133,9 +136,9 @@ add("A7-cta", W, H, "A", `<div class="pad">${head("Get started")}<div class="gro
 <p class="lead">Premium is ฿${PREM}. Explore the live demo first, no account needed. Cancel any time.</p>${sp(48)}<div><span class="btn">lekhafinancial.com</span></div><div class="grow"></div><div class="foot">${DISC}</div></div>`);
 
 add("A-story1", W, SH, "A", sPad(`${head("Investment intelligence")}${sp(100)}<h1 style="font-size:92px">Institutional-grade research.<br><span class="acc">From ฿${PAID} a month.</span></h1>${sp(44)}<p class="lead">Portfolio, filings, valuation, macro data and a cited AI analyst in one workspace.</p><div class="grow"></div>`));
-add("A-story2", W, SH, "A", sPad(`${head("Monthly price compared")}${sp(50)}<h2>Priced below<br><span class="acc">every platform shown.</span></h2>${sp(34)}${chart(W - 168, 84)}<div class="grow"></div><div class="foot">${SRC_NOTE}</div>`));
+add("A-story2", W, SH, "A", sPad(`${head("Monthly price compared")}${sp(50)}<h2>LEKHA Paid is priced below<br><span class="acc">every platform shown.</span></h2>${sp(34)}${chart(W - 168, 80, 23)}<div class="grow"></div><div class="foot">${SRC_NOTE}</div>`));
 add("A-story3", W, SH, "A", sPad(`${head("Get started")}<div class="grow"></div><h1 style="font-size:92px">฿${PAID} a month.<br><span class="acc">฿${PREM} for Premium.</span></h1>${sp(50)}<div><span class="btn">lekhafinancial.com</span></div><div class="grow"></div><div class="foot">${DISC}</div>`));
-add("A-square", W, W, "A", `<div class="pad" style="padding:64px 72px 56px">${head("Monthly price compared")}${sp(26)}<h2 style="font-size:50px">Priced below <span class="acc">every platform shown.</span></h2>${sp(14)}${chart(W - 144, 62)}<div class="grow"></div><div class="foot" style="font-size:16px;margin-top:8px;padding-top:12px">${SRC_NOTE}</div></div>`);
+add("A-square", W, W, "A", `<div class="pad" style="padding:64px 72px 56px">${head("Monthly price compared")}${sp(26)}<h2 style="font-size:46px">LEKHA Paid is priced below<br><span class="acc">every platform shown.</span></h2>${sp(4)}${chart(W - 144, 38, 18)}<div class="grow"></div><div class="foot" style="font-size:16px;margin-top:8px;padding-top:12px">${SRC_NOTE}</div></div>`);
 
 /* ================= SET B: brand awareness ================= */
 add("B1-intro", W, H, "B", `<div class="pad">${head("LEKHA Financials")}<div class="grow"></div><h1>One workspace for the<br>whole <span class="acc">research process.</span></h1>${sp(36)}
@@ -152,7 +155,7 @@ add("B-square", W, W, "B", `<div class="pad" style="padding:72px 84px">${head("L
 
 /* ================= SET C: features ================= */
 const feat = (name, tag, title, intro, items, note) => add(name, W, H, "C", `<div class="pad">${head(tag)}${sp(54)}<h2>${title}</h2>${sp(18)}<p class="lead" style="font-size:30px">${intro}</p>${sp(26)}
-${items.map(([h, p], i) => `<div class="def"><div class="n">0${i + 1}</div><div><h3>${h}</h3><p>${p}</p></div></div>`).join("")}<div class="grow"></div><div class="foot">${note || "Analysis software, not investment advice. Data may be delayed."}</div></div>`);
+${items.map(([h, p], i) => `<div class="def" style="flex:1;align-content:center${i === items.length - 1 ? ";border-bottom:none" : ""}"><div class="n">0${i + 1}</div><div><h3>${h}</h3><p>${p}</p></div></div>`).join("")}<div class="foot">${note || "Analysis software, not investment advice. Data may be delayed."}</div></div>`);
 
 add("C1-cover", W, H, "C", `<div class="pad">${head("The LEKHA toolkit")}<div class="grow"></div><h1>Everything a<br><span class="acc">research desk</span><br>needs.</h1>${sp(40)}<p class="lead">Seven capabilities, one workspace, one account. Swipe through the toolkit.</p><div class="grow"></div><div class="foot">${DISC}</div></div>`);
 feat("C2-portfolio", "01 · Portfolio", "Your holdings, measured.", "Value, performance and risk, written in plain language.", [
@@ -185,9 +188,9 @@ feat("C8-access", "07 · Built for you", "Your workspace, your way.", "Configure
   ["Guided start", "A ten-step tour, a command palette and a live demo that needs no account."]]);
 add("C9-cta", W, H, "C", `<div class="pad">${head("Get started")}<div class="grow"></div><h1>See it for<br><span class="acc">yourself.</span></h1>${sp(36)}<p class="lead">Open the live demo, then choose Paid at ฿${PAID} or Premium at ฿${PREM} a month.</p>${sp(48)}<div><span class="btn">lekhafinancial.com</span></div><div class="grow"></div><div class="foot">${DISC}</div></div>`);
 add("C-story1", W, SH, "C", sPad(`${head("The LEKHA toolkit")}<div class="grow"></div><h1 style="font-size:92px">Everything a <span class="acc">research desk</span> needs.</h1>${sp(40)}<p class="lead">Portfolio, company research, valuation, macro, simulation and cited AI.</p><div class="grow"></div>`));
-add("C-story2", W, SH, "C", sPad(`${head("Seven capabilities")}${sp(40)}${[["01", "Portfolio and risk"], ["02", "Company research"], ["03", "Valuation"], ["04", "Macro and rotation"], ["05", "Simulation"], ["06", "Cited AI research"], ["07", "Ten languages, 100 themes"]].map(([a, b]) => `<div style="display:flex;gap:28px;align-items:baseline;padding:26px 0;border-bottom:1px solid var(--line)"><span style="font-size:24px;font-weight:600;color:var(--accent)">${a}</span><span style="font-size:42px;font-weight:700;letter-spacing:-.02em">${b}</span></div>`).join("")}<div class="grow"></div>`));
+add("C-story2", W, SH, "C", sPad(`${head("Seven capabilities")}<div style="flex:1;display:flex;flex-direction:column;margin-top:10px">${[["01", "Portfolio and risk"], ["02", "Company research"], ["03", "Valuation"], ["04", "Macro and rotation"], ["05", "Simulation"], ["06", "Cited AI research"], ["07", "Ten languages, 100 themes"]].map(([a, b], i, all) => `<div style="flex:1;display:flex;gap:28px;align-items:center;${i < all.length - 1 ? "border-bottom:1px solid var(--line)" : ""}"><span style="font-size:24px;font-weight:600;color:var(--accent)">${a}</span><span style="font-size:44px;font-weight:700;letter-spacing:-.02em">${b}</span></div>`).join("")}</div>`));
 add("C-story3", W, SH, "C", sPad(`${head("Get started")}<div class="grow"></div><h1 style="font-size:92px">See it for <span class="acc">yourself.</span></h1>${sp(44)}<div><span class="btn">lekhafinancial.com</span></div><div class="grow"></div><div class="foot">${DISC}</div>`));
-add("C-square", W, W, "C", `<div class="pad" style="padding:72px 84px">${head("The LEKHA toolkit")}<div class="grow"></div><h1 style="font-size:72px">Everything a research desk needs.</h1>${sp(26)}<p class="lead" style="font-size:28px">Portfolio · Company research · Valuation · Macro · Simulation · Cited AI</p><div class="grow"></div></div>`);
+add("C-square", W, W, "C", `<div class="pad" style="padding:72px 84px">${head("The LEKHA toolkit")}<div class="grow"></div><h1 style="font-size:72px">Everything a research desk needs.</h1>${sp(26)}<p class="lead" style="font-size:28px">Portfolio · Company research · Valuation<br>Macro · Simulation · Cited AI</p><div class="grow"></div></div>`);
 
 /* ---------- write + render ---------- */
 for (const [n, s] of Object.entries(S)) writeFileSync(join(SRC, n + ".html"), s.html);
@@ -200,6 +203,11 @@ for (const [n, s] of Object.entries(S)) {
   await p.goto("file://" + join(SRC, n + ".html"), { waitUntil: "load" }).catch(() => {});
   await p.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
   await p.waitForTimeout(300);
+  const bad = await p.evaluate(() => { const pad = document.querySelector(".pad"), r = [], W = innerWidth, H = innerHeight;
+    if (pad.scrollHeight > pad.clientHeight + 1) r.push("pad overflows by " + (pad.scrollHeight - pad.clientHeight));
+    for (const e of document.querySelectorAll("body *")) { if (e.classList.contains("pad")) continue; const b = e.getBoundingClientRect(); if (b.width && (b.right > W - 40 || b.left < 40 && e.tagName !== "svg" || b.bottom > H - 40)) { if (!e.closest("svg") || e.tagName === "text") r.push(e.tagName + " " + Math.round(b.left) + "," + Math.round(b.top) + "," + Math.round(b.right) + "," + Math.round(b.bottom) + " " + (e.textContent || "").slice(0, 30)); } }
+    return r.slice(0, 6); });
+  if (bad.length) console.log("CHECK", n, JSON.stringify(bad));
   await p.screenshot({ path: join(OUT, n + ".png") });
   await ctx.close();
 }

@@ -13,31 +13,39 @@ Stories and Reels keep text inside the safe zone (250 px top, 270 px bottom).
 
 ## Prices shown
 LEKHA Paid THB 299 per month, Premium THB 599 per month (live Stripe prices created 23 Nov 2026).
-USD figures use 1 USD = 32.70 THB: Paid $9.14, Premium $18.32.
+Everything in the creatives is in Thai baht. Competitor USD list prices are converted at 1 USD = 32.70 THB and rounded to the whole baht (the rate is stated on each price slide). Change `FX` in `build.mjs` and rebuild if the rate moves.
 
-| Platform | Monthly USD | Basis | Source |
+| Platform | USD list price | THB per month | Source |
 |---|---|---|---|
-| Bloomberg Terminal | $2,665 | $31,980 a year, one terminal, third-party reports | https://www.koyfin.com/blog/bloomberg-terminal-cost/ , https://privateequitylist.com/intelligence/bloomberg-terminal-cost |
-| Koyfin Premium | $79 | monthly billing | https://www.koyfin.com/pricing/ |
-| Koyfin Plus | $39 | monthly billing | https://www.koyfin.com/pricing/ |
-| TradingView Premium | $69.95 | monthly billing; $59.95 per month on annual billing | https://www.tradingview.com/pricing/ |
-| Seeking Alpha Premium | $24.92 | $299 a year divided by 12 | https://about.seekingalpha.com/premium-subscription-price-update |
+| Bloomberg Terminal | $31,980 a year, one terminal (third-party reports) | 87,146 | https://www.koyfin.com/blog/bloomberg-terminal-cost/ , https://privateequitylist.com/intelligence/bloomberg-terminal-cost |
+| Koyfin Premium | $79 a month | 2,583 | https://www.koyfin.com/pricing/ |
+| TradingView Premium | $69.95 a month ($59.95 on annual billing) | 2,287 | https://www.tradingview.com/pricing/ |
+| TIKR Pro | $54.95 a month | 1,797 | https://www.tikr.com/pricing |
+| Finviz Elite | $39.50 a month ($299.50 a year) | 1,292 | https://finviz.com/elite |
+| Koyfin Plus | $39 a month | 1,275 | https://www.koyfin.com/pricing/ |
+| Morningstar Investor | $34.95 a month ($249 a year) | 1,143 | https://www.morningstar.com/mm/investor/affiliate |
+| TIKR Plus | $24.95 a month | 816 | https://www.tikr.com/pricing |
+| Seeking Alpha Premium | $299 a year | 815 | https://about.seekingalpha.com/premium-subscription-price-update |
+| Stock Analysis Pro | $9.99 a month | 327 | https://stockanalysis.com/pro/ |
+| LEKHA Premium | THB 599 a month | 599 | live Stripe price |
+| LEKHA Paid | THB 299 a month | 299 | live Stripe price |
 
 Re-check every figure on the vendor page on the day the ads go live. Bloomberg publishes no rate card, so that number rests on third-party reports.
-Koyfin and TradingView discount annual billing; the chart uses monthly list price for those two.
+The chart compares monthly list prices. Several competitors are cheaper on annual billing (for example TIKR Plus about $17.95 a month and Stock Analysis Pro $79 a year), and LEKHA bills monthly only, so do not claim LEKHA is cheaper on an annual basis.
+Considered and left out because no current list price could be confirmed: YCharts (quote-based), Simply Wall St (official page showed no price in search).
 
 ## Claims policy used in the creatives
-- Price claim: "Priced below every platform shown" is true for the plans and billing intervals listed above, and the source note is on every price slide.
+- Price claim: "LEKHA Paid is priced below every platform shown" is true for the plans and monthly billing listed above (LEKHA Premium is above Stock Analysis Pro, so the headline names Paid), and the source note is on every price slide.
 - No "same features" claim. Slide A5 compares primary focus only and says it is not a full feature list; the feature slides (Set C) describe LEKHA only. Do not add a competitor feature matrix without verifying each cell on the vendor site.
 - No performance, return or advice claims. Monte Carlo, stress tests and council reports are marked Premium.
 
 ## Ad copy (Set A, conversions)
 Primary text
 1. Institutional-grade research from THB 299 a month. Portfolio, filings, valuation, macro data and an AI analyst that cites its sources, in one workspace. Try the live demo, no account needed.
-2. A professional terminal costs $31,980 a year. LEKHA Financials starts at THB 299 a month. See the comparison.
+2. A professional terminal costs THB 1,045,746 a year. LEKHA Financials starts at THB 299 a month. See the comparison.
 3. Every number the AI analyst states is checked against the evidence it cites. Fact, calculated, interpretation, speculation: each claim is labelled.
 
-Headlines: "Institutional-grade research" · "Priced below every platform shown" · "An analyst that shows its work"
+Headlines: "Institutional-grade research" · "LEKHA Paid is priced below every platform shown" · "An analyst that shows its work"
 Description: "Plans from THB 299 a month." · "Cancel any time."
 CTA button: Learn more (or Sign up). Link: https://lekhafinancial.com with UTM `utm_source=meta&utm_medium=paid&utm_campaign=paid_subscription&utm_content=<creative>`.
 
