@@ -346,14 +346,14 @@
     holdingSymbols().forEach(function (s) {
       var t = holdingMap()[s], px = closesOf(s)[closesOf(s).length - 1];
       var f = FUND_CFG[t];
-      if (t === "SMH") { lines.push("SMH," + px + "," + Math.round(px * 505e6 / 1e3) + ",505000000,1.25,,,USD,ETF"); return; }
+      if (t === "SMH") { lines.push("SMH," + px + "," + Math.round(px * 505e6) + ",505000000,1.25,,,USD,ETF"); return; }
       if (/\.BK$|\.HK$/.test(s)) return;
       if (!f) {
         var r = mulberry32(hash("val:" + t)), sh = Math.round((300 + r() * 8000)) * 1e6, pe = Math.round(8 + r() * 40);
-        lines.push([t, px.toFixed(2), Math.round(px * sh / 1e6), sh, (0.7 + r() * 1.3).toFixed(3), pe, (px / pe).toFixed(2), "USD", "Common Stock"].join(","));
+        lines.push([t, px.toFixed(2), Math.round(px * sh), sh, (0.7 + r() * 1.3).toFixed(3), pe, (px / pe).toFixed(2), "USD", "Common Stock"].join(","));
         return;
       }
-      lines.push([t, px.toFixed(2), Math.round(px * f.sh * 1e6 / 1e6), f.sh * 1e6, betaVsSpy(s).toFixed(3), f.pe, f.eps, "USD", "Common Stock"].join(","));
+      lines.push([t, px.toFixed(2), Math.round(px * f.sh * 1e6), f.sh * 1e6, betaVsSpy(s).toFixed(3), f.pe, f.eps, "USD", "Common Stock"].join(","));
     });
     lines.push("UPDATED," + at);
     return lines.join("\n");
@@ -383,12 +383,17 @@
       da.push(Math.round(r * 0.035)); sbc.push(Math.round(r * (0.02 + rnd() * 0.05)));
       fcf.push(Math.round(r * (0.14 + rnd() * 0.14)));
     }
+    /* Scale the simulated history to the demo market cap (a 2025 price/sales around 2.6, which puts most of the demo values near its demo prices) so the
+       values in the demo are plausible next to the demo prices instead of a million times off. */
+    var pxc = closesOf(t), pxv = pxc && pxc.length ? pxc[pxc.length - 1] : 100;
+    var revNow = (cfg.sh * 1e6 * pxv) / (cfg.ps || 2.6) / 1e6, k = revNow / (rev[rev.length - 1] || 1);
+    for (var i = 0; i < rev.length; i++) { rev[i] = Math.round(rev[i] * k); ocf[i] = Math.round(ocf[i] * k); da[i] = Math.round(da[i] * k); sbc[i] = Math.round(sbc[i] * k); fcf[i] = Math.round(fcf[i] * k); }
     var rev3 = rev.slice(-3), g = +(Math.pow(rev3[2] / rev3[0], 1 / 2) - 1).toFixed(3);
     return {
       t: t, method: "dcf", cls: cfg.cls, clsAuto: true, sector: cfg.sector, ai: false,
       cur: "USD", bsCur: "USD", basis: "fcf", shareMode: "mc", asOf: daysAgoIso(4),
       cols: cols, ends: ends, rev: rev, fcf: fcf, ocf: ocf, da: da, sbc: sbc,
-      debt: Math.round(base * (0.2 + rnd() * 0.5)), netcash: Math.round(base * (rnd() * 0.8 - 0.2)),
+      debt: Math.round(rev[0] * (0.2 + rnd() * 0.5)), netcash: Math.round(rev[0] * (rnd() * 0.8 - 0.2)),
       rev_ttm: rev[6], fcf_ttm: fcf[6],
       fc: { fy: "FY2025", end: "2025-12-31", rev: rev3, g: g, glh: 1, eps: cfg.eps, pt: cfg.pe, basis: "trailing", note: "Simulated consensus for the demo — not a real estimate." },
       src: { cf: "Simulated XBRL extract (demo)", bs: "Simulated balance sheet (demo)" }

@@ -149,8 +149,16 @@ function dedupe(items) {
 // text is cleaned on the way out as well as on the way in, so rows already sitting in the shared cache are fixed too
 const cleanText = (t) => (t == null ? t : P.news.decode(t));
 async function getNews(opts = {}) {
-  const { asOf = null } = opts, limit = Math.max(1, Math.min(60, +opts.limit || 25));
-  if (asOf) { const r = await getNews({ symbol: opts.symbol, category: opts.category, query: opts.query, limit: 150 }); return { data: r.data.filter((n) => day(n.publishedAt) <= asOf).slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines are not archived for the demo date." } }; }
+  const { asOf = null } = opts, limit = Math.max(1, Math.min(150, +opts.limit || 25));
+  if (asOf) {
+    // News has no archive: the live feeds only carry recent days, so filtering to the demo cut-off would return
+    // nothing. Keep the cut-off where it has an effect (older items) and fall back to the current feed otherwise.
+    const r = await getNews({ symbol: opts.symbol, category: opts.category, query: opts.query, limit: 150 });
+    const cut = r.data.filter((n) => day(n.publishedAt) <= asOf);
+    return cut.length
+      ? { data: cut.slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines up to the demo date." } }
+      : { data: r.data.slice(0, limit), meta: { ...r.meta, asOf, note: "Live headlines: news is not archived for the demo date, so the current feed is shown." } };
+  }
   const r = await getNewsCached(opts);
   return { ...r, data: (r.data || []).slice(0, limit).map((n) => ({ ...n, headline: cleanText(n.headline), summary: cleanText(n.summary) })) };
 }
@@ -164,7 +172,7 @@ async function getNewsCached({ symbol = null, category = null, query = null } = 
     if (!parts.length) { const e = new Error("no_provider_for_news"); e.attempts = attempts; e.status = 502; throw e; }
     let items = dedupe(parts); if (category) items = items.filter((n) => n.category === category); if (query) { const q = query.toLowerCase(); items = items.filter((n) => (n.headline + " " + (n.summary || "")).toLowerCase().includes(q)); }
     return { data: items.slice(0, 150), source: "merged", attempts };
-  }, { ttl: 10 * 6e4 });
+  }, { ttl: 30 * 6e4 });
 }
 
 // ---------------- earnings / estimates / peers ----------------

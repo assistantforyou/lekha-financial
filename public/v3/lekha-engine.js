@@ -1180,7 +1180,10 @@ function vDcf(R0,g1,m,m0,W,gT,cap,d,N){N=N||VAL_N;let R=R0*(1+g1),pv=0,gt=Math.m
 function vUniform(R0,g,m,m0,W,gT,N){N=N||VAL_N;let R=R0,pv=0,fcf=0;for(let t=1;t<=N;t++){R*=1+g;const mt=m+(m0-m)*Math.pow(VAL_LAM,t);fcf=R*mt/100;pv+=fcf/Math.pow(1+W/100,t)}
   return pv+fcf*(1+gT/100)/(W/100-gT/100)/Math.pow(1+W/100,N)}
 function vLive(L,t){return L&&L.rows[t]||null}
-function vShares(f,lv){return f.shareMode==="gf"?lv.sh:lv.mcap/lv.px}
+/* Share count decides the per-share value, so a unit slip here multiplies every valuation.
+   The sheet’s own share column wins whenever the market-cap route disagrees with it by 1000x or more. */
+function vShares(f,lv){if(f.shareMode==="gf")return lv.sh;const derived=lv.mcap/lv.px;
+  if(isFinite(lv.sh)&&lv.sh>0&&isFinite(derived)&&(derived/lv.sh>1e3||derived/lv.sh<1e-3))return lv.sh;return derived}
 /* ctx: {rf, erp, sbc, mos:{quality,growth,cyclical,speculative}, L (live inputs)} */
 function valueOne(f,ctx){const t=f.t;const lv=vLive(ctx.L,t);
   const r={t,method:f.method,cls:f.cls,sector:f.sector,ai:!!f.ai,notes:[],iv:null,px:lv?lv.px:null,asOf:f.asOf};
@@ -1299,32 +1302,44 @@ function renderValMissing(){const el=$("val-miss");if(!el)return;const rows=[],s
     else if(!r&&S.fundLoaded&&!S.fund[t])why=(window.PT_VAL_SKIPPED||[]).includes(t)?("Beyond your plan's "+((window.PT_LIMITS&&PT_LIMITS.valSymbols)||12)+"-symbol valuation limit. Paid and Premium value every holding — no symbol limit."):(window.PT_VAL_FAILED||[]).includes(t)?"This batch could not be fetched just now — use Refresh to retry.":"No fundamentals returned for this ticker.";
     if(why)rows.push(`<tr><td class="l"><b>${esc(t)}</b></td><td class="l">${esc(why)}</td></tr>`)}
   el.hidden=!rows.length;if(rows.length)$("val-miss-body").innerHTML=rows.join("")}
-function renderValA(){const box=$("val-a");if(!S.vres){box.innerHTML=valEmptyHtml();const b=box.querySelector("[data-act]");if(b)b.onclick=()=>{b.dataset.act==="ov"?setTab("ov"):window.PT_RELOAD_VAL&&window.PT_RELOAD_VAL()};return}
-  const rows=vRows();const w=Math.max(320,box.clientWidth||800);const mob=w<560;const LW=mob?50:66,RW=mob?62:150,PL=LW+6,PW=w-LW-RW-14;const RH=mob?26:28,top=26;
-  let xmax=200;for(const r of rows)if(r.iv)xmax=Math.max(xmax,Math.min(400,r.iv.bull/r.px*100));xmax=Math.ceil(xmax/50)*50;
-  const X=v=>PL+Math.max(0,Math.min(v,xmax))/xmax*PW;const H=top+rows.length*RH+8;
-  let s=`<svg width="${w}" height="${H}" role="img" aria-label="Intrinsic value range for each holding, price set to 100">`;
-  for(let v=0;v<=xmax;v+=(mob?100:50)){s+=`<line x1="${X(v)}" x2="${X(v)}" y1="${top-6}" y2="${H-6}" stroke="var(--line)" ${v===100?'':'stroke-dasharray="2 3"'}/><text x="${X(v)}" y="${top-10}" text-anchor="middle" class="ax">${v}</text>`}
-  rows.forEach((r,i)=>{const y=top+i*RH,cy=y+RH/2;const sel=r.t===S.vSel;const col=V_STAT[r.status||"na"];
+function renderValA(){const box=$("val-a");if(!box)return;
+  if(!S.vres){box.innerHTML=valEmptyHtml();const b=box.querySelector("[data-act]");if(b)b.onclick=()=>{b.dataset.act==="ov"?setTab("ov"):window.PT_RELOAD_VAL&&window.PT_RELOAD_VAL()};return}
+  const rows=vRows();if(!rows.length){box.innerHTML='<div class="empty"><b>Nothing to plot yet.</b><br>Intrinsic value is drawn for the stocks you hold. Add positions on the Overview tab.</div>';return}
+  const w=Math.max(320,box.clientWidth||800);const mob=w<560;
+  const LW=mob?50:66,RW=mob?66:172,PL=LW+6,PW=Math.max(80,w-LW-RW-14),RH=mob?26:28,top=30;
+  const ok=r=>!!(r.iv&&isFinite(r.px)&&r.px>0&&isFinite(r.iv.bear)&&isFinite(r.iv.base)&&isFinite(r.iv.bull));
+  const nz=(r,v)=>v/r.px*100;
+  /* Today's price is normalised to 100, so every stock shares one axis. The axis is fitted to the data
+     (never a fixed 200) and capped at 500, where an arrow marks a range that runs past the edge. */
+  let hi=125;
+  for(const r of rows){if(!ok(r))continue;hi=Math.max(hi,nz(r,r.iv.bull),nz(r,r.iv.base),nz(r,r.iv.bear));if(isFinite(r.buy)&&r.buy>0)hi=Math.max(hi,nz(r,r.buy))}
+  const capped=hi>500;const step=(mob||hi>300)?100:50;hi=Math.min(500,Math.ceil(hi/step)*step);
+  const X=v=>PL+Math.max(0,Math.min(v,hi))/hi*PW;
+  const H=top+rows.length*RH+10;
+  let s=`<svg width="${w}" height="${H}" role="img" aria-label="Intrinsic value range per holding, today's price set to 100">`;
+  for(let v=0;v<=hi;v+=step)s+=`<line x1="${X(v)}" x2="${X(v)}" y1="${top-8}" y2="${H-10}" stroke="var(--line)" ${v===100?"":'stroke-dasharray="2 3"'}/><text x="${X(v)}" y="${top-12}" text-anchor="middle" class="ax">${v}</text>`;
+  rows.forEach((r,i)=>{const y=top+i*RH,cy=y+RH/2,sel=r.t===S.vSel,col=V_STAT[r.status||"na"];
     s+=`<g class="va-row" data-t="${esc(r.t)}" style="cursor:pointer"><rect x="0" y="${y}" width="${w}" height="${RH}" fill="${sel?"var(--accent-soft)":"transparent"}"/>`;
     s+=`<text x="4" y="${cy+4}" class="lb">${esc(r.t)}</text>`;
-    if(r.iv){const b1=X(r.iv.bear/r.px*100),b2=X(r.iv.bull/r.px*100),bb=X(r.iv.base/r.px*100),bp=X(r.buy/r.px*100);
+    if(ok(r)){
+      const b1=X(nz(r,r.iv.bear)),b2=X(nz(r,r.iv.bull)),bb=X(nz(r,r.iv.base));
       s+=`<rect x="${b1}" y="${cy-6}" width="${Math.max(2,b2-b1)}" height="12" rx="2" fill="${col}" fill-opacity=".22" stroke="${col}" stroke-opacity=".55"/>`;
-      if(r.iv.bull/r.px*100>xmax)s+=`<path d="M${b2-1} ${cy-6} l6 6 l-6 6z" fill="${col}"/>`;
+      if(capped&&nz(r,r.iv.bull)>hi)s+=`<path d="M${b2-2} ${cy-6} l7 6 l-7 6 z" fill="${col}"/>`;
       s+=`<line x1="${bb}" x2="${bb}" y1="${cy-9}" y2="${cy+9}" stroke="${col}" stroke-width="3"/>`;
-      s+=`<path d="M${bp} ${cy-5} l4 5 l-4 5 l-4 -5z" fill="var(--panel)" stroke="var(--fg)" stroke-width="1.3"/>`;
-      s+=`<text x="${w-4}" y="${cy+4}" text-anchor="end" class="rv" fill="${col}">${mob?pm(r.mos):"Base "+usd(r.iv.base,r.iv.base>=100?0:2)+" · MOS "+pm(r.mos)}</text>`}
-    else s+=`<text x="${PL+4}" y="${cy+4}" class="na">${r.method==="nav"?(mob?"Fund · NAV":"Fund · valued at NAV, no DCF"):(mob?"No value · reverse DCF":"Insufficient confidence · reverse DCF only")}</text>`;
+      if(isFinite(r.buy)&&r.buy>0){const bp=X(nz(r,r.buy));s+=`<path d="M${bp} ${cy-5} l4 5 l-4 5 l-4 -5z" fill="var(--panel)" stroke="var(--fg)" stroke-width="1.3"/>`}
+      s+=`<text x="${w-4}" y="${cy+4}" text-anchor="end" class="rv" fill="${col}">${mob?pm(r.mos):"Base "+usd(r.iv.base)+" · MOS "+pm(r.mos)}</text>`}
+    else if(r.method==="nav")s+=`<text x="${PL+4}" y="${cy+4}" class="na">${mob?"Fund · NAV":"Fund · valued at NAV, no DCF"}</text>`;
+    else s+=`<text x="${PL+4}" y="${cy+4}" class="na">${isFinite(r.px)&&r.px>0?(mob?"No value · reverse DCF":"Insufficient confidence · reverse DCF only"):"No live price, so no range"}</text>`;
     s+=`</g>`});
-  s+=`<line x1="${X(100)}" x2="${X(100)}" y1="${top-6}" y2="${H-6}" stroke="var(--fg)" stroke-width="1.5"/></svg>`;
+  s+=`<line x1="${X(100)}" x2="${X(100)}" y1="${top-8}" y2="${H-10}" stroke="var(--fg)" stroke-width="1.5"/></svg>`;
   box.innerHTML=s;box.style.position="relative";
-  box.querySelectorAll(".va-row").forEach(g=>{const r=S.vres.res[g.dataset.t];
+  box.querySelectorAll(".va-row").forEach(g=>{const r=S.vres.res[g.dataset.t];if(!r)return;
     g.addEventListener("mousemove",e=>{const b=box.getBoundingClientRect();vTip(box,tipFor(r),e.clientX-b.left,e.clientY-b.top)});
     g.addEventListener("mouseleave",()=>vTip(box,null));
     g.addEventListener("click",()=>{S.vSel=r.t;S.vCustom=null;renderValAll(true)})})}
 /* ---- Graph B: diverging margin of safety ---- */
 function renderValB(){const box=$("val-b");if(!S.vres){box.innerHTML="";return}
-  const rows=Object.values(S.vres.res).filter(r=>r.iv&&r.value>0).sort((a,b)=>b.mos-a.mos);
+  const rows=Object.values(S.vres.res).filter(r=>r.iv&&r.value>0&&isFinite(r.mos)&&isFinite(r.px)&&r.px>0).sort((a,b)=>b.mos-a.mos);
   const w=Math.max(320,box.clientWidth||800);const mob=w<560;const LW=mob?50:66,RW=mob?78:120,PL=LW+6,PW=w-LW-RW-14,RH=22,top=22;const lo=-200,hi=100;
   const X=v=>PL+(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*PW;const H=top+rows.length*RH+6;
   let s=`<svg width="${w}" height="${H}" role="img" aria-label="Margin of safety for each stock against its required threshold">`;
@@ -1332,8 +1347,8 @@ function renderValB(){const box=$("val-b");if(!S.vres){box.innerHTML="";return}
   rows.forEach((r,i)=>{const y=top+i*RH,cy=y+RH/2,m=r.mos*100,col=V_STAT[r.status];const x0=X(0),x1=X(m);
     s+=`<g class="vb-row" data-t="${esc(r.t)}" style="cursor:pointer"><rect x="0" y="${y}" width="${w}" height="${RH}" fill="${r.t===S.vSel?"var(--accent-soft)":"transparent"}"/><text x="4" y="${cy+4}" class="lb">${esc(r.t)}</text>`;
     s+=`<rect x="${Math.min(x0,x1)}" y="${cy-6}" width="${Math.max(1,Math.abs(x1-x0))}" height="12" fill="${col}" fill-opacity=".85"/>`;
-    if(m<lo)s+=`<path d="M${X(lo)+1} ${cy} l6 -6 v12z" fill="var(--panel)"/>`;
-    s+=`<line x1="${X(r.reqMos*100)}" x2="${X(r.reqMos*100)}" y1="${cy-9}" y2="${cy+9}" stroke="var(--fg)" stroke-width="2"/>`;
+    if(m<lo)s+=`<path d="M${X(lo)+1} ${cy} l6 -6 v12z" fill="${col}"/>`;
+    if(isFinite(r.reqMos))s+=`<line x1="${X(r.reqMos*100)}" x2="${X(r.reqMos*100)}" y1="${cy-9}" y2="${cy+9}" stroke="var(--fg)" stroke-width="2"/>`;
     s+=`<text x="${w-4}" y="${cy+4}" text-anchor="end" class="rv"><tspan fill="${col}">${pm(r.mos)}</tspan><tspan class="muted" dx="6">w ${pu(r.weight,1)}</tspan></text></g>`});
   box.innerHTML=s+"</svg>";box.style.position="relative";
   box.querySelectorAll(".vb-row").forEach(g=>{const r=S.vres.res[g.dataset.t];g.addEventListener("mousemove",e=>{const b=box.getBoundingClientRect();vTip(box,tipFor(r),e.clientX-b.left,e.clientY-b.top)});
@@ -1391,7 +1406,8 @@ function renderValC(){const box=$("val-c"),sel=$("val-sel");if(!S.vres){box.inne
       $("vs-iv").textContent=usd(cu.iv);$("vs-mos").textContent=pc(cu.iv>0?(cu.iv-r.px)/cu.iv:null);drawValCChart(r,f)}));
     $("vs-reset").onclick=()=>{S.vCustom=null;renderValC()}}}
 function drawValCChart(r,f){const box=$("vc-chart");if(!box)return;const cu=vCustom(r,f,S.vCustom);const fx=r.fx/1000;
-  const hist=r.cash.map((v,i)=>({lab:f.cols[i]==="TTM"?"TTM":f.cols[i].replace("FY20","FY"),v:v*fx})).reverse();
+  const hist=r.cash.map((v,i)=>({lab:f.cols[i]==="TTM"?"TTM":f.cols[i].replace("FY20","FY"),v:v*fx})).reverse().filter(h=>isFinite(h.v));
+  if(!hist.length||!isFinite(cu.iv)){box.innerHTML="<div class=\"empty\">No usable cash-flow history for this company, so the projection is not drawn.</div>";return}
   const proj=k=>r.rows[k].map(x=>x.fcf*fx);const P={bear:proj("bear"),base:proj("base"),bull:proj("bull"),you:cu.rows.map(x=>x.fcf*fx)};
   const n=hist.length+VAL_N;const all=[...hist.map(h=>h.v),...P.bear,...P.bull,...P.you,0];const ymin=Math.min(...all),ymax=Math.max(...all);
   const w=Math.max(320,box.clientWidth||800),H=230,pl=48,pr=10,pt=14,pb=26;const X=i=>pl+(i+0.5)*(w-pl-pr)/n,Y=v=>pt+(ymax-v)/(ymax-ymin||1)*(H-pt-pb);const bw=Math.max(3,(w-pl-pr)/n*0.6);

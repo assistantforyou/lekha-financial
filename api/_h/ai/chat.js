@@ -13,6 +13,12 @@ const ds = require("../../_ai/ds");
 const DAY = 86400000;
 const MAX_MESSAGES = 40;
 
+// How long a repeated question may be answered from cache. A price answer is only good for minutes,
+// a general explanation stays right for a week. DeepSeek's own prefix cache is separate: it is
+// automatic, lasts a few hours on their side and cannot be extended from here.
+const ANSWER_TTL = { company: 30 * 60000, portfolio: 15 * 60000, macro: 2 * 3600000, general: 7 * DAY };
+const answerTtl = (kind) => ANSWER_TTL[kind] || 30 * 60000;
+
 const LIMITS = {
   demo: { turns: 15, deep: 0 },
   free: { turns: 30, deep: 0 },
@@ -101,7 +107,7 @@ module.exports = async function handler(req, res) {
   if (ck) {
     try {
       const c = await cacheGet(ck);
-      if (c && c.text && Date.now() - Number(c.at || 0) < 10 * 60000) hit = c;
+      if (c && c.text && Date.now() - Number(c.at || 0) < answerTtl(c.kind)) hit = c;
     } catch (e) { hit = null; }
   }
 
@@ -124,6 +130,7 @@ module.exports = async function handler(req, res) {
 
   let answer = "";
   let evidencePart = null;
+  let planKind = null;
   try {
     for await (const part of loop.run({
       question: message,
@@ -139,6 +146,7 @@ module.exports = async function handler(req, res) {
     })) {
       if (part.type === "text") answer += part.text;
       if (part.type === "evidence") evidencePart = part;
+      if (part.type === "plan") planKind = part.kind;
       send(res, part);
     }
   } catch (e) {
@@ -151,7 +159,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (ck && answer) {
-    try { await cacheSet(ck, { at: Date.now(), text: answer, evidence: evidencePart }); } catch (e) { /* cache is optional */ }
+    try { await cacheSet(ck, { at: Date.now(), text: answer, evidence: evidencePart, kind: planKind }); } catch (e) { /* cache is optional */ }
   }
 
   if (persisted && !aborted) {
