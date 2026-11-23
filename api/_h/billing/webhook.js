@@ -8,9 +8,9 @@ const raw = (req) => new Promise((resolve, reject) => { const c = []; req.on("da
 function planOf(sub) {
   const price = sub.items?.data?.[0]?.price?.id;
   if (!price) throw new Error("Missing subscription price");
-  if (price === process.env.STRIPE_PRICE_PAID) return "paid";
-  const legacy = (process.env.STRIPE_LEGACY_PREMIUM_PRICES || "").split(",").map(s => s.trim());
-  if (price === process.env.STRIPE_PRICE_PREMIUM || legacy.includes(price)) return "premium";
+  const list = (name) => (process.env[name] || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (price === process.env.STRIPE_PRICE_PAID || list("STRIPE_LEGACY_PAID_PRICES").includes(price)) return "paid";
+  if (price === process.env.STRIPE_PRICE_PREMIUM || list("STRIPE_LEGACY_PREMIUM_PRICES").includes(price)) return "premium";
   throw new Error("Unmapped subscription price");
 }
 
