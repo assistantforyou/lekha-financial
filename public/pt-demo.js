@@ -60,6 +60,11 @@
     { tk: "PTT.BK", acct: "Demo Bank", theme: "Energy", cur: "THB", qty: 200, avg: 32.10, px: 34.25, dr: 1.8e-4, vo: 0.009, be: 0.7 },
     { tk: "JNJ", acct: "Demo Retirement", theme: "Health Care", cur: "USD", qty: 25, avg: 162.3, px: 154.9, dr: -0.5e-4, vo: 0.008, be: 0.55 },
     { tk: "PEP", acct: "Demo Retirement", theme: "Consumer staples", cur: "USD", qty: 30, avg: 142.8, px: 158.2, dr: 3.0e-4, vo: 0.007, be: 0.5 },
+    /* Thai listings (SET), held in a baht account so the demo shows a second market and a second currency. */
+    { tk: "CPALL.BK", acct: "Demo Bangkok", theme: "Thai consumer", cur: "THB", qty: 400, avg: 58.50, px: 62.75, dr: 2.0e-4, vo: 0.010, be: 0.65 },
+    { tk: "SCB.BK", acct: "Demo Bangkok", theme: "Thai banks", cur: "THB", qty: 300, avg: 118.0, px: 127.5, dr: 2.6e-4, vo: 0.009, be: 0.95 },
+    { tk: "AOT.BK", acct: "Demo Bangkok", theme: "Thai transport", cur: "THB", qty: 500, avg: 62.00, px: 55.25, dr: -1.2e-4, vo: 0.012, be: 0.9 },
+    { tk: "DELTA.BK", acct: "Demo Bangkok", theme: "Thai electronics", cur: "THB", qty: 100, avg: 780.0, px: 942.0, dr: 5.8e-4, vo: 0.017, be: 1.3 },
     { tk: "CASH", acct: "Demo Brokerage", theme: "Cash", cur: "USD", qty: 12000, avg: 1, px: 1, dr: 0, vo: 0, be: 0 }
   ];
   var UNIVERSE = {
@@ -414,7 +419,7 @@
         return;
       }
       if (/\.BK$|\.HK$/.test(s)) {
-        out.push({ id: s, data: { t: t, missing: "Non-US listing: the demo cannot value " + t + " (the real terminal values US-listed holdings from SEC filings).", ai: false } });
+        out.push({ id: s, data: { t: t, missing: "Non-US listing: the demo simulates SEC filings, so it quotes " + t + " and shows it in the portfolio, risk and sector screens, but cannot model its intrinsic value. Real SET filings need the SET feed, which this demo does not carry.", ai: false } });
         return;
       }
       var cfg = FUND_CFG[t];
@@ -458,7 +463,10 @@
       { h: "Rate-cut odds firm after soft simulated inflation print", imp: "bullish", tks: ["SPY", "XLK"], bull: "Softer simulated CPI lifts rate-sensitive names.", bear: "One simulated print is not a trend; the demo macro series is invented." },
       { h: "Electric-vehicle maker misses simulated delivery estimates", imp: "bearish", tks: ["TSLA"], bull: "Sentiment washout could mark a floor for the demo's worst performer.", bear: "The demo position sits 35% underwater and well below its high." },
       { h: "Defensive staples and healthcare lag as simulated risk appetite builds", imp: "mixed", tks: ["XLP", "XLV", "PEP", "JNJ"], bull: "Rotation into cyclicals usually leaves staples cheap.", bear: "The demo's defensive sleeve drags on relative performance today." },
-      { h: "Energy majors steady as simulated crude holds its range", imp: "mixed", tks: ["XOM", "PTT.BK", "XLE"], bull: "Income exposure holds its value.", bear: "Simulated crude offers no momentum either way." }
+      { h: "Energy majors steady as simulated crude holds its range", imp: "mixed", tks: ["XOM", "PTT.BK", "XLE"], bull: "Income exposure holds its value.", bear: "Simulated crude offers no momentum either way." },
+      { h: "Thai banks and retailers report simulated resilient domestic demand", imp: "bullish", tks: ["SCB.BK", "CPALL.BK"], bull: "Domestic consumption and net interest margin both hold in the simulated quarter.", bear: "Household debt and a slow simulated tourist recovery cap the upside." },
+      { h: "Simulated tourist arrivals lift Thai airport and travel names", imp: "bullish", tks: ["AOT.BK"], bull: "Passenger volumes recover in the simulated data set.", bear: "The demo's AOT position is still 11% below its simulated cost." },
+      { h: "Thai electronics maker gains on simulated data-centre power orders", imp: "bullish", tks: ["DELTA.BK"], bull: "Power and thermal orders extend the simulated order book.", bear: "One order cycle does not justify the demo's 21x simulated multiple." }
     ];
     [0, 1, 2, 3].forEach(function (back) {
       var date = daysAgoIso(back);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Search, Lock } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
@@ -12,10 +12,14 @@ import { startTour } from "@/tour/store"
 
 const KEY = "ptpub.v1.app.tree"
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null") } catch (e) { return null } }
-/* Collapsible tree: groups open/closed state persists; the active group always opens; a filter box narrows leaves. */
+/* Collapsible tree: groups open/closed state persists; the active group always opens; a filter box narrows leaves.
+   The filter starts as a button, not a field: opening the menu on a phone must not raise the keyboard. */
 export default function Sidebar({ routeKey, isAdmin, tier, onNavigate, className }) {
   const [open, setOpen] = useState(() => load() || Object.fromEntries(TREE.map((g) => [g.id, g.id === "portfolio"])))
   const [q, setQ] = useState("")
+  const [searching, setSearching] = useState(false)
+  const box = useRef(null)
+  useEffect(() => { if (searching && box.current) box.current.focus() }, [searching])
   useEffect(() => { const g = routeKey.split("/")[0]; setOpen((o) => (o[g] ? o : { ...o, [g]: true })) }, [routeKey])
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(open)) } catch (e) {} }, [open])
   const ql = q.trim().toLowerCase()
@@ -24,7 +28,11 @@ export default function Sidebar({ routeKey, isAdmin, tier, onNavigate, className
   return (
     <nav aria-label="Main navigation" className={cn("flex h-full min-h-0 flex-col", className)}>
       <div className="flex items-center gap-2 p-3 pb-2">
-        <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter pages…" className="h-8 pl-8 text-[13px]" aria-label="Filter pages" /></div>
+        <div className="relative min-w-0 flex-1">
+          {searching
+            ? <><Search className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" /><Input ref={box} value={q} onChange={(e) => setQ(e.target.value)} onBlur={() => { if (!q.trim()) setSearching(false) }} onKeyDown={(e) => { if (e.key === "Escape") { setQ(""); setSearching(false) } }} placeholder="Filter pages…" className="h-8 pl-8 text-[13px]" aria-label="Filter pages" /></>
+            : <button type="button" onClick={() => setSearching(true)} className="flex h-8 w-full items-center gap-2 rounded-md border border-border px-2.5 text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/40"><Search className="size-3.5 shrink-0" /><span className="truncate">Filter pages</span></button>}
+        </div>
         <Button variant="ghost" size="icon" className="size-8" onClick={() => setOpen(Object.fromEntries(TREE.map((g) => [g.id, !allOpen])))} aria-label={allOpen ? "Collapse all" : "Expand all"} title={allOpen ? "Collapse all" : "Expand all"}>{allOpen ? <ChevronsDownUp /> : <ChevronsUpDown />}</Button>
       </div>
       <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-4">

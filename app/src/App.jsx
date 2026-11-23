@@ -83,7 +83,7 @@ export default function App() {
     }
   }, [confirming, gated, feature, tier])
   const group = BY_KEY[route.key] ? BY_KEY[route.key].groupTitle : ""
-  const side = <Sidebar routeKey={route.key} isAdmin={admin} tier={tier} onNavigate={() => setMenu(false)} />
+  const side = <Sidebar routeKey={route.key} isAdmin={admin} tier={tier} onNavigate={() => setMenu(false)} onSearch={() => { setMenu(false); setSearch(true) }} />
   return (
     <TooltipProvider>
       <div className="shell min-h-dvh bg-background text-foreground">
@@ -101,12 +101,12 @@ export default function App() {
             </footer>
           </main>
         </div>
-        <Sheet open={menu} onOpenChange={setMenu}><SheetContent side="left" className="p-0">{side}</SheetContent></Sheet>
+        <Sheet open={menu} onOpenChange={setMenu}><SheetContent side="left" className="p-0" onOpenAutoFocus={(e) => e.preventDefault()}>{side}</SheetContent></Sheet>
         <CommandPalette open={search} onOpenChange={setSearch} navigate={navigate} />
         <Tour navigate={navigate} />
         <ThemeDialog open={theme} onOpenChange={setTheme} />
         <LangDialog open={lang} onOpenChange={setLang} />
-        <Toaster theme="system" position="bottom-right" toastOptions={{ style: { background: "var(--popover)", color: "var(--fg)", border: "1px solid var(--line)" } }} />
+        <Toaster theme="system" position="bottom-left" toastOptions={{ style: { background: "var(--popover)", color: "var(--fg)", border: "1px solid var(--line)" } }} />
       </div>
     </TooltipProvider>)
 }

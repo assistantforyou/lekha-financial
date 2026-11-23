@@ -3,7 +3,8 @@ import { HelpCircle, X } from "lucide-react"
 import { HELP } from "@/lib/help"
 
 // Screen help lives in a corner so it never takes layout space: a small question mark in the
-// bottom-left (bottom-right belongs to notifications) that opens a short note on demand.
+// bottom-right that opens a short note on demand. Notifications sit bottom-left so the two do not
+// stack on top of each other.
 export default function PageHelp({ routeKey }) {
   const h = HELP[routeKey]
   const [open, setOpen] = useState(false)
@@ -28,7 +29,7 @@ export default function PageHelp({ routeKey }) {
   if (!h) return null
 
   return (
-    <div className="pointer-events-none fixed bottom-4 left-4 z-40 print:hidden">
+    <div className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end print:hidden">
       {open && (
         <div ref={box} role="dialog" aria-label="How to use this screen" className="pointer-events-auto mb-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg border border-border bg-[var(--panel)] p-3 shadow-lg">
           <div className="flex items-start gap-2">

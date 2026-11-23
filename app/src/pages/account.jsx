@@ -61,25 +61,49 @@ export function Profile({ item, navigate, me }) {
 }
 
 /* ---------------- Preferences ---------------- */
+/* Grouped the way people think about it: how it looks, what language and money it speaks, where it starts,
+   and how to get the walkthrough again. Every control writes the same preferences the classic engine reads. */
+const ZOOM = { S: 0.92, M: 1, L: 1.12, XL: 1.25 }
+const QUICK_THEMES = [["lekha-teal", "LEKHA Teal", "#0f766e"], ["lekha-navy", "LEKHA Navy", "#1e3a5f"], ["lekha-teal-light", "LEKHA Teal Light", "#0d9488"], ["lekha-light", "LEKHA Light", "#475569"]]
+const START_SCREENS = [["portfolio", "My portfolio", "Your holdings, today's change and the performance chart."], ["macro", "Macro dashboard", "Rates, inflation and the economic regime."]]
+
 export function Preferences({ item, navigate }) {
   const [, force] = useState(0), cur = useCurrency(), I = window.PT_I18N, bump = () => force((x) => x + 1)
   const theme = A.getPref("theme", "lekha-teal"), size = A.getPref("size", "M"), density = A.getPref("density", "comfortable")
   const [start, setStart] = useState(() => { try { return JSON.parse(localStorage.getItem("ptpub.v1.v3.start") || "null") || "portfolio" } catch (e) { return "portfolio" } })
-  const quick = [["lekha-teal", "LEKHA Teal"], ["lekha-navy", "LEKHA Navy"], ["lekha-teal-light", "LEKHA Teal Light"], ["lekha-light", "LEKHA Light"]]
+  const lang = I ? I.LANGS.find((l) => l.code === I.lang) : null
   return (<div><PageHeader title={item.title} description={item.desc} />
-    <div className="grid gap-4 xl:grid-cols-2">
-      <Card><CardHeader><CardTitle>Appearance</CardTitle><CardDescription>Saved in this browser and synced to your account.</CardDescription></CardHeader><CardContent className="space-y-5">
-        <Field label="Theme" id="th"><div className="grid grid-cols-2 gap-2">{quick.map(([id, l]) => <button key={id} onClick={() => { A.setPref("theme", id); bump() }} aria-pressed={theme === id} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm", theme === id ? "border-primary bg-accent" : "border-border hover:bg-accent/50")}>{theme === id && <Check className="size-4 text-primary" />}{l}</button>)}</div>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event("lekha:theme"))}>Browse all 100 themes…</Button></Field>
-        <Field label="Text size" id="sz"><Seg label="Text size" value={size} onChange={(v) => { A.setPref("size", v); document.documentElement.style.setProperty("--zoom", { S: 0.92, M: 1, L: 1.12, XL: 1.25 }[v]); bump() }} options={[["S", "Small"], ["M", "Medium"], ["L", "Large"], ["XL", "Extra large"]]} /></Field>
-        <Field label="Density" id="dn"><Seg label="Density" value={density} onChange={(v) => { A.setPref("density", v); document.documentElement.toggleAttribute("data-density", v === "compact"); if (v === "compact") document.documentElement.setAttribute("data-density", "compact"); bump() }} options={[["comfortable", "Comfortable"], ["compact", "Compact"]]} /></Field></CardContent></Card>
-      <Card><CardHeader><CardTitle>Language, currency, start screen</CardTitle></CardHeader><CardContent className="space-y-5">
-        <Field label="Language" id="lg" hint="Changes every label and the language the AI analyst answers in. Live headlines and filings stay in their original language.">
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">{(I ? I.LANGS : []).map((l) => <button key={l.code} translate="no" onClick={() => l.code !== I.lang && I.setLang(l.code)} aria-pressed={I.lang === l.code} className={cn("notranslate rounded-lg border px-3 py-2 text-left text-sm", I.lang === l.code ? "border-primary bg-accent font-semibold" : "border-border hover:bg-accent/50")}>{l.native}</button>)}</div></Field>
-        <Field label="Show money in" id="cy" hint="Per-share prices stay in each stock's own currency."><Seg label="Currency" value={cur} onChange={setCurrency} options={[["USD", "USD $"], ["THB", "THB ฿"]]} /></Field>
-        <Field label="Open the app on" id="st"><Seg label="Start screen" value={start} onChange={(v) => { setStart(v); localStorage.setItem("ptpub.v1.v3.start", JSON.stringify(v)); toast.success("Saved") }} options={[["portfolio", "My portfolio"], ["macro", "Macro dashboard"]]} /></Field></CardContent></Card>
-      <Card className="xl:col-span-2"><CardHeader><CardTitle translate="no">{ui("replayHead")}</CardTitle><CardDescription translate="no">{ui("replayText")}</CardDescription></CardHeader><CardFooter><Button variant="outline" translate="no" onClick={() => startTour(0)}><CircleHelp />{ui("replay")}</Button></CardFooter></Card>
-      <Card className="xl:col-span-2"><CardHeader><CardTitle>Reset</CardTitle><CardDescription>Restores display preferences to their defaults. Your holdings and data are not touched.</CardDescription></CardHeader><CardFooter><Button variant="outline" onClick={() => { ["theme", "size", "density"].forEach((k) => A.setPref(k, k === "theme" ? "lekha-teal" : k === "size" ? "M" : "comfortable")); toast.success("Preferences reset"); setTimeout(() => location.reload(), 300) }}><RefreshCw />Reset display preferences</Button></CardFooter></Card>
+    <div className="max-w-4xl space-y-4">
+      <Card><CardHeader><CardTitle>How it looks</CardTitle><CardDescription>Theme, text size and spacing. Changes apply straight away and follow you to other devices.</CardDescription></CardHeader>
+        <CardContent className="space-y-5">
+          <Field label="Theme" id="th">
+            <div className="grid gap-2 sm:grid-cols-2">{QUICK_THEMES.map(([id, name, swatch]) => <button key={id} onClick={() => { A.setPref("theme", id); bump() }} aria-pressed={theme === id} className={cn("flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm", theme === id ? "border-primary bg-accent" : "border-border hover:bg-accent/50")}><span aria-hidden="true" className="size-4 shrink-0 rounded-full border border-border" style={{ background: swatch }} />{name}{theme === id && <Check className="ml-auto size-4 text-primary" />}</button>)}</div>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event("lekha:theme"))}>Browse all 100 themes</Button>
+          </Field>
+          <Field label="Text size" id="sz" hint="Enlarges every screen. Useful on a large monitor or a small laptop."><Seg label="Text size" value={size} onChange={(v) => { A.setPref("size", v); document.documentElement.style.setProperty("--zoom", ZOOM[v]); bump() }} options={[["S", "Small"], ["M", "Medium"], ["L", "Large"], ["XL", "Extra large"]]} /></Field>
+          <Field label="Spacing" id="dn" hint="Compact fits more rows on screen; comfortable leaves more air between them."><Seg label="Spacing" value={density} onChange={(v) => { A.setPref("density", v); if (v === "compact") document.documentElement.setAttribute("data-density", "compact"); else document.documentElement.removeAttribute("data-density"); bump() }} options={[["comfortable", "Comfortable"], ["compact", "Compact"]]} /></Field>
+        </CardContent></Card>
+
+      <Card><CardHeader><CardTitle>Language and money</CardTitle><CardDescription>{lang ? `Currently ${lang.native}.` : ""} Language changes every label and the language the AI analyst answers in. Headlines and filings stay in the language the publisher wrote them.</CardDescription></CardHeader>
+        <CardContent className="space-y-5">
+          <Field label="Language" id="lg">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">{(I ? I.LANGS : []).map((l) => <button key={l.code} translate="no" onClick={() => l.code !== I.lang && I.setLang(l.code)} aria-pressed={I.lang === l.code} className={cn("notranslate rounded-lg border px-3 py-2 text-left text-sm", I.lang === l.code ? "border-primary bg-accent font-semibold" : "border-border hover:bg-accent/50")}>{l.native}</button>)}</div>
+          </Field>
+          <Field label="Show money in" id="cy" hint="Totals and portfolio values convert at the daily rate. Each share price stays in the currency the stock trades in."><Seg label="Currency" value={cur} onChange={setCurrency} options={[["USD", "US dollar"], ["THB", "Thai baht"]]} /></Field>
+        </CardContent></Card>
+
+      <Card><CardHeader><CardTitle>Where the app opens</CardTitle><CardDescription>The first screen after you sign in. The rest is one click away in the sidebar.</CardDescription></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2">{START_SCREENS.map(([id, name, why]) => <button key={id} onClick={() => { setStart(id); localStorage.setItem("ptpub.v1.v3.start", JSON.stringify(id)); toast.success("Start screen saved") }} aria-pressed={start === id} className={cn("rounded-lg border px-3 py-2.5 text-left", start === id ? "border-primary bg-accent" : "border-border hover:bg-accent/50")}><div className="flex items-center gap-2 text-sm font-medium">{name}{start === id && <Check className="size-4 text-primary" />}</div><p className="mt-0.5 text-[12px] text-muted-foreground">{why}</p></button>)}</div>
+          <Separator />
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-medium">Panels and sidebar</div><p className="text-[12px] text-muted-foreground">Choose which sections appear, and in what order.</p></div><Button variant="outline" onClick={() => navigate("account/layout")}>Open layout</Button></div>
+        </CardContent></Card>
+
+      <Card><CardHeader><CardTitle translate="no">{ui("replayHead")}</CardTitle><CardDescription translate="no">{ui("replayText")}</CardDescription></CardHeader>
+        <CardFooter><Button variant="outline" translate="no" onClick={() => startTour(0)}><CircleHelp />{ui("replay")}</Button></CardFooter></Card>
+
+      <Card><CardHeader><CardTitle>Back to defaults</CardTitle><CardDescription>Restores the theme, text size and spacing only. Holdings, watchlist and layouts are not touched.</CardDescription></CardHeader>
+        <CardFooter><Button variant="outline" onClick={() => { A.setPref("theme", "lekha-teal"); A.setPref("size", "M"); A.setPref("density", "comfortable"); toast.success("Display preferences reset"); setTimeout(() => location.reload(), 300) }}><RefreshCw />Reset display preferences</Button></CardFooter></Card>
     </div></div>)
 }
 

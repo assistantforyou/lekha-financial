@@ -84,7 +84,7 @@ const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
   assert.strictEqual(ex.fx.usdthb, 34.25);
   assert.strictEqual(ex.fx.hkdusd, 0.1282);
   const hold = D.holdingsDoc();
-  assert.strictEqual(hold.items.length, 14);
+  assert.strictEqual(hold.items.length, 18);
   for (const it of hold.items) {
     if (it.tk !== "CASH") assert.ok(ex.ath[it.tk] && ex.ath[it.tk].v > 0, "ATH missing for " + it.tk);
   }
@@ -107,7 +107,7 @@ const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
   assert.strictEqual(news.length, 4);
   assert.ok(/imulated/.test(news[0].data.macro), "demo news is labelled simulated");
   const fund = await src.getCollection("fund");
-  assert.strictEqual(fund.length, 13); // 10 US stocks + SMH(nav) + PTT.BK/0700.HK missing-docs
+  assert.strictEqual(fund.length, 17); // 10 US stocks + SMH(nav) + 6 non-US listings that are quoted but not valued
   const rev = await src.getCollection("rev");
   assert.strictEqual(rev.length, 3); // today + -35d + -91d (revision trend needs the old snapshots)
   const etf = await src.getCollection("etf");
