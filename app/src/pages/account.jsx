@@ -19,6 +19,7 @@ import * as A from "@/lib/account"
 import { isDemo, setCurrency, useCurrency, useSession, useMe, useTier } from "@/lib/engine"
 import { date, dateTime, num, pct } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
+import { QUOTAS } from "@/lib/entitlements"
 
 const Field = ({ label, id, children, hint }) => <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label>{children}{hint && <p className="text-[12px] text-muted-foreground">{hint}</p>}</div>
 const Seg = ({ value, onChange, options, label }) => <div role="group" aria-label={label} className="inline-flex rounded-md border border-border p-0.5">{options.map(([v, l]) => <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)} className={cn("rounded px-3 py-1.5 text-[13px] transition", value === v ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>{l}</button>)}</div>
@@ -83,18 +84,11 @@ export function Preferences({ item, navigate }) {
 }
 
 /* ---------------- Plans & billing ---------------- */
-const PRICE = { demo: "No charge", free: "฿0/mo", paid: "฿399/mo", premium: "฿599/mo" }
-/* Copy mirrors api/_data/entitlements.json and the quotas the server enforces; the server is the authority. */
-const TIERS = [
-  {
-    id: "demo", name: "Demo", tagline: "A preview with a sample portfolio, no account.",
-    body: "Look around the terminal with a sample portfolio before you sign up. The demo is not a plan: it shows the same screens as Free, and features that need Paid or Premium show what they include instead of running. Nothing is saved to the service.",
-    points: [
-      ["Free screens on sample data", "Portfolio overview, holdings, risk, watchlist, company workspace, news, macro dashboard and macro regime, on a sample portfolio."],
-      ["Locked features stay locked", "Market rotation, intelligence, risk appetite, valuation, deep analysis, sector rotation, the AI analyst, the Council and the simulation engine are not available in the demo."],
-      ["Nothing persisted", "Holdings, layouts and settings stay in this browser only, and reset whenever you clear site data."],
-    ],
-  },
+/* Exactly three subscription plans (Free, Paid, Premium). The Demo is a preview offered separately, never a plan
+   card. Copy mirrors api/_data/entitlements.json and the quotas the server enforces; the server is the authority. */
+const PRICE = { free: "฿0/mo", paid: "฿399/mo", premium: "฿599/mo" }
+const Q = (name, tier) => (QUOTAS[name] || {})[tier]
+const PLANS = [
   {
     id: "free", name: "Free", tagline: "Real market data, your own portfolio.",
     body: "For tracking a real portfolio with real quotes and filings. Data comes from the free provider tiers, so history is shorter and holdings are capped.",
@@ -113,7 +107,7 @@ const TIERS = [
       ["Market rotation, intelligence and risk appetite", "Relative strength across sectors and styles, the daily AI-labelled market briefing, XLY/XLP, VIX and VIXEQ."],
       ["Intrinsic value and deep analysis", "DCF and residual-income models with margin of safety for every holding, plus the one-holding-at-a-time deep analysis."],
       ["Sector rotation", "Relative rotation graph, leadership quality with earnings revisions, and sector breadth."],
-      ["AI analyst and daily briefing", "Ask about your own positions: 20 analyst questions and 1 new briefing a day, plus 30 cited research questions a day."],
+      ["AI analyst and daily briefing", `Ask about your own positions: ${Q("analystQuestionsPerDay", "paid")} analyst questions and ${Q("briefingGenerationsPerDay", "paid")} new briefing a day, plus 30 cited research questions a day.`],
       ["Unlimited holdings and full history", "Track every account and position with the full daily series each source serves."],
     ],
   },
@@ -124,17 +118,17 @@ const TIERS = [
       ["Simulation engine", "Monte Carlo on your holdings: up to 1,000,000 requested paths per run for up to 25 invested holdings. The completed path count is shown on every result."],
       ["Stress tests and Projection Lab", "Rate-shock, tech-drawdown and recession scenarios on your weights, and the illustrative Projection Lab."],
       ["LLM council and saved reports", "One model writes five role-based perspectives and a CEO synthesis in a single structured response, saved as a report you can reread. 10 new reports a day."],
-      ["Higher AI allowances", "40 analyst questions and 3 new briefings a day, and 80 cited research questions a day."],
+      ["Higher AI allowances", `${Q("analystQuestionsPerDay", "premium")} analyst questions and ${Q("briefingGenerationsPerDay", "premium")} new briefings a day, and 80 cited research questions a day.`],
       ["Everything in Paid", "Every market, sector, valuation and analyst feature."],
     ],
   },
 ]
 export function Plans({ item, navigate, me }) {
-  const sess = useSession(), signedIn = !!(sess && sess.access_token) && !isDemo(), cur = signedIn ? (me ? me.tier : "free") : "demo", [busy, setBusy] = useState(null)
+  const sess = useSession(), demo = isDemo(), signedIn = !!(sess && sess.access_token) && !demo, cur = signedIn ? (me ? me.tier : "free") : null, [busy, setBusy] = useState(null)
   const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   const manage = async () => { setBusy("portal"); try { const j = await A.portal(); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
-    <div className="grid gap-4 md:grid-cols-2">{TIERS.map((t) => <Card key={t.id} className={cn("flex flex-col", cur === t.id && "border-primary", t.id === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}>
+    <div className="grid gap-4 lg:grid-cols-3" data-plan-cards="3">{PLANS.map((t) => <Card key={t.id} data-plan={t.id} className={cn("flex flex-col", cur === t.id && "border-primary", t.id === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}>
       <CardHeader className="gap-2 pb-3">
         <div className="flex items-center justify-between gap-3"><CardTitle className="text-xl">{t.name}</CardTitle>{cur === t.id && <Badge variant="default">Current</Badge>}</div>
         <div className="num text-2xl font-semibold">{PRICE[t.id]}</div>
@@ -143,11 +137,15 @@ export function Plans({ item, navigate, me }) {
       </CardHeader>
       <CardContent className="flex-1 space-y-3 pt-1">
         {t.points.map(([title, detail]) => <div key={title} className="rounded-lg border border-border/60 bg-background/40 p-3">
-          <div className="flex items-start gap-2 text-[13.5px] font-semibold"><Check className={cn("mt-0.5 size-4 shrink-0", t.id === "demo" ? "text-[var(--warn)]" : "text-[var(--up)]")} />{title}</div>
+          <div className="flex items-start gap-2 text-[13.5px] font-semibold"><Check className="mt-0.5 size-4 shrink-0 text-[var(--up)]" />{title}</div>
           <p className="ml-6 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{detail}</p>
         </div>)}
       </CardContent>
-      <CardFooter className="pt-0">{t.id === "demo" ? (cur !== "demo" ? <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button> : <span className="text-[12.5px] text-muted-foreground">You are in the demo.</span>) : t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => cur === "paid" ? manage() : go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
+      <CardFooter className="pt-0">{t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => cur === "paid" ? manage() : go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
+    <Card className="mt-4" data-demo-preview><CardContent className="flex flex-wrap items-center gap-3 pt-5">
+      <div className="min-w-0 flex-1 text-sm"><div className="font-semibold">Not ready to sign up? Try the demo.</div><p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">The demo is a free preview, not a plan. It shows the Free screens on a sample portfolio with simulated data, needs no account and saves nothing to the service. Paid and Premium features stay locked in the demo.</p></div>
+      {demo ? <span className="text-[12.5px] text-muted-foreground">You are in the demo.</span> : <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button>}
+    </CardContent></Card>
     {signedIn && me?.can_manage_billing && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · period ends {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button>{["past_due", "unpaid", "incomplete"].includes(me.sub_status) && <Alert className="basis-full"><AlertTriangle className="size-4" /><AlertTitle>Payment not received</AlertTitle><AlertDescription>The latest charge for your subscription failed, so paid features are paused. Update the card in Manage subscription; access returns as soon as Stripe confirms the payment.</AlertDescription></Alert>}</CardContent></Card>}
     <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. Investment values can fall. Data may be delayed, and projections are hypothetical.</p><ReleasePolicies /></div>)
 }

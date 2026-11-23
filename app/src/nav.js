@@ -42,7 +42,7 @@ export const TREE = [
   { id: "account", title: "Account & settings", icon: CircleUser, items: [
     { id: "profile", title: "Profile", icon: CircleUser, page: "profile", desc: "Who you are, your plan and your session." },
     { id: "preferences", title: "Preferences", icon: Settings2, page: "preferences", desc: "Language, theme (100), text size, density, currency and start screen." },
-    { id: "plans", title: "Plans & billing", icon: CreditCard, page: "plans", desc: "Compare Demo, Free, Paid and Premium; manage your subscription." },
+    { id: "plans", title: "Plans & billing", icon: CreditCard, page: "plans", desc: "Compare Free ฿0, Paid ฿399 and Premium ฿599; manage your subscription. The demo is a free preview." },
     { id: "layout", title: "Dashboard layout", icon: LayoutGrid, page: "layout", desc: "Show, hide and reorder panels on every screen." },
     { id: "data", title: "Data & import", icon: Upload, page: "data", desc: "Import statements, export your data and check sync status." },
     { id: "diagnostics", title: "Diagnostics (admin)", icon: Stethoscope, page: "diagnostics", admin: true, desc: "Provider health, latency, cache hit rate, tool failures, token use and running costs." },
