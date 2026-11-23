@@ -125,7 +125,9 @@ demo allowance (15 questions per day per browser).
 ## Stripe
 
 Prices are configured in Vercel, not in code. The Premium price must change before this pricing
-can go live.
+can go live, in one coordinated release with this code: see the cutover and rollback procedure in
+`docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md` section 8.5. Production today (read 23 Nov) still sells the
+฿699 Premium price and lists the ฿599 candidate as legacy; the target configuration is:
 
 ```
 STRIPE_PRICE_PAID=price_1UesoyQ0yLOm6KwFuYZbTz9J     # ฿399/month (live, 23 Nov) — unchanged
@@ -143,9 +145,10 @@ STRIPE_LEGACY_PREMIUM_PRICES=price_1UcqQNQ0yLOm6KwFJRbgNC8n,price_1UesqhQ0yLOm6K
   subscribed at ฿699 keeps Premium. Existing subscriptions keep their own price; nothing migrates them.
 - Preview (Stripe TEST mode) needs its own ฿599 Premium TEST price; the staging TEST Premium price on
   record is ฿1,299 (`docs/STAGING_AUDIT_LOG.md`, 22 Nov).
-- `node scripts/check-release-config.mjs` checks both prices against these amounts. It is no longer
-  part of the Vercel build command (removed in `404ef49`); run it with the target environment's
-  variables before a deployment.
+- `node scripts/check-release-config.mjs` runs first in the Vercel build command (restored after
+  `404ef49` removed it). It checks build configuration offline, then the live Stripe prices; any
+  failure, including a Stripe outage, stops the build so nothing is deployed. Each price may grant
+  only one plan (checked at build, in Checkout and in the webhook).
 - Webhook: only explicitly mapped Paid, Premium and grandfathered price IDs grant access. An unknown
   active price raises a retryable error for operator reconciliation.
 

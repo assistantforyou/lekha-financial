@@ -141,3 +141,13 @@ Branch `feature/subscription-entitlements-399-599` from `b9ce696`. No staging Pr
 | 2026-11-23, before 11:31Z | Browser check on `localhost:3488` with a local Supabase stand-in (three fixed test accounts, no keys) | local | Demo, Free, Paid, Premium, `?demo=1`, `/v2`, `/v3`, forged headers and browser state, billing-return polling with a simulated record change, revocation, 375 px layout: as expected. Checkout and portal calls reached the real handlers and returned 503 (no Stripe locally). |
 | 2026-11-23, before 11:31Z | The preview tool started the main checkout's `pt-dev` config once (loads `keys.env`, which targets the production Supabase project) | local dev server | Stopped after about 9 s. The page had no session and made no `/api/` requests; nothing reached production. |
 | 2026-11-23T11:31Z | Stripe price verification, TEST portal configuration, staged plan journey | Stripe / staging | NOT DONE: no Stripe access in this environment; Preview variables are branch-scoped to `audit/full-system-repair`. Owner actions listed in the details file. |
+
+## 23 Nov 2026 — PR #19 repair round (read-only checks)
+
+- Supabase: `lekha-staging` (`tnfmujnwjkxgjdqbdupb`) exists separately from production; table list only, RLS on.
+- Vercel `portfolio-terminal`: setting names and scopes read, no secret decrypted. Staging Preview variables are
+  scoped to `audit/full-system-repair`, not to `feature/subscription-entitlements-399-599`. Production lacks
+  `SITE_URL`, `COMMERCIAL_DATA_APPROVAL`, `VITE_TERMS_URL`, `VITE_PRIVACY_URL`; its Premium legacy list holds the
+  ฿599 candidate, so ฿699 is the current Premium price.
+- No setting, deployment, Stripe object or database row was changed. Staged billing journey BLOCKED; see
+  `docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md` section 8.
