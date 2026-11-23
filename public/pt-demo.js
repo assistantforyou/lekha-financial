@@ -697,6 +697,7 @@
   }
 
   /* ---- the PT_DATA_SOURCE-compatible adapter ---- */
+  /* The demo is a full preview: every dataset below is simulated locally for the sample portfolio, nothing is locked. */
   function source() {
     currentHoldings();
     return {

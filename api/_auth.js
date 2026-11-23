@@ -1,7 +1,7 @@
 // Accounts: Supabase Auth (GoTrue) called server-side with the service-role key, so the browser needs no Supabase key.
 // Profiles (plan, Stripe ids, synced preferences) live in pt_profiles. Admins: env ADMIN_EMAILS (comma-separated).
 const { sb } = require("./_lib");
-const { TIERS, LIMITS, tierOf } = require("./_tiers");
+const { TIERS, LIMITS, FEATURES, tierOf, featuresOf, planFor } = require("./_tiers");
 
 const gotrue = (path, opts = {}) => fetch(`${process.env.SUPABASE_URL}/auth/v1/${path}`, {
   ...opts,
@@ -71,15 +71,15 @@ async function requireUser(req, res) {
 // Server-authoritative tier guard: resolves the caller's tier from their verified profile
 // and refuses (402) unless it is on the allowed list. `need` in the response body tells the
 // UI which plans would unlock the endpoint; the stored plan is never taken from the client.
-async function requireTier(req, res, allowed) {
+async function requireTier(req, res, allowed, extra = null) {
   // the public sample portfolio (api/_h/free/demo.js) calls handlers on a synthetic request it alone can flag; it gets paid-tier depth
   if (req.__demoPublic === true) return { user_id: "demo-public", email: null, plan: "paid", sub_status: "active", period_end: "2999-01-01T00:00:00Z", is_admin: false };
   const list = Array.isArray(allowed) ? allowed.filter((t) => TIERS.includes(t)) : [];
   if (!list.length) throw new Error("requireTier: no valid tiers allowed");
   const u = await userFrom(req);
-  // Demo is a real entitlement: while the product is in preview every plan is open to anonymous
-  // visitors, so a request with no signed-in user resolves to the demo profile instead of a 401.
-  // The token-on-disk demo profile never reaches Supabase and is created fresh per request.
+  // Anonymous visitors resolve to the demo profile only where a route explicitly lists "demo"
+  // (the cited research agent and its knowledge base, with their own demo quotas). Demo is not a
+  // plan: no restricted feature lists it. The demo profile never reaches Supabase.
   if (!u) {
     if (!list.includes("demo")) { res.status(401).json({ error: "This needs a signed-in account." }); return null; }
     return { user_id: "demo", email: null, plan: "demo", demo: true, sub_status: "active", period_end: "2999-01-01T00:00:00Z", is_admin: false, prefs: {} };
@@ -89,10 +89,33 @@ async function requireTier(req, res, allowed) {
   if (!list.includes(tier)) {
     // name the cheapest plan that unlocks this endpoint; a Paid-or-Premium gate must not read as Premium-only
     const want = list.includes("paid") ? (list.includes("premium") ? "Paid or Premium" : "Paid") : "Premium";
-    res.status(402).json({ error: `${want} plan required.`, tier, need: list });
+    res.status(402).json({ error: `${want} plan required.`, tier, need: list, ...(extra || {}) });
     return null;
   }
   return p;
+}
+
+// Feature guard (api/_data/entitlements.json): same contract as requireTier (401 anonymous, 402 with
+// {tier, need}) plus `feature` and `plan` (the cheapest plan that unlocks it) for the upgrade screen.
+// Demo is never entitled, so an anonymous caller always gets 401 here.
+async function requireFeature(req, res, feature) {
+  const names = Array.isArray(feature) ? feature : [feature];
+  if (!names.length || names.some((f) => !FEATURES[f])) throw new Error("requireFeature: unknown feature " + names.join(","));
+  const list = TIERS.filter((t) => names.some((f) => FEATURES[f].includes(t))); // any listed feature unlocks
+  feature = names[0];
+  // the synthetic sample-portfolio request (api/_h/free/demo.js) never unlocks a restricted feature
+  if (req.__demoPublic === true) { res.status(402).json({ error: "Not available in the demo.", tier: "demo", need: list, feature, plan: planFor(feature) }); return null; }
+  return requireTier(req, res, list, { feature, plan: planFor(feature) });
+}
+
+// Responses gated by a feature must never sit in a shared (CDN) or browser cache: a later caller
+// without the entitlement could otherwise be served the stored answer. Forces every Cache-Control
+// the handler sets afterwards to private, no-store.
+function lockCache(res) {
+  const set = res.setHeader.bind(res);
+  res.setHeader = (k, v) => set(k, /^cache-control$/i.test(String(k)) ? "private, no-store" : v);
+  set("Cache-Control", "private, no-store");
+  return res;
 }
 
 async function requirePremium(req, res) {
@@ -114,6 +137,7 @@ const publicProfile = (p) => {
     plan: tier === "paid" || tier === "premium" ? tier : "free",
     tier,
     limits: LIMITS[tier],
+    features: featuresOf(tier),
     can_manage_billing: !!p.stripe_customer_id,
     sub_status: p.sub_status || null,
     period_end: p.period_end || null,
@@ -122,4 +146,4 @@ const publicProfile = (p) => {
   };
 };
 
-module.exports = { gotrue, admin, userFrom, profile, updateProfile, requireUser, requireTier, requirePremium, requireAdmin, publicProfile, isAdmin, bearer, callbackUrl, withRedirect };
+module.exports = { gotrue, admin, userFrom, profile, updateProfile, requireUser, requireTier, requireFeature, lockCache, requirePremium, requireAdmin, publicProfile, isAdmin, bearer, callbackUrl, withRedirect };

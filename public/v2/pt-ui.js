@@ -1,5 +1,5 @@
 /* Portfolio Terminal UI layer: Settings tab, display preferences, customizable layout, plain-language panel
-   subtitles, account (email + password), plans (Free / Paid ฿399 / Premium ฿699), admin Costs, and extra charts.
+   subtitles, account (email + password), plans (Free ฿0 / Paid ฿399 / Premium ฿599), admin Costs, and extra charts.
    Loaded after index.html's main script; uses its globals (S, $, esc, setTab, render*) and pt-datasource.js
    (PT_AUTH, PT_DEMO_MODE, PT_TIER). Preferences are stored in this browser and, when signed in, synced to the account. */
 (function () {
@@ -317,33 +317,32 @@
   function seg(name, opts, cur) { return "<div class='seg' role='group' data-pref='" + name + "'>" + opts.map(function (o) { return "<button type='button' data-v='" + o[0] + "' aria-pressed='" + (o[0] === cur) + "'>" + h(o[1]) + "</button>"; }).join("") + "</div>"; }
 
   /* ---- one tier card in the pricing grid: the "Revised pricing structure" table, one column per card ---- */
-  var PLAN_ROWS = ["Market data", "Portfolio tracking", "Historical analysis", "Valuation coverage", "Advanced indicators",
-    "AI investment analyst", "Single-model LLM Council", "Monte Carlo simulations", "Stress testing"];
+  /* mirrors api/_data/entitlements.json (Free ฿0 / Paid ฿399 / Premium ฿599); the server enforces it */
+  var PLAN_ROWS = ["Market data", "Portfolio tracking", "Historical analysis", "Market rotation, intelligence, risk appetite", "Intrinsic value & deep analysis",
+    "Sector rotation", "AI analyst & daily briefing", "Single-model LLM Council", "Monte Carlo simulations", "Stress testing & Projection Lab"];
+  /* exactly three subscription plans; the demo is a preview offered separately, never a plan column */
   var PLAN_VALS = {
-    demo:    ["Simulated", "Simulated", "Simulated", "Simulated", "Demo", "Demo only", "Demo only", "Demo only", "Demo only"],
-    free:    ["Real", "20 holdings", "5 years", "12 symbols", "Basic", "—", "—", "—", "—"],
-    paid:    ["Real", "Unlimited", "Full history", "Unlimited", "Full", "—", "—", "—", "Standard"],
-    premium: ["Real", "Unlimited", "Full history", "Unlimited", "Full", "Included", "Included", "Included", "Advanced"],
+    free:    ["Real", "20 holdings", "5 years", "—", "—", "—", "—", "—", "—", "—"],
+    paid:    ["Real", "Unlimited", "Full history", "Included", "Included", "Included", "Included", "—", "—", "—"],
+    premium: ["Real", "Unlimited", "Full history", "Included", "Included", "Included", "Included", "Included", "Included", "Included"],
   };
   function planCell(tier, cur, signed) {
     var C = {
-      demo: { name: "Demo", price: "Free" },
-      free: { name: "Free", price: "Free" },
+      free: { name: "Free", price: "฿0<span class='per'>/mo</span>" },
       paid: { name: "Paid", price: "฿399<span class='per'>/mo</span>" },
-      premium: { name: "Premium", price: "฿699<span class='per'>/mo</span>" },
+      premium: { name: "Premium", price: "฿599<span class='per'>/mo</span>" },
     }[tier];
     var rows = PLAN_ROWS.map(function (label, i) {
       var v = PLAN_VALS[tier][i];
       return "<div><dt>" + h(label) + "</dt><dd" + (v === "—" ? " class='na' aria-label='Not included'" : v === "Included" ? " class='inc'" : "") + ">" + h(v) + "</dd></div>";
     }).join("");
     var btn = "";
-    if (tier === "demo") btn = cur === "demo" ? "" : "<a class='btn' href='?demo=1'>Try the demo</a>";
-    else if (tier === "free") btn = cur === "free" ? "" : signed ? "" : "<a class='btn' href='#set-account'>Create a free account</a>";
+    if (tier === "free") btn = cur === "free" ? "" : signed ? "" : "<a class='btn' href='#set-account'>Create a free account</a>";
     else if (tier === "paid") {
       if (cur === "paid") btn = "";
       else if (cur !== "premium") btn = "<button class='btn pri' type='button' data-plan='paid'>Choose Paid</button>";
     } else if (tier === "premium") {
-      if (cur !== "premium") btn = "<button class='btn pri' type='button' data-plan='premium'>" + (cur === "paid" ? "Upgrade to Premium" : "Go Premium") + "</button>";
+      if (cur !== "premium") btn = "<button class='btn pri' type='button' data-plan='premium'" + (cur === "paid" ? " data-switch='portal'" : "") + ">" + (cur === "paid" ? "Upgrade to Premium" : "Go Premium") + "</button>";
     }
     return "<div class='plan" + (cur === tier ? " cur" : "") + (tier === "premium" ? " prem" : "") + "' data-tier='" + tier + "'><h3>" + C.name + (cur === tier ? " <span class='badge'>CURRENT</span>" : "") + "</h3>" +
       "<div class='p'>" + C.price + "</div><dl>" + rows + "</dl>" + btn + "</div>";
@@ -354,7 +353,7 @@
     var p = prefs(), signed = !!(AUTH && AUTH.session() && !DEMO());
     var u = signed ? await loadMe() : null; signed = !!u;
     var qs = new URLSearchParams(location.search), billing = qs.get("billing");
-    var cur = u ? (u.tier || "free") : "demo";
+    var cur = u ? (u.tier || "free") : null;
     var html = "";
     if (billing === "success") html += "<div class='set-banner up'>Payment received. Your plan switches on as soon as Stripe confirms it (usually a few seconds) — this page refreshes itself.</div>";
     if (billing === "cancel") html += "<div class='set-banner'>Checkout was cancelled. Nothing was charged.</div>";
@@ -381,10 +380,11 @@
 
     // plans / pricing
     var manage = (u && (u.tier === "paid" || u.tier === "premium")) ? "<div class='set-row'><button class='btn' id='set-manage' type='button'>Manage subscription</button><span class='note'>Switch plans or cancel from the secure billing portal.</span></div>" : "";
-    var planNote = DEMO() ? "<p class='note'>All four tiers run the <b>same</b> Portfolio Terminal — what changes is whether the data is simulated or real, how deep it goes, and (on Premium) your personal AI analyst.</p>" : "";
-    var plans = "<div class='plan-grid'>" + ["demo", "free", "paid", "premium"].map(function (t) { return planCell(t, cur, signed); }).join("") + "</div>" + manage +
-      "<div class='set-msg' id='set-dmsg' role='status'></div>" + planNote;
-    html += card("set-plan", "Plans & data", plans, "One terminal, four levels: Demo (simulated), Free (limited real data), Paid (full real data, unlimited valuation coverage), Premium (everything in Paid + AI analyst, LLM Council and Monte Carlo simulations). Prices in Thai baht.");
+    var demoNote = "<div class='set-row' data-demo-preview><span class='note'><b>Demo preview</b> · not a plan. The Free screens on a sample portfolio with simulated data; no account, nothing saved, and Paid and Premium features stay locked.</span>" +
+      (DEMO() ? "<span class='note'>You are in the demo.</span>" : "<a class='btn' href='?demo=1'>Open the demo</a>") + "</div>";
+    var plans = "<div class='plan-grid' data-plan-cards='3'>" + ["free", "paid", "premium"].map(function (t) { return planCell(t, cur, signed); }).join("") + "</div>" + manage +
+      "<div class='set-msg' id='set-dmsg' role='status'></div>" + demoNote;
+    html += card("set-plan", "Plans & data", plans, "Three plans: Free ฿0 (real data, 20 holdings, 5 years of history), Paid ฿399/month (every market, sector and valuation screen plus the AI analyst and daily briefing), Premium ฿599/month (everything in Paid plus the LLM Council and the simulation engine). Prices in Thai baht.");
 
     // display
     var langOpts = (window.PT_I18N ? PT_I18N.LANGS : []).map(function (l) { return "<option value='" + l.code + "'" + (l.code === (window.PT_I18N ? PT_I18N.lang : "en") ? " selected" : "") + ">" + l.native + "</option>"; }).join("");
@@ -450,8 +450,10 @@
     if (planCard) planCard.querySelectorAll("button[data-plan]").forEach(function (b) {
       b.onclick = async function () {
         if (!AUTH.session() || DEMO()) { say("set-dmsg", "Create a free account first — then pick a paid plan here.", true); var a = el("set-account"); if (a) a.scrollIntoView({ behavior: "smooth" }); return; }
-        say("set-dmsg", "Opening secure checkout…");
-        try { var j = await post("/api/billing/checkout", { plan: b.getAttribute("data-plan") }, true); location.href = j.url; } catch (e) { say("set-dmsg", e.message, true); }
+        /* an existing Paid subscriber changes plan in the Stripe billing portal (Checkout refuses a second subscription) */
+        var sw = b.getAttribute("data-switch") === "portal";
+        say("set-dmsg", sw ? "Opening the billing portal…" : "Opening secure checkout…");
+        try { var j = sw ? await post("/api/billing/portal", {}, true) : await post("/api/billing/checkout", { plan: b.getAttribute("data-plan") }, true); location.href = j.url; } catch (e) { say("set-dmsg", e.message, true); }
       };
     });
     if (el("set-manage")) el("set-manage").onclick = async function () { try { var j = await post("/api/billing/portal", {}, true); location.href = j.url; } catch (e) { say("set-dmsg", e.message, true); } };
@@ -527,7 +529,7 @@
     "#news-chart{max-width:560px}#ph-alloc{margin:4px 0 8px}",
     ".set-wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}@media (max-width:900px){.set-wrap{grid-template-columns:1fr}}",
     "#set-costs,#set-plan,#set-layout{grid-column:1/-1}",
-    ".plan-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}@media (max-width:1000px){.plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:560px){.plan-grid{grid-template-columns:1fr}}",
+    ".plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media (max-width:1000px){.plan-grid{grid-template-columns:repeat(1,minmax(0,1fr))}}@media (max-width:560px){.plan-grid{grid-template-columns:1fr}}",
     ".plan{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:7px}",
     ".plan.cur{border-color:var(--accent);background:var(--accent-soft)}",
     ".plan h3{margin:0;font-size:15px;display:flex;align-items:center;gap:8px}",

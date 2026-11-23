@@ -7,7 +7,7 @@
 // Env: COUNCIL_V3_DAILY (default 10 fresh runs per user per day), COUNCIL_V3_MAX_TOKENS (default 6000).
 const crypto = require("crypto");
 const { requireTier } = require("../../_auth");
-const { tierOf } = require("../../_tiers");
+const { tierOf, tierAllows } = require("../../_tiers");
 const { rateHit, cacheGet, cacheSet } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { userContext, portfolioBlock, marketBlock, cleanTk } = require("./_ctx");
@@ -218,7 +218,7 @@ module.exports = async (req, res) => {
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   const tier = p.demo || req.__demoPublic === true ? "demo" : tierOf(p);
-  if (tier !== "premium") return forbid(res, tier);
+  if (!tierAllows(tier, "council")) return forbid(res, tier);
   try {
     const b = obj(req.body) || {};
     const question = clean(b.question, 600);

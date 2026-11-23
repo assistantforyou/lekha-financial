@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:app",
+  "buildCommand": "node scripts/check-release-config.mjs --warn-only && npm run build:app",
   "outputDirectory": "public",
   "functions": {
     "api/ai.js": {

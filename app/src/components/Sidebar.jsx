@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { TREE } from "@/nav"
+import { allows, featureOfRoute, PLAN_NAME, planFor } from "@/lib/entitlements"
 import { ui } from "@/tour/copy"
 import { startTour } from "@/tour/store"
 
 const KEY = "ptpub.v1.app.tree"
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null") } catch (e) { return null } }
 /* Collapsible tree: groups open/closed state persists; the active group always opens; a filter box narrows leaves. */
-export default function Sidebar({ routeKey, isAdmin, onNavigate, className }) {
+export default function Sidebar({ routeKey, isAdmin, tier, onNavigate, className }) {
   const [open, setOpen] = useState(() => load() || Object.fromEntries(TREE.map((g) => [g.id, g.id === "portfolio"])))
   const [q, setQ] = useState("")
   useEffect(() => { const g = routeKey.split("/")[0]; setOpen((o) => (o[g] ? o : { ...o, [g]: true })) }, [routeKey])
@@ -35,10 +36,10 @@ export default function Sidebar({ routeKey, isAdmin, onNavigate, className }) {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <ul className="ml-[18px] mt-0.5 space-y-px border-l border-border pl-2">
-                  {g.items.map((i) => { const key = `${g.id}/${i.id}`, on = routeKey === key
+                  {g.items.map((i) => { const key = `${g.id}/${i.id}`, on = routeKey === key, f = featureOfRoute(key), lock = !!f && !!tier && !allows(tier, f)
                     return (<li key={key}><a href={"#/" + key} onClick={() => onNavigate && onNavigate(key)} aria-current={on ? "page" : undefined}
                       className={cn("flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none transition focus-visible:ring-[3px] focus-visible:ring-ring/40", on ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground")}>
-                      <i.icon className={cn("size-3.5 shrink-0", on && "text-primary")} /><span className="min-w-0 flex-1 truncate">{i.title}</span>{i.admin && <Lock className="size-3 opacity-60" />}</a></li>) })}
+                      <i.icon className={cn("size-3.5 shrink-0", on && "text-primary")} /><span className="min-w-0 flex-1 truncate">{i.title}</span>{(i.admin || lock) && <Lock className="size-3 opacity-60" aria-label={lock ? `${PLAN_NAME[planFor(f)]} feature` : "Admin only"} />}</a></li>) })}
                 </ul>
               </CollapsibleContent>
             </Collapsible>) })}

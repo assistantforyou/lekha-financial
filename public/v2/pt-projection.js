@@ -275,15 +275,21 @@
       D = j; b.innerHTML = markup(); root = b.querySelector(".lk"); selected = "21D"; bind(); update();
     }).catch(function () { b.innerHTML = '<div class="empty">The projection demo could not be loaded.</div>'; });
   }
+  var LOCK_TIER = null;
   function mountLocked() {
     var b = body(); if (!b) return;
     b.innerHTML = '<div class="lk-locked"><svg class="lk-ghost" viewBox="0 0 600 220" aria-hidden="true" preserveAspectRatio="none"><path d="M0 190 C60 180 90 170 140 160 S230 150 280 120 S380 110 430 70 S540 40 600 20 L600 220 L0 220 Z" fill="var(--chart)" fill-opacity=".18"/><path d="M0 190 C60 180 90 170 140 160 S230 150 280 120 S380 110 430 70 S540 40 600 20" fill="none" stroke="var(--chart)" stroke-width="4"/></svg>' +
       '<div class="lk-lock-c"><div class="lk-lock-t">Illustrative Projection Lab · Premium</div><p class="note">An interactive growth-scenario lab with five horizons, scenario bands, dated catalysts and an outcome silhouette. Available on the Premium plan.</p>' +
-      '<button class="btn pri" type="button" id="lk-upgrade">Go Premium — ฿699/month</button><div class="set-msg" id="lk-lock-msg" role="status"></div></div></div>';
+      '<button class="btn pri" type="button" id="lk-upgrade">Go Premium — ฿599/month</button><div class="set-msg" id="lk-lock-msg" role="status"></div></div></div>';
     var up = document.getElementById("lk-upgrade");
     up.onclick = function () {
-      var msg = document.getElementById("lk-lock-msg"); msg.textContent = "Opening secure checkout…";
-      window.PT_AUTH.fetch("/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: "premium" }) })
+      var msg = document.getElementById("lk-lock-msg");
+      var s = window.PT_AUTH && PT_AUTH.session && PT_AUTH.session();
+      if (window.PT_DEMO_MODE || !(s && s.access_token)) { msg.textContent = "Create an account or sign in first, then choose Premium."; return; }
+      /* an existing Paid subscriber switches plans in the billing portal; Checkout refuses a second subscription */
+      var portal = LOCK_TIER === "paid";
+      msg.textContent = portal ? "Opening the billing portal…" : "Opening secure checkout…";
+      window.PT_AUTH.fetch(portal ? "/api/billing/portal" : "/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: "premium" }) })
         .then(function (r) { return r.json(); }).then(function (j) { if (j && j.url) location.href = j.url; else msg.textContent = (j && j.error) || "Checkout is not available right now."; })
         .catch(function () { msg.textContent = "Checkout is not available right now."; });
     };
@@ -291,9 +297,10 @@
   function apply() {
     var sec = section(); if (!sec) return Promise.resolve();
     return tierNow().then(function (tier) {
-      if (tier === "demo" || tier === "premium") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; return mountFull(); }
-      if (tier === "free") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; mountLocked(); return; }
-      sec.remove(); /* Paid sees nothing; unknown tier (sign-in lookup failed) shows nothing rather than a wrong state */
+      /* Premium feature (simulation): demo, Free and Paid see the locked card; unknown tier (sign-in lookup failed) shows nothing */
+      if (tier === "premium" || tier === "demo") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; return mountFull(); }
+      if (tier === "free" || tier === "paid") { LOCK_TIER = tier; sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; mountLocked(); return; }
+      sec.remove();
     });
   }
   window.PT_PROJ = { apply: apply };

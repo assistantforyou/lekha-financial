@@ -24,12 +24,11 @@ const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
 
   const src = D.source();
 
-  // 3. Every dataset the page watches is served, and passes the page's parser gates.
+  // 3. The demo is a full preview (owner decision, 23 Nov 2026): the page's data source serves every dataset,
+  //    all simulated locally for the sample portfolio, and each passes the page's parser gates.
   const csv = {};
-  for (const k of ["HISTORY", "ROTATION", "RISK", "BREADTH", "OBOS", "FACTOR", "VOLATILITY", "VALIN", "PEER"]) {
-    csv[k] = await src.fetchCsv(k);
-    assert.ok(typeof csv[k] === "string" && csv[k].length > 100, k + " missing");
-  }
+  for (const k of ["HISTORY", "ROTATION", "RISK", "BREADTH", "OBOS", "FACTOR", "VOLATILITY", "VALIN", "PEER"]) csv[k] = await src.fetchCsv(k);
+  for (const k of Object.keys(csv)) assert.ok(typeof csv[k] === "string" && csv[k].length > 100, k + " missing");
 
   // BREADTH: >400 stocks with sector + above-50d/200d flags
   assert.ok(csv.BREADTH.split("\n").length > 401, "breadth needs >400 stocks");

@@ -130,3 +130,24 @@ AI spend this session: USD 0.00874 (16 metered calls in total on staging, USD 0.
 | 2026-11-22T17:13:12Z | Routing on Preview: Council -> Gemini, `llmRequests 1`, no fallback (row 18, USD 0.0030); agent NVDA P/E -> Gemini accepted first call, 5.8 s, "P/E 25.64x" = 125.65 / 4.90 (row 19); expert -> Z.ai (row 20) | staging Preview | **Verified.** Staging AI total USD 0.0181. |
 | 2026-11-22T17:15Z | Desktop 1440x900 and iPhone 13 as Premium user 1: Plans, Council, Simulation, Company workspace, Preferences render with Premium badge, Council "five analytical lenses in a single model response", Simulation "hypothetical", no horizontal scroll, 0 page errors; company landing shows session-close prices | staging Preview | PASS. The NVDA company detail page could not be held by automation (first-run tour navigation), so its on-page source labels were not browser-verified; API labels were. Movers note says "Computed from live quotes" on a weekend (minor copy). |
 | 2026-11-22T17:20Z | Reconciled `FINAL_RELEASE_ACCEPTANCE.md` (dated status block) and `COMMERCIAL_LAUNCH_BLOCKERS.md` (B5 deployed); added `LAUNCH_GAP_PLAN.md` (source disablement, AI routing, ops requirements, email settings, Checkout presentation) | docs | Supabase org plan confirmed Free (no PITR/branching). No alert-delivery code exists. |
+
+## 2026-11-23 Subscription entitlements (Free ฿0 / Paid ฿399 / Premium ฿599), local only
+
+Branch `feature/subscription-entitlements-399-599` from `b9ce696`. No staging Preview, Supabase, Stripe or Production action was taken. Details: `SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md`.
+
+| UTC | Action | Scope | Evidence / outcome |
+| --- | --- | --- | --- |
+| 2026-11-23, before 11:31Z | `npm test` (43 files) and `npm run build:app` | local | exit 0 / built. Handler tests are mocked at `fetch`. |
+| 2026-11-23, before 11:31Z | Browser check on `localhost:3488` with a local Supabase stand-in (three fixed test accounts, no keys) | local | Demo, Free, Paid, Premium, `?demo=1`, `/v2`, `/v3`, forged headers and browser state, billing-return polling with a simulated record change, revocation, 375 px layout: as expected. Checkout and portal calls reached the real handlers and returned 503 (no Stripe locally). |
+| 2026-11-23, before 11:31Z | The preview tool started the main checkout's `pt-dev` config once (loads `keys.env`, which targets the production Supabase project) | local dev server | Stopped after about 9 s. The page had no session and made no `/api/` requests; nothing reached production. |
+| 2026-11-23T11:31Z | Stripe price verification, TEST portal configuration, staged plan journey | Stripe / staging | NOT DONE: no Stripe access in this environment; Preview variables are branch-scoped to `audit/full-system-repair`. Owner actions listed in the details file. |
+
+## 23 Nov 2026 — PR #19 repair round (read-only checks)
+
+- Supabase: `lekha-staging` (`tnfmujnwjkxgjdqbdupb`) exists separately from production; table list only, RLS on.
+- Vercel `portfolio-terminal`: setting names and scopes read, no secret decrypted. Staging Preview variables are
+  scoped to `audit/full-system-repair`, not to `feature/subscription-entitlements-399-599`. Production lacks
+  `SITE_URL`, `COMMERCIAL_DATA_APPROVAL`, `VITE_TERMS_URL`, `VITE_PRIVACY_URL`; its Premium legacy list holds the
+  ฿599 candidate, so ฿699 is the current Premium price.
+- No setting, deployment, Stripe object or database row was changed. Staged billing journey BLOCKED; see
+  `docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md` section 8.

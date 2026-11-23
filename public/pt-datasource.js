@@ -4,8 +4,11 @@
      signed-in FREE       real data via /api/free (limited history & valuation symbols, server-enforced)
      signed-in PAID       /api/free at full depth + Alpha Vantage news/estimates via /api/av
      signed-in PREMIUM    everything in PAID (the AI panel is served by /api/ai)
-   ?demo=1 forces the DEMO simulation even when signed in.
-   The server decides entitlements on every request; nothing here is security.
+   ?demo=1 forces the DEMO simulation even when signed in. The demo is a non-billable preview with
+   Free-level screens: it reports tier "demo" and never a paid tier.
+   The server decides entitlements on every request; nothing here is security. Datasets that feed only
+   Paid/Premium screens are requested with the account token and skipped when /api/auth/me says the
+   plan does not include them (the server would answer 402 anyway).
    Endpoint contract (base = /api/free, Bearer-authenticated):
      GET base/health                -> {"ok":true,"name":"..."}
      GET base/csv/<KEY>             -> text/csv  (KEY: ROTATION BREADTH RISK OBOS FACTOR PEER VOLATILITY VALIN HISTORY); 204/404 = not available
@@ -117,12 +120,14 @@
   }
 
 
-  window.PT_TIER_READY = function () { return Promise.resolve({ tier: "premium" }); };
+  window.PT_TIER_READY = function () { return Promise.resolve({ tier: "demo" }); };
   if (window.PT_DEMO_MODE) {
     /* ---- DEMO: deterministic local simulation; no network, no private data, writes only to ptpub.v1.demo.* ----
-       The demo is opened up completely: it reports the Premium tier so every panel, the
-       analyst, the council and the simulation engine render without an account. */
-    window.PT_TIER = "premium";
+       A preview, not a plan, with nothing locked (owner decision, 23 Nov 2026): every panel, the analyst, the council
+       and the simulation engine run on the simulated sample portfolio. It reports tier "demo" and never a paid tier,
+       so no server endpoint is opened by it; real accounts stay enforced server-side. This holds for ?demo=1 on a
+       signed-in account too: the demo never borrows the account's plan or data. */
+    window.PT_TIER = "demo";
     window.PT_LIMITS = { holdings: null, aiPerDay: null, simulationsPerDay: null, historyYears: null };
     window.PT_SOURCE_LABEL = "Simulated sample portfolio";
     if (window.PT_DEMO && window.PT_DEMO.source) {
@@ -157,8 +162,26 @@
      so they are fetched WITHOUT the auth header — Vercel's CDN never caches authorized
      requests, and the edge cache is what keeps a page load fast on the Hobby plan.
      Anything per-user (HISTORY, FACTOR, VALIN, fund, rev, extras, me, state) keeps Bearer. */
-  var SHARED_RE = /^(?:csv\/(?:ROTATION|RISK|BREADTH|OBOS|PEER|VOLATILITY)|doc\?|collection\/(?:etf|ins|news))(?:$|[/?&])/;
+  var SHARED_RE = /^(?:doc\?|collection\/(?:etf|ins))(?:$|[/?&])/;
+  /* datasets that feed only Paid/Premium screens (mirrors api/_h/free/*; any listed feature unlocks) */
+  var GATED = {
+    "csv/ROTATION": ["marketRotation", "sectorRotation"], "csv/RISK": ["riskAppetite"], "csv/VOLATILITY": ["riskAppetite"],
+    "csv/BREADTH": ["sectorRotation"], "csv/OBOS": ["sectorRotation"], "csv/FACTOR": ["sectorRotation"], "csv/PEER": ["valuation"],
+    "csv/VALIN": ["valuation", "deepAnalysis"], "collection/fund": ["valuation", "deepAnalysis"], "collection/rev": ["sectorRotation", "deepAnalysis"],
+    "collection/news": ["marketIntel", "deepAnalysis"], "doc?path=meta%2Fvixeq_hist": ["riskAppetite"]
+  };
+  function gateOf(path) { return GATED[String(path).replace(/^\//, "").split(/[?&]lang=/)[0]] || null; }
+  /* false only when the account record positively says the plan lacks every listed feature */
+  async function entitled(path) {
+    var g = gateOf(path); if (!g) return true;
+    var m = await meAsync();
+    if (!m || !m.features) return true;   /* unknown: let the server decide */
+    return g.some(function (f) { return m.features[f] === true; });
+  }
+  var PLAN_REQUIRED = { code: "plan_required", message: "Included in the Paid and Premium plans" };
+  window.PT_ENTITLED = function (feature) { return !!(me && me.features && me.features[feature] === true); };
   async function get(path, asText) {   /* async keyword used to sit stranded before the comment above, so await below was read as a call to a function named "await" and every signed-in data request threw */
+    if (!(await entitled(path))) { if (/^\/?csv\//.test(path)) throw PLAN_REQUIRED; return null; }   /* not in this plan: same as the server's 402, without the request */
     var url = BASE + path;
     var opts = { headers: { Accept: "application/json, text/csv, */*" } };
     var r, shared = SHARED_RE.test(path);
@@ -176,6 +199,7 @@
   /* HISTORY and FACTOR take your tickers in a POST body (never the URL). The server enforces the
      plan's history depth; symbols are capped server-side too (MAX 25). */
   async function freePost(key) {
+    if (!(await entitled("csv/" + key))) throw PLAN_REQUIRED;
     var syms = holdingSymbols();
     var r = await authFetch(BASE + "/csv/" + key, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbols: syms }) });
     if (r.status === 204 || r.status === 404) return null;
@@ -202,6 +226,7 @@
      Paid and Premium have no symbol limit (valSymbols === null), so every holding is sent in batches of 25
      (the server's per-request ceiling) and the replies are merged. */
   async function holdPost(path, asText) {
+    if (!(await entitled(path))) { if (asText) throw PLAN_REQUIRED; return []; }
     var m = await meAsync(), lim = m && m.limits ? m.limits.valSymbols : undefined;
     var cap = lim === null ? Infinity : (lim || 12);
     var all = holdingSymbols(), syms = cap === Infinity ? all : all.slice(0, cap);
@@ -263,6 +288,7 @@
     getCollection: async function (n) {
       /* everything a source returns is untrusted: check shape, dates and URLs before the page renders it */
       var v = null;
+      if (!(await entitled("collection/" + n))) return [];
       if (n === "news" || n === "rev") v = await premiumCollection(n);
       if (v == null && (n === "fund" || n === "rev")) v = await holdPost("collection/" + n, false);
       if (v == null) v = await get("/collection/" + encodeURIComponent(n), false);

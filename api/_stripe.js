@@ -38,4 +38,18 @@ function verifySignature(raw, header, secret, toleranceSec = 300, now = Date.now
 
 const periodEnd = (sub) => { const t = sub.current_period_end || (sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].current_period_end); return t ? new Date(t * 1000).toISOString() : null; };
 
-module.exports = { stripe, verifySignature, form, periodEnd };
+// Price IDs that grant each plan. A price may grant exactly one plan: the current Paid and Premium prices must
+// differ, and neither may appear in the other plan's legacy list (a THB 399 price listed as legacy Premium would
+// sell Premium for THB 399). `issues` names the conflict without echoing any value.
+const priceList = (v) => String(v || "").split(",").map((s) => s.trim()).filter(Boolean);
+function priceMap(env = process.env) {
+  const paid = String(env.STRIPE_PRICE_PAID || "").trim(), premium = String(env.STRIPE_PRICE_PREMIUM || "").trim();
+  const grants = { paid: new Set([paid, ...priceList(env.STRIPE_LEGACY_PAID_PRICES)].filter(Boolean)),
+    premium: new Set([premium, ...priceList(env.STRIPE_LEGACY_PREMIUM_PRICES)].filter(Boolean)) };
+  const issues = [];
+  if (paid && paid === premium) issues.push("STRIPE_PRICE_PAID and STRIPE_PRICE_PREMIUM must be different prices");
+  else if ([...grants.paid].some((id) => grants.premium.has(id))) issues.push("a Stripe price is mapped to both Paid and Premium (check the legacy price lists)");
+  return { paid, premium, grants, issues };
+}
+
+module.exports = { stripe, verifySignature, form, periodEnd, priceMap };

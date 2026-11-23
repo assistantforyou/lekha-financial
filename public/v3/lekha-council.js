@@ -207,7 +207,9 @@ async function convene() {
 /* ---------- AI Research Reports list (saved live reports + the sample reports) ---------- */
 function reports() {
   const el = document.getElementById("lekha-reports"); if (!el) return;
-  const saved = store.get(), samples = (demo && demo.scenarios) || [];
+  /* saved live reports are Premium material (feature councilReports): after a downgrade they stay in this browser's
+     storage (and on the server, withheld) but are not listed here; the sample reports stay available */
+  const saved = isLive() ? store.get() : [], samples = (demo && demo.scenarios) || [];
   el.innerHTML = `<section class="panel"><div class="ph"><h2>Council reports</h2><span class="note">${esc(st.saveNote || "Your saved live reports sync to your account.")}</span></div>
     ${saved.length ? `<ul class="cn-list">${saved.map((r, i) => `<li><button class="btn" data-rep="${i}">${esc(r.ceo && r.ceo.verdict)} · ${esc(r.question)}</button><span class="note">${esc((r.savedAt || "").slice(0, 10))}</span></li>`).join("")}</ul>` : `<p class="note">No live Council reports yet${isLive() || window.PT_DEMO_MODE ? "." : " — live reports are a Premium feature."}</p>`}
     <h3>Sample reports</h3><ul class="cn-list">${samples.map((s) => `<li><button class="btn" data-sample="${esc(s.id)}">${esc(s.ceo.verdict)} · ${esc(s.question)}</button></li>`).join("")}</ul></section>`;

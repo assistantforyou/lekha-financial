@@ -1,23 +1,47 @@
-# Portfolio Terminal — plans and data tiers (18 Nov 2026)
+# LEKHA Financials — plans and feature access (23 Nov 2026)
 
-One product, four levels. The terminal is the same for everyone; what changes is
-**whether the data is simulated or real, how deep it goes, and (on Premium) the AI layer.**
-Some panels preview higher tiers. The server checks account entitlements for restricted operations.
+Exactly three commercial plans: **Free ฿0**, **Paid ฿399/month**, **Premium ฿599/month**.
+The **Demo** is a non-billable preview for visitors without an account. It is not a plan, and nothing
+in it is locked (owner decision, 23 Nov 2026): every screen, the analyst, the Council and the
+simulation engine run on a simulated sample portfolio computed in the browser. It reports tier `demo`
+and never a paid tier, so no server endpoint is opened by it; real accounts stay enforced server-side.
 
-| | Demo | Free | Paid ฿399/mo | Premium ฿699/mo |
+The feature matrix lives in one file, `api/_data/entitlements.json`. The server reads it through
+`api/_tiers.js` (`FEATURES`, `featureOfRoute`, `canUse`, `quota`) and enforces it. The React shell
+imports the same file (`app/src/lib/entitlements.js`) only to decide what to show.
+
+| Route | Feature | Free | Paid | Premium |
 |---|---|---|---|---|
-| Sign-in | none | account | account | account |
-| Data | sample portfolio; some research routes use historical provider data | real (public sources) | real + Alpha Vantage layer | real + Alpha Vantage layer |
-| Holdings | 14 demo positions (demo namespace) | 20 | unlimited | unlimited |
-| Own-portfolio history | full simulated | 5 years | full depth the source serves | full depth the source serves |
-| Valuation symbols | 14 | 12 | unlimited | unlimited |
-| Analyst estimate revisions | simulated | — | ✓ | ✓ |
-| Illustrative Projection Lab (synthetic scenario panel) | ✓ | locked teaser | hidden | ✓ |
-| AI analyst chat / daily briefing / Monte Carlo & stress sims | canned demo answers | teaser | teaser | ✓ (40 asks, 3 briefings, 10 sims per day) |
+| `macro/rotation` | marketRotation | locked | yes | yes |
+| `macro/intel` | marketIntel | locked | yes | yes |
+| `macro/appetite` | riskAppetite | locked | yes | yes |
+| `analysis/value` | valuation | locked | yes | yes |
+| `analysis/deep` | deepAnalysis | locked | yes | yes |
+| `analysis/ask` | analyst | locked | yes | yes |
+| `analysis/briefing` | briefing | locked | yes | yes |
+| `analysis/council` | council | locked | locked | yes |
+| `analysis/reports` | councilReports | locked | locked | yes |
+| `analysis/stress` | simulation | locked | locked | yes |
+| `sector/*` | sectorRotation | locked | yes | yes |
+| `simulation/*` | simulation | locked | locked | yes |
 
-Market-wide datasets (rotation, breadth, OBOS, factor, peer, volatility, macro, flows)
-are identical for every signed-in tier — they are shared, cheap, and cached. Gating
-targets the user's own portfolio depth, not the shared market context.
+Every other route keeps its Free entitlement: portfolio overview, holdings, `portfolio/risk`,
+watchlist, company workspace, research agent, news search, macro dashboard, macro regime and account pages.
+
+| Limits | Demo | Free | Paid | Premium |
+|---|---|---|---|---|
+| Holdings | 14 sample | 20 | unlimited | unlimited |
+| Own-portfolio history | sample | 5 years | full depth served | full depth served |
+| Portfolio analyst questions / day | — | — | 20 | 40 |
+| New daily briefings / day | — | — | 1 | 3 |
+| Cited research agent questions / day | 15 | 30 | 30 | 80 |
+| Expert-mode analyst questions / day | — | — | 30 | 80 |
+| New Council reports / day | — | — | — | 10 (`COUNCIL_V3_DAILY`) |
+| Server simulations / day | — | — | — | 10 |
+| Monte Carlo per run (browser) | — | — | — | up to 1,000,000 requested paths, 25 invested holdings; the completed count is shown |
+
+The Paid AI quotas are new with this change. They are finite and counted server-side through the
+atomic `pt_rate_hit` RPC; review them against real usage before a commercial launch.
 
 ## Where the numbers live
 
@@ -34,46 +58,101 @@ is not `active`/`trialing` or is past its `period_end` (+1 day grace) → free;
 ## What each piece enforces
 
 - `api/_auth.js` — `requireTier(req, res, allowed)`: 401 anonymous, 402 with
-  `{tier, need}` when the tier is not allowed. Every gated endpoint calls it.
+  `{tier, need}` when the tier is not allowed. `requireFeature(req, res, feature | [features])`
+  is the same contract for a feature of the matrix and adds `{feature, plan}` to the 402 body.
+  The synthetic sample-portfolio request (`__demoPublic`) never passes `requireFeature`.
+  `lockCache(res)` forces `Cache-Control: private, no-store` on gated responses so no CDN or
+  browser cache can hand an entitled answer to someone else.
+- `api/_h/free/csv/[key]` — ROTATION, RISK, VOLATILITY, BREADTH, OBOS, FACTOR, PEER and VALIN
+  need the feature they feed (Paid/Premium). HISTORY keeps its Free entitlement.
+- `api/_h/free/collection/[name]` — `news` (the AI-labelled market briefing), `fund` and `rev`
+  need Paid/Premium; `etf` and `ins` stay public. `api/_h/free/doc` — `meta/vixeq_hist` needs
+  Risk appetite; the FRED, CFTC, TIC and Fear & Greed docs feed Free screens and stay public.
+- `api/_h/free/demo` — serves only HISTORY, quotes and street (analyst targets) for the sample
+  portfolio; valuation, fundamentals, factor history and revisions were removed.
 - `api/state.js` — holdings documents are capped per plan (Free 20; Paid/Premium
-  unlimited): a sync over the cap returns `422 {code:"holdings_limit"}` with the
-  limit in the message.
+  unlimited): a sync over the cap returns `422 {code:"holdings_limit"}`. Saved Council reports
+  (`reports/*`) are withheld from `GET` (not deleted) for accounts without `councilReports`.
+- `api/rag.js`, `api/_fin/agent.js` — indexing a Council report needs `councilReports`, and the
+  research agent never retrieves saved reports for an account without it.
 - `api/_history.js` — own-portfolio history truncated to `historyDays` (Free 1825,
   subscribers untruncated).
-- `api/_valuation.js` — valuation/fundamentals symbols capped at `valSymbols`
-  (Free 12; Paid and Premium `null` = unlimited). Every request is still capped at 25
-  symbols (`BATCH`: SEC pacing + the 60 s function limit), so the client
-  (`pt-datasource.js` `holdPost`) sends unlimited plans as batches of 25 and merges the
-  results. Unlimited plans get 120 valuation requests per 10 minutes (Free: 20).
-- `api/_h/av/*` — the Alpha Vantage layer (consensus, revisions, premium news)
-  requires Paid or Premium.
-- `api/_h/ai/*` — the AI analyst (ask / briefing / simulate) requires Premium, with
-  per-user daily caps via the atomic `pt_rate_hit` RPC. Portfolio context is assembled
-  server-side from the caller's own `pt_user_state` rows only — never from the request.
+- `api/_valuation.js` — valuation/fundamentals symbols capped at `valSymbols`; Paid and Premium
+  are unlimited and sent in batches of 25.
+- `api/_h/av/*` — the Alpha Vantage layer (consensus, revisions, premium news) requires Paid or Premium.
+- `api/_h/ai/ask`, `briefing` and the expert mode of `/api/data/agent` — Paid and Premium, with the
+  per-plan daily quotas above. `api/_h/ai/simulate`, `council` — Premium. `council-v3` keeps its
+  documented 403 below Premium. Portfolio context is assembled server-side from the caller's own
+  `pt_user_state` rows only — never from the request.
+
+## What the browser enforces (display only)
+
+- `app/src/App.jsx` renders `LockedFeature` instead of the module for a locked route, so the
+  classic panels never leave the hidden stage; the sidebar shows a lock on locked routes.
+- `public/pt-datasource.js` reports tier `demo` in the demo and skips gated datasets when
+  `/api/auth/me` says the plan lacks them. `public/pt-demo.js` serves no sample data for locked features.
+- `public/v3/lekha-modules.js` imports and mounts Simulation, Council and Deep Analysis only when
+  `/api/auth/me` includes the feature. `/v2` and `/v3` use the same data source, so locked panels
+  there show "included in the Paid and Premium plans" instead of data.
+
+**Limitation:** the Monte Carlo engine (`public/v3/lekha-sim.js`, `sim-runner.js`,
+`sim-stream.worker.js`, `public/core/engine.js`) and the Projection Lab illustration
+(`public/v2/pt-projection-data.json`) are static assets that any visitor can download. The lock
+stops the app from mounting them for accounts without Premium; it cannot stop someone from running
+public JavaScript on their own data. The server-side Premium simulation (`/api/ai/simulate`) is
+protected. See `docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md`.
+
+## Upgrades
+
+- Free → Paid or Premium: `POST /api/billing/checkout {plan}` opens Stripe Checkout. Checkout first
+  reads the configured price from Stripe and opens only if it is active, THB, monthly and exactly
+  the advertised amount (39,900 / 59,900 satang); otherwise it returns `503 {code:"price_mismatch"}`
+  and creates nothing.
+- Paid ↔ Premium, cancel, card change: the Stripe billing portal (`POST /api/billing/portal`).
+  Checkout refuses a second subscription with `409`. The portal only offers the plan switch if the
+  portal configuration in Stripe lists both products and their current prices.
+- Returning from Checkout (`?billing=success`) or the portal (`?billing=portal`) grants nothing. The
+  app re-reads `/api/auth/me` every 3 s for up to a minute and reloads once when the verified plan
+  changes. Only the signed webhook changes `pt_profiles`.
 
 ## Demo architecture
 
-Anonymous visitors enter demo mode. The browser seeds sample holdings and uses a separate storage namespace. Historical research routes can contact the server. Council scenarios are pre-written and local Monte Carlo runs use the sample portfolio. Account document sync is disabled in demo mode.
-
-The cited research endpoint allows 15 questions per day in demo, 30 per signed-in Free or Paid account and 80 on Premium. Premium expert requests also consume the research allowance. The portfolio analyst has a separate 40-question cap. The Premium Council default is 10 new generations per day. Its five perspectives and synthesis come from one structured model response. Cached Council answers consume no new generation.
+Anonymous visitors enter demo mode. The browser seeds sample holdings and uses a separate storage
+namespace. Account document sync is disabled. Every route is open: the data comes from `public/pt-demo.js`,
+which simulates each dataset locally for the sample portfolio, and the analyst, Council and Monte Carlo run
+in the browser on that data (the Council plays its pre-written sample reports; no model is called). The
+server-side `/api/free/demo` endpoint still serves only HISTORY, quotes and street for the sample tickers.
+The cited research agent keeps its demo allowance (15 questions per day per browser).
 
 ## Stripe
 
-One product per plan, THB monthly prices, created live 18 Nov 2026:
+Prices are configured in Vercel, not in code. The Premium price must change before this pricing
+can go live, in one coordinated release with this code: see the cutover and rollback procedure in
+`docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md` section 8.5. Production today (read 23 Nov) still sells the
+฿699 Premium price and lists the ฿599 candidate as legacy; the target configuration is:
 
 ```
-STRIPE_PRICE_PAID=price_1UesoyQ0yLOm6KwFuYZbTz9J     # ฿399/month
-STRIPE_PRICE_PREMIUM=price_1UesqhQ0yLOm6KwFvcO9Owwh   # ฿699/month
-# Earlier prices stay active so existing subscribers keep their plan:
-STRIPE_LEGACY_PAID_PRICES=price_1UcqQNQ0yLOm6KwFb5qMhW1q,price_1UesDJQ0yLOm6KwFIldZbquM   # ฿699 (18 Nov), ฿299 (23 Nov)
-STRIPE_LEGACY_PREMIUM_PRICES=price_1UcqQNQ0yLOm6KwFJRbgNC8n,price_1UesDNQ0yLOm6KwFfD77FGmK # ฿1,299 (18 Nov), ฿599 (23 Nov)
+STRIPE_PRICE_PAID=price_1UesoyQ0yLOm6KwFuYZbTz9J     # ฿399/month (live, 23 Nov) — unchanged
+STRIPE_PRICE_PREMIUM=<a verified live ฿599/month Premium price>
+# Earlier prices stay mapped so existing subscribers keep their plan:
+STRIPE_LEGACY_PAID_PRICES=price_1UcqQNQ0yLOm6KwFb5qMhW1q,price_1UesDJQ0yLOm6KwFIldZbquM    # ฿699 (18 Nov), ฿299 (23 Nov)
+STRIPE_LEGACY_PREMIUM_PRICES=price_1UcqQNQ0yLOm6KwFJRbgNC8n,price_1UesqhQ0yLOm6KwFvcO9Owwh # ฿1,299 (18 Nov), ฿699 (23 Nov)
 ```
 
-- Checkout: `POST /api/billing/checkout {plan:"paid"|"premium"}` → Stripe Checkout.
-  An existing active subscription gets `409` (switch plans from the customer portal).
-- Webhook: only explicitly mapped Paid, Premium and grandfathered price IDs grant access. An unknown active price raises a retryable error for operator reconciliation.
-- Until both price env vars are set in Vercel, checkout returns a clear 503 and
-  everything else works.
+- Candidate for `STRIPE_PRICE_PREMIUM`: `price_1UesDNQ0yLOm6KwFfD77FGmK`, recorded here as the ฿599
+  Premium price created on 23 Nov and since moved to the legacy list. Reuse it only after confirming
+  in the live Stripe dashboard that it belongs to the LEKHA Premium product, is active, THB,
+  59,900 satang, monthly and licensed. When it becomes the current price, move the ฿699 price
+  `price_1UesqhQ0yLOm6KwFvcO9Owwh` into `STRIPE_LEGACY_PREMIUM_PRICES` (as above) so anyone who
+  subscribed at ฿699 keeps Premium. Existing subscriptions keep their own price; nothing migrates them.
+- Preview (Stripe TEST mode) needs its own ฿599 Premium TEST price; the staging TEST Premium price on
+  record is ฿1,299 (`docs/STAGING_AUDIT_LOG.md`, 22 Nov).
+- `node scripts/check-release-config.mjs` runs first in the Vercel build command (restored after
+  `404ef49` removed it). It checks build configuration offline, then the live Stripe prices; any
+  failure, including a Stripe outage, stops the build so nothing is deployed. Each price may grant
+  only one plan (checked at build, in Checkout and in the webhook).
+- Webhook: only explicitly mapped Paid, Premium and grandfathered price IDs grant access. An unknown
+  active price raises a retryable error for operator reconciliation.
 
 ## Multi-portfolio
 
@@ -83,8 +162,8 @@ go if that ever changes.
 
 ## Display
 
-- **Plans card** (`public/pt-ui.js`): the rows mirror the "Revised pricing structure" table. Copy only — the
-  gating numbers above (`api/_tiers.js`) are what the backend enforces.
+- **Plans** (`app/src/pages/account.jsx`, classic card in `public/v2/pt-ui.js`): copy mirrors
+  `api/_data/entitlements.json`; the backend enforces it.
 - **Themes** (`public/pt-themes.js`): 100 editor-style themes (74 dark, 26 light) plus LEKHA Auto/Light/Dark, picked
   from the palette button in the header and stored in the `theme` display preference (synced per account).
   `node scripts/check-themes.mjs` verifies every theme's contrast.

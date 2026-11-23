@@ -44,6 +44,9 @@ The old modular "main" skin (`public/app.js`, `views/`, `core/ui` etc.) was **re
 * Observability (`obs.js`): per-provider calls/errors/latency, cache hit rate, tool failures; daily rollup in `pt_av_cache` (`fin/stats/<day>`); admin page **Account → Diagnostics** (`GET /api/data/diag`, admins only) also shows token usage from `pt_costs` and which env vars are set (booleans only).
 * Routes: `search quote quotes history company profile statements facts filings news earnings estimates peers ratios valuation macro fx calc agent diag` (one function, `api/data.js`; Vercel Hobby allows 12 functions, 10 used).
 
+## Plans and feature access (23 Nov 2026)
+Free ฿0 / Paid ฿399 / Premium ฿599; the Demo is a preview, never a plan. The feature matrix is `api/_data/entitlements.json`, read by `api/_tiers.js` (server, authoritative: `requireFeature`, `canUse`, `quota`) and `app/src/lib/entitlements.js` (display). A new restricted screen needs: a route entry in that JSON, `requireFeature` (plus `lockCache` for shared data) on every endpoint it reads, and the dataset in `GATED` in `public/pt-datasource.js` / `LOCKED_*` in `public/pt-demo.js`. Details and limitations: `docs/TIERS.md`, `docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md`. `api/_scripts-parse.test.js` fails if any browser script stops parsing.
+
 ## Account backend additions
 `api/auth/[action].js` gained `email` (confirmation-link email change) and `delete` (password re-check + typed `DELETE`; refuses while a paid subscription is active). **`delete` is not exercised against production**; test with a throwaway account before relying on it.
 

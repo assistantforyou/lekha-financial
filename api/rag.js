@@ -5,6 +5,7 @@
 //   ingest  -> store one document the client already has (saved council report, imported statement summary)
 // Embeddings are owner-scoped; demo visitors have no server-side documents.
 const { requireTier } = require("./_auth");
+const { tierOf, canUse } = require("./_tiers");
 const { knowledgeOwner } = require("./_demo-owner");
 const { clientId } = require("./_history");
 const { rateHit } = require("./_lib");
@@ -64,6 +65,8 @@ module.exports = async (req, res) => {
     if (text.length < 80) return res.status(400).json({ error: "That document is too short to index." });
     if (!(await rateHit(`rag/ingest/${quotaOwner}/${Math.floor(Date.now() / 36e5)}`, 30).catch(() => true))) return res.status(429).json({ error: "Too many documents this hour." });
     const kind = ["report", "statement", "note"].includes(b.kind) ? b.kind : "note";
+    // saved Council reports are Premium material: only an account entitled to them may index one
+    if (kind === "report" && (p.demo || !canUse(p, "councilReports"))) return res.status(402).json({ error: "Premium plan required for council reports.", tier: p.demo ? "demo" : tierOf(p), need: ["premium"], feature: "councilReports", plan: "premium" });
     const ref = `${kind}:${String(b.ref || Date.now()).slice(0, 80)}`;
     try {
       const chunks = rag.chunkText(text);
