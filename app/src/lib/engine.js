@@ -23,9 +23,11 @@ export function useSession() {
   return s
 }
 // /api/auth/me record (tier, limits, is_admin, prefs) for signed-in users
+// re-read on "lekha:me-refresh" (billing return): the plan shown is always the server's verified one, never a redirect's claim
 export function useMe() {
-  const [me, set] = useState(null), s = useSession()
-  useEffect(() => { let dead = false; if (!s || isDemo()) { set(null); return } window.PT_AUTH.fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)).then((j) => !dead && set(j)).catch(() => {}); return () => { dead = true } }, [s && s.email])
+  const [me, set] = useState(null), s = useSession(), [n, bump] = useState(0)
+  useEffect(() => { const f = () => bump((x) => x + 1); window.addEventListener("lekha:me-refresh", f); return () => window.removeEventListener("lekha:me-refresh", f) }, [])
+  useEffect(() => { let dead = false; if (!s || isDemo()) { set(null); return } window.PT_AUTH.fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)).then((j) => !dead && j && set(j)).catch(() => {}); return () => { dead = true } }, [s && s.email, n])
   return me
 }
-export const reloadMe = () => window.dispatchEvent(new Event("storage"))
+export const reloadMe = () => { window.dispatchEvent(new Event("storage")); window.dispatchEvent(new Event("lekha:me-refresh")) }

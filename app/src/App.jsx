@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronRight, FlaskConical } from "lucide-react"
-import { Toaster } from "sonner"
+import { Toaster, toast } from "sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Sheet } from "@/components/ui/sheet-root"
 import { SheetContent } from "@/components/ui/dialog"
@@ -13,9 +13,10 @@ import Tour from "@/tour/Tour"
 import { ThemeDialog, LangDialog } from "@/components/Pickers"
 import { PageHeader } from "@/components/common"
 import { BY_KEY, DEFAULT_ROUTE, parseHash } from "@/nav"
-import AnalystGate from "@/components/AnalystGate"
+import LockedFeature from "@/components/LockedFeature"
+import { allows, featureOfRoute } from "@/lib/entitlements"
 import { Skeleton } from "@/components/ui/skeleton"
-import { isDemo, useMe, useSession } from "@/lib/engine"
+import { isDemo, reloadMe, useMe, useSession } from "@/lib/engine"
 import PAGES from "@/pages"
 
 const START = "ptpub.v1.v3.start"
@@ -50,20 +51,48 @@ export default function App() {
   }, [route.key, route.param])
   const qs = route.query ? route.query.toString() : "", r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param, qs])   // query (?tab=…) must be a dependency or tab links never switch
   const admin = !!(me && me.is_admin), demo = isDemo(), signedIn = !!(sess && sess.access_token)
-  // the analyst screens are Premium: Free and Paid users get a page of their own for each (not one shared upsell); Premium and Demo get the live analyst
-  const analystGate = !!(item.analyst && signedIn && !demo), gated = analystGate && !!(me && me.tier && me.tier !== "premium"), gateLoading = analystGate && !me
+  /* Feature access (api/_data/entitlements.json, the same matrix the server enforces). The demo is a preview, never
+     a plan; a signed-in account's tier is the verified one from /api/auth/me. A locked route renders the lock screen
+     INSTEAD of its module, so the classic panels never leave the hidden stage. Display only: the endpoints behind
+     every module re-check the subscription. */
+  const feature = featureOfRoute(route.key), tier = demo || !signedIn ? "demo" : me && me.tier ? me.tier : null
+  const gateLoading = !!feature && tier === null, gated = !!feature && tier !== null && !allows(tier, feature)
+  /* back from Stripe Checkout or the billing portal: the redirect proves nothing, so poll the verified plan until the webhook lands */
+  const [confirming, setConfirming] = useState(() => /[?&]billing=(success|portal)(&|$)/.test(location.search))
+  useEffect(() => {
+    const b = new URLSearchParams(location.search).get("billing"); if (!b) return
+    try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {}
+    if (b === "success") toast("Checkout returned. Your plan changes when Stripe confirms the subscription.")
+    else if (b === "cancel") toast("Checkout cancelled. Nothing was charged.")
+  }, [])
+  useEffect(() => {
+    if (!confirming) return
+    let n = 0
+    const t = setInterval(() => { if (++n > 20) { clearInterval(t); setConfirming(false) } else reloadMe() }, 3000)
+    return () => clearInterval(t)
+  }, [confirming])
+  const firstTier = useRef(undefined)
+  useEffect(() => {
+    if (!confirming || !tier) return
+    if (firstTier.current === undefined) { firstTier.current = tier; if (!(feature && gated === false)) return }
+    if (tier !== firstTier.current || (feature && gated === false)) {
+      setConfirming(false); toast.success(`Your account is on the ${tier[0].toUpperCase() + tier.slice(1)} plan.`)
+      // the classic engine, its data source and the feature modules read the plan once at load: reload so they start on the verified plan
+      if (tier !== firstTier.current) setTimeout(() => location.reload(), 1500)
+    }
+  }, [confirming, gated, feature, tier])
   const group = BY_KEY[route.key] ? BY_KEY[route.key].groupTitle : ""
-  const side = <Sidebar routeKey={route.key} isAdmin={admin} onNavigate={() => setMenu(false)} />
+  const side = <Sidebar routeKey={route.key} isAdmin={admin} tier={tier} onNavigate={() => setMenu(false)} />
   return (
     <TooltipProvider>
       <div className="shell min-h-dvh bg-background text-foreground">
-        <Banner onMenu={() => setMenu(true)} onSearch={() => setSearch(true)} onTheme={() => setTheme(true)} onLang={() => setLang(true)} navigate={navigate} customizable={isPane && !item.analyst && !["tab-sim", "tab-sim-proj", "tab-an-deep", "tab-an-council", "lekha-reports", "v3-ai-host"].some((p) => item.panes.includes(p))} />
+        <Banner onMenu={() => setMenu(true)} onSearch={() => setSearch(true)} onTheme={() => setTheme(true)} onLang={() => setLang(true)} navigate={navigate} customizable={isPane && !gated && !gateLoading && !item.analyst && !["tab-sim", "tab-sim-proj", "tab-an-deep", "tab-an-council", "lekha-reports", "v3-ai-host"].some((p) => item.panes.includes(p))} />
         {demo && <div className="border-b border-[color-mix(in_srgb,var(--warn)_40%,var(--border))] bg-[color-mix(in_srgb,var(--warn)_10%,var(--background))] px-3 py-1 text-[12px]"><div className="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-3 gap-y-1"><FlaskConical className="size-3.5 text-[var(--warn)]" /><b className="font-mono text-[11px] tracking-wider text-[var(--warn)]">DEMO</b><span className="text-muted-foreground">{demoAsOf()}</span>{signedIn ? <a className="ml-auto text-primary hover:underline" href={location.pathname}>Exit demo</a> : <a className="ml-auto text-primary hover:underline" href="/login.html">Create a free account to save your own holdings</a>}</div></div>}
         <div className="mx-auto flex max-w-[1700px]">
           <aside data-tour="nav" className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border lg:block">{side}</aside>
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">
             <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[12px] text-muted-foreground"><span>{group}</span><ChevronRight className="size-3" /><span className="text-foreground">{item.title}{route.param ? ` · ${route.param}` : ""}</span></nav>
-            {isPane ? <><PageHeader title={item.title} description={item.desc} />{gated ? <AnalystGate kind={item.analyst} tier={me.tier} navigate={navigate} /> : gateLoading ? <div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div> : <PanelHost ids={item.panes} analyst={item.analyst} route={r} />}</> : Page ? <Page route={r} item={item} navigate={navigate} me={me} /> : null}
+            {gated ? <><PageHeader title={item.title} description={item.desc} /><LockedFeature feature={feature} title={item.title} tier={tier} me={me} signedIn={signedIn} demo={demo} navigate={navigate} confirming={confirming} /></> : gateLoading ? <><PageHeader title={item.title} description={item.desc} /><div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div></> : isPane ? <><PageHeader title={item.title} description={item.desc} /><PanelHost ids={item.panes} analyst={item.analyst} route={r} /></> : Page ? <Page route={r} item={item} navigate={navigate} me={me} /> : null}
             <footer className="mt-12 border-t border-border pt-4 text-[11.5px] leading-relaxed text-muted-foreground">
               <p>LEKHA Financials is analysis software, not investment advice.</p>
               <div id="app-foot-slot" />

@@ -16,7 +16,7 @@ export const STEPS = [
   { id: "holdings", where: true, hash: "portfolio/holdings", target: [panelOf("tbl"), panelOf("ph-form")] },
   { id: "company", where: true, hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-head"]')] },
   { id: "tabs", where: true, hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-tabs"]')] },
-  { id: "discover", where: true, hash: "sector/now", target: [() => byId("rot-sum")] },
+  { id: "discover", where: true, hash: "sector/now", target: [() => byId("rot-sum"), sel('section[aria-labelledby="locked-title"]')] },   // Free and demo: the Paid lock screen
   { id: "finish", hash: "portfolio/overview", ready: () => !!byId("kpis") },
 ]
 
