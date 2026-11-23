@@ -2,8 +2,8 @@
 const { sb } = require("./_lib");
 const { tokenCost } = require("./_pricing");
 
-async function logUsage({ service, job, model, inTok = 0, outTok = 0, extra = {}, timeoutMs = 1000 }) {
-  const usd = tokenCost(model, inTok, outTok);
+async function logUsage({ service, job, model, inTok = 0, outTok = 0, cachedTok = 0, extra = {}, timeoutMs = 1000 }) {
+  const usd = tokenCost(model, inTok, outTok, cachedTok);
   try {
     await sb("pt_costs", {
       method: "POST", signal: AbortSignal.timeout(timeoutMs),

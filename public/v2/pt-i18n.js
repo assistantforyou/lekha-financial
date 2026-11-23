@@ -323,6 +323,50 @@
     return fill(v, vars ? vars.map(function (x) { return { raw: String(x) }; }) : r.slots, info.locale);
   };
 
+  /* Dynamic translation. The bundled dictionaries cover the classic panels; copy that was written later, or
+     anything a document adds, misses them. Those strings are queued here and translated on the server once,
+     then kept in the shared cache. New copy therefore works without regenerating the dictionaries. */
+  var dynQ = {}, dynSent = {}, dynTimer = 0, dynBusy = false, dynUntil = Date.now() + 180000, dynCount = 0;
+  var dynOn = info.code !== "en" && typeof W.fetch === "function";
+  function dynKey(s) { return norm(String(s).replace(/<\/?\d+\/?>/g, ""), false).key; }
+  function queueDyn(src) {
+    if (!dynOn) return;
+    var s = String(src == null ? "" : src).replace(/\s+/g, " ").trim();
+    if (s.length < 2 || s.length > 300 || !HAS_LETTERS.test(s)) return;
+    if (DICT[dynKey(s)] != null || dynSent[s] || dynQ[s] || dynCount >= 400 || Date.now() > dynUntil) return;
+    dynQ[s] = 1; dynCount++;
+    if (!dynTimer) dynTimer = setTimeout(dynFlush, 600);
+  }
+  function dynApply(map) {
+    var changed = false;
+    for (var src in map) {
+      var v = map[src]; if (typeof v !== "string" || !v || v === src) continue;
+      var k = dynKey(src);
+      if (DICT[k] == null) { DICT[k] = v; changed = true; }
+    }
+    if (changed) { api.has = true; setTimeout(function () { try { api.rescan(); } catch (e) {} }, 0); }
+  }
+  function dynFlush() {
+    dynTimer = 0;
+    if (dynBusy) { dynTimer = setTimeout(dynFlush, 400); return; }
+    var batch = Object.keys(dynQ).slice(0, 80);
+    if (!batch.length) return;
+    batch.forEach(function (s) { delete dynQ[s]; dynSent[s] = 1; });
+    dynBusy = true;
+    W.fetch("/api/data/i18n", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lang: info.code, texts: batch })
+    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var map = j && j.data && j.data.map; if (map) dynApply(map);
+    }).catch(function () { /* offline: the string stays English until the next visit */ }).then(function () {
+      dynBusy = false;
+      if (Object.keys(dynQ).length) dynTimer = setTimeout(dynFlush, 400);
+    });
+  }
+  api.dynFlush = dynFlush;
+  W.PT_I18N_DYNAMIC = { queue: queueDyn, flush: dynFlush, dict: DICT };
+
   var collect = /[?&]i18n=collect/.test(location.search) || !!W.PT_I18N_COLLECT;
   var seen = {}, miss = {};
   function recMiss(k, sample, partial) {
@@ -396,7 +440,8 @@
       if (collect) seen[key] = seen[key] || { s: v };
       if (info.code === "en") continue;
       var r = translate(collapse(v).trim(), info.locale, recMiss);
-      if (r != null) { el.setAttribute(a, r); el["__pa_" + a] = r; }
+      if (r != null && r !== collapse(v).trim()) { el.setAttribute(a, r); el["__pa_" + a] = r; }
+      else queueDyn(collapse(v).trim());
     }
   }
   function doUnit(el) {
@@ -406,7 +451,7 @@
     if (collect) { var k = norm(u.src, false).key; if (!seen[k]) seen[k] = { s: u.src, k2: norm(u.src, true).key }; }
     if (info.code === "en") return;
     var r = translate(u.src, info.locale, recMiss);
-    if (r == null) return;
+    if (r == null || r === u.src) { queueDyn(u.src); return; }
     if (!validTags(r, u.elems.length)) return;
     if (!u.elems.length) { /* plain text unit */
       var single = el.childNodes.length === 1 && el.firstChild.nodeType === 3;
@@ -421,7 +466,8 @@
     if (collect) { var k = norm(src, false).key; if (!seen[k]) seen[k] = { s: src, k2: norm(src, true).key }; }
     if (info.code === "en") return;
     var r = translate(src, info.locale, recMiss);
-    if (r == null || /<\/?\d+\/?>/.test(r)) return;
+    if (r == null || r === src) { queueDyn(src); return; }
+    if (/<\/?\d+\/?>/.test(r)) return;
     var lead = /^\s/.test(raw) ? " " : "", trail = /\s$/.test(raw) ? " " : "";
     n.nodeValue = lead + r + trail; n.__pti = n.nodeValue;
   }

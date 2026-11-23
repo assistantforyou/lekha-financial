@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import Banner from "@/components/Banner"
 import Sidebar from "@/components/Sidebar"
 import PanelHost from "@/components/PanelHost"
+import PageHelp from "@/components/PageHelp"
 import CommandPalette from "@/components/CommandPalette"
 import Tour from "@/tour/Tour"
 import { ThemeDialog, LangDialog } from "@/components/Pickers"
@@ -63,6 +64,7 @@ export default function App() {
           <aside data-tour="nav" className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border lg:block">{side}</aside>
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">
             <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[12px] text-muted-foreground"><span>{group}</span><ChevronRight className="size-3" /><span className="text-foreground">{item.title}{route.param ? ` · ${route.param}` : ""}</span></nav>
+            <PageHelp routeKey={route.key} />
             {isPane ? <><PageHeader title={item.title} description={item.desc} />{gated ? <AnalystGate kind={item.analyst} tier={me.tier} navigate={navigate} /> : gateLoading ? <div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div> : <PanelHost ids={item.panes} analyst={item.analyst} route={r} />}</> : Page ? <Page route={r} item={item} navigate={navigate} me={me} /> : null}
             <footer className="mt-12 border-t border-border pt-4 text-[11.5px] leading-relaxed text-muted-foreground">
               <p>LEKHA Financials is analysis software, not investment advice.</p>

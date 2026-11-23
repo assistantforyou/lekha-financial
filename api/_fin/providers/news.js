@@ -62,14 +62,14 @@ function parse(xml, publisher, tickers, dflt) {
 async function company(sym) {
   if (!require("../../_licensing").allowed("yahoo")) return [];
   return obs.timed(name, "yahoo-rss", async () => {
-    const x = await request(name, `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(sym)}&region=US&lang=en-US`, { text: true, headers: { "User-Agent": BROWSER_UA }, timeoutMs: 8000 });
+    const x = await request(name, `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(sym)}&region=US&lang=en-US`, { text: true, headers: { "User-Agent": BROWSER_UA }, timeoutMs: 5000 });
     return parse(x, "Yahoo Finance", [sym], "company");
   });
 }
 let memo = null; // the 27 feeds are fetched at most once every 5 minutes per instance, however many callers ask
 async function market() {
-  if (memo && Date.now() - memo.t < 5 * 6e4) return memo.p;
-  const p = Promise.all(FEEDS.map((f) => obs.timed(name, "feed:" + f.name, async () => parse(await request(name, f.url, { text: true, headers: { "User-Agent": BROWSER_UA }, timeoutMs: 8000 }), f.name, [], f.category)).catch(() => []))).then((a) => a.flat());
+  if (memo && Date.now() - memo.t < 15 * 6e4) return memo.p;
+  const p = Promise.all(FEEDS.map((f) => obs.timed(name, "feed:" + f.name, async () => parse(await request(name, f.url, { text: true, headers: { "User-Agent": BROWSER_UA }, timeoutMs: 5000 }), f.name, [], f.category)).catch(() => []))).then((a) => a.flat());
   memo = { t: Date.now(), p }; p.then((r) => { if (!r.length && memo && memo.p === p) memo = null; });
   return p;
 }

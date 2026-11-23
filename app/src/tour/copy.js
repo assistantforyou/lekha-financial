@@ -6,7 +6,7 @@
 
 export const COPY = {
   en: {
-    ui: { next: "Next", back: "Back", skip: "Skip Tour", finish: "Start Exploring", label: "Quick Tour", step: "Step {n} of {total}", replay: "Replay tour", replayHead: "Quick tour", replayText: "A one-minute guided walk through search, navigation, holdings and research.", palette: "Take the Quick Tour" },
+    ui: { next: "Next", back: "Back", skip: "Skip Tour", finish: "Start Exploring", label: "Quick Tour", step: "Step {n} of {total}", replay: "Replay tour", replayHead: "Quick tour", replayText: "A one-minute guided walk through search, navigation, holdings and research.", explore: "Keep exploring", account: "Create a free account", palette: "Take the Quick Tour" },
     steps: {
       welcome: { t: "Welcome to LEKHA Financials", b: "Your workspace for researching companies, tracking your holdings and seeing how your portfolio is doing. This tour takes about a minute." },
       search: { t: "Start with search", b: "Find any company, ETF, index or crypto by name or ticker, plus filings, news and pages. Press {key} from anywhere.", a: "Tap here to find any company, ETF, index or crypto, plus filings, news and pages." },
@@ -21,7 +21,7 @@ export const COPY = {
     },
   },
   th: {
-    ui: { next: "ถัดไป", back: "ย้อนกลับ", skip: "ข้ามทัวร์", finish: "เริ่มสำรวจ", label: "ทัวร์แนะนำ", step: "ขั้นที่ {n} จาก {total}", replay: "เปิดทัวร์อีกครั้ง", replayHead: "ทัวร์แนะนำ", replayText: "แนะนำการใช้งานหนึ่งนาที ครอบคลุมการค้นหา การนำทาง สินทรัพย์ที่ถือ และการค้นคว้า", palette: "ดูทัวร์แนะนำ" },
+    ui: { next: "ถัดไป", back: "ย้อนกลับ", skip: "ข้ามทัวร์", finish: "เริ่มสำรวจ", label: "ทัวร์แนะนำ", step: "ขั้นที่ {n} จาก {total}", replay: "เปิดทัวร์อีกครั้ง", replayHead: "ทัวร์แนะนำ", replayText: "แนะนำการใช้งานหนึ่งนาที ครอบคลุมการค้นหา การนำทาง สินทรัพย์ที่ถือ และการค้นคว้า", explore: "สำรวจต่อ", account: "สร้างบัญชีฟรี", palette: "ดูทัวร์แนะนำ" },
     steps: {
       welcome: { t: "ยินดีต้อนรับสู่ LEKHA Financials", b: "พื้นที่ทำงานสำหรับค้นคว้าบริษัท ติดตามสินทรัพย์ที่ถือ และดูว่าพอร์ตโฟลิโอของคุณเป็นอย่างไร ทัวร์นี้ใช้เวลาประมาณหนึ่งนาที" },
       search: { t: "เริ่มต้นด้วยการค้นหา", b: "ค้นหาบริษัท ETF ดัชนี หรือคริปโตด้วยชื่อหรือสัญลักษณ์ รวมถึงเอกสารที่ยื่น ข่าว และหน้าต่าง ๆ กด {key} ได้จากทุกหน้า", a: "แตะที่นี่เพื่อค้นหาบริษัท ETF ดัชนี หรือคริปโต รวมถึงเอกสารที่ยื่น ข่าว และหน้าต่าง ๆ" },
@@ -36,7 +36,7 @@ export const COPY = {
     },
   },
   "zh-Hans": {
-    ui: { next: "下一步", back: "上一步", skip: "跳过导览", finish: "开始探索", label: "快速导览", step: "第 {n} 步，共 {total} 步", replay: "重新播放导览", replayHead: "快速导览", replayText: "一分钟带你了解搜索、导航、持仓和研究。", palette: "开始快速导览" },
+    ui: { next: "下一步", back: "上一步", skip: "跳过导览", finish: "开始探索", label: "快速导览", step: "第 {n} 步，共 {total} 步", replay: "重新播放导览", replayHead: "快速导览", replayText: "一分钟带你了解搜索、导航、持仓和研究。", explore: "继续探索", account: "创建免费账户", palette: "开始快速导览" },
     steps: {
       welcome: { t: "欢迎使用 LEKHA Financials", b: "研究公司、跟踪持仓、了解投资组合表现的一站式工作台。本导览约需一分钟。" },
       search: { t: "从搜索开始", b: "按名称或代码查找任何公司、ETF、指数或加密资产，也可搜索文件、新闻和页面。随时按 {key}。", a: "点按此处查找任何公司、ETF、指数或加密资产，也可搜索文件、新闻和页面。" },
@@ -51,7 +51,7 @@ export const COPY = {
     },
   },
   "zh-Hant": {
-    ui: { next: "下一步", back: "上一步", skip: "略過導覽", finish: "開始探索", label: "快速導覽", step: "第 {n} 步，共 {total} 步", replay: "重新播放導覽", replayHead: "快速導覽", replayText: "一分鐘帶你了解搜尋、導覽、持倉和研究。", palette: "開始快速導覽" },
+    ui: { next: "下一步", back: "上一步", skip: "略過導覽", finish: "開始探索", label: "快速導覽", step: "第 {n} 步，共 {total} 步", replay: "重新播放導覽", replayHead: "快速導覽", replayText: "一分鐘帶你了解搜尋、導覽、持倉和研究。", explore: "繼續探索", account: "建立免費帳戶", palette: "開始快速導覽" },
     steps: {
       welcome: { t: "歡迎使用 LEKHA Financials", b: "研究公司、追蹤持倉、了解投資組合表現的一站式工作台。本導覽約需一分鐘。" },
       search: { t: "從搜尋開始", b: "依名稱或代號尋找任何公司、ETF、指數或加密資產，也可搜尋文件、新聞和頁面。隨時按 {key}。", a: "點按此處尋找任何公司、ETF、指數或加密資產，也可搜尋文件、新聞和頁面。" },
@@ -66,7 +66,7 @@ export const COPY = {
     },
   },
   ja: {
-    ui: { next: "次へ", back: "戻る", skip: "ツアーをスキップ", finish: "使い始める", label: "クイックツアー", step: "ステップ {n} / {total}", replay: "ツアーを再生", replayHead: "クイックツアー", replayText: "検索、ナビゲーション、保有銘柄、調査を1分で案内します。", palette: "クイックツアーを見る" },
+    ui: { next: "次へ", back: "戻る", skip: "ツアーをスキップ", finish: "使い始める", label: "クイックツアー", step: "ステップ {n} / {total}", replay: "ツアーを再生", replayHead: "クイックツアー", replayText: "検索、ナビゲーション、保有銘柄、調査を1分で案内します。", explore: "そのまま使ってみる", account: "無料アカウントを作成", palette: "クイックツアーを見る" },
     steps: {
       welcome: { t: "LEKHA Financials へようこそ", b: "企業の調査、保有銘柄の管理、ポートフォリオの状況把握のための作業スペースです。このツアーは約1分で終わります。" },
       search: { t: "まずは検索から", b: "企業、ETF、指数、暗号資産を名前やティッカーで探せます。開示書類、ニュース、ページも検索できます。どこからでも {key} で開きます。", a: "ここをタップして企業、ETF、指数、暗号資産を検索できます。開示書類、ニュース、ページも対象です。" },
@@ -81,7 +81,7 @@ export const COPY = {
     },
   },
   ko: {
-    ui: { next: "다음", back: "이전", skip: "둘러보기 건너뛰기", finish: "시작하기", label: "빠른 둘러보기", step: "{total}단계 중 {n}단계", replay: "둘러보기 다시 보기", replayHead: "빠른 둘러보기", replayText: "검색, 탐색, 보유 종목, 조사를 1분 만에 안내합니다.", palette: "빠른 둘러보기 시작" },
+    ui: { next: "다음", back: "이전", skip: "둘러보기 건너뛰기", finish: "시작하기", label: "빠른 둘러보기", step: "{total}단계 중 {n}단계", replay: "둘러보기 다시 보기", replayHead: "빠른 둘러보기", replayText: "검색, 탐색, 보유 종목, 조사를 1분 만에 안내합니다.", explore: "계속 둘러보기", account: "무료 계정 만들기", palette: "빠른 둘러보기 시작" },
     steps: {
       welcome: { t: "LEKHA Financials에 오신 것을 환영합니다", b: "기업을 조사하고, 보유 종목을 추적하고, 포트폴리오 상태를 한눈에 확인하는 작업 공간입니다. 둘러보기는 약 1분이면 끝납니다." },
       search: { t: "검색으로 시작하세요", b: "이름이나 티커로 기업, ETF, 지수, 암호화폐를 찾고 공시, 뉴스, 페이지도 검색합니다. 어디서든 {key}를 누르세요.", a: "여기를 눌러 기업, ETF, 지수, 암호화폐와 공시, 뉴스, 페이지를 검색하세요." },
@@ -96,7 +96,7 @@ export const COPY = {
     },
   },
   es: {
-    ui: { next: "Siguiente", back: "Atrás", skip: "Omitir recorrido", finish: "Empezar a explorar", label: "Recorrido rápido", step: "Paso {n} de {total}", replay: "Repetir recorrido", replayHead: "Recorrido rápido", replayText: "Un paseo guiado de un minuto por la búsqueda, la navegación, las posiciones y la investigación.", palette: "Hacer el recorrido rápido" },
+    ui: { next: "Siguiente", back: "Atrás", skip: "Omitir recorrido", finish: "Empezar a explorar", label: "Recorrido rápido", step: "Paso {n} de {total}", replay: "Repetir recorrido", replayHead: "Recorrido rápido", replayText: "Un paseo guiado de un minuto por la búsqueda, la navegación, las posiciones y la investigación.", explore: "Seguir explorando", account: "Crear una cuenta gratuita", palette: "Hacer el recorrido rápido" },
     steps: {
       welcome: { t: "Te damos la bienvenida a LEKHA Financials", b: "Tu espacio para investigar empresas, seguir tus posiciones y ver cómo va tu cartera. Este recorrido dura aproximadamente un minuto." },
       search: { t: "Empieza por la búsqueda", b: "Encuentra cualquier empresa, ETF, índice o criptomoneda por nombre o ticker, además de presentaciones, noticias y páginas. Pulsa {key} desde cualquier lugar.", a: "Toca aquí para buscar cualquier empresa, ETF, índice o criptomoneda, además de presentaciones, noticias y páginas." },
@@ -111,7 +111,7 @@ export const COPY = {
     },
   },
   hi: {
-    ui: { next: "आगे", back: "पीछे", skip: "टूर छोड़ें", finish: "खोजना शुरू करें", label: "क्विक टूर", step: "चरण {n} / {total}", replay: "टूर दोबारा चलाएँ", replayHead: "क्विक टूर", replayText: "खोज, नेविगेशन, होल्डिंग्स और शोध का एक मिनट का मार्गदर्शन।", palette: "क्विक टूर देखें" },
+    ui: { next: "आगे", back: "पीछे", skip: "टूर छोड़ें", finish: "खोजना शुरू करें", label: "क्विक टूर", step: "चरण {n} / {total}", replay: "टूर दोबारा चलाएँ", replayHead: "क्विक टूर", replayText: "खोज, नेविगेशन, होल्डिंग्स और शोध का एक मिनट का मार्गदर्शन।", explore: "आगे देखते रहें", account: "मुफ़्त खाता बनाएँ", palette: "क्विक टूर देखें" },
     steps: {
       welcome: { t: "LEKHA Financials में आपका स्वागत है", b: "कंपनियों पर शोध करने, अपने होल्डिंग्स ट्रैक करने और पोर्टफोलियो की स्थिति समझने के लिए आपका कार्यक्षेत्र। यह टूर लगभग एक मिनट का है।" },
       search: { t: "खोज से शुरुआत करें", b: "नाम या टिकर से कोई भी कंपनी, ETF, इंडेक्स या क्रिप्टो खोजें, साथ ही फाइलिंग, समाचार और पेज भी। कहीं से भी {key} दबाएँ।", a: "कोई भी कंपनी, ETF, इंडेक्स या क्रिप्टो, साथ ही फाइलिंग, समाचार और पेज खोजने के लिए यहाँ टैप करें।" },
@@ -126,7 +126,7 @@ export const COPY = {
     },
   },
   vi: {
-    ui: { next: "Tiếp", back: "Quay lại", skip: "Bỏ qua", finish: "Bắt đầu khám phá", label: "Giới thiệu nhanh", step: "Bước {n} trên {total}", replay: "Xem lại phần giới thiệu", replayHead: "Giới thiệu nhanh", replayText: "Hướng dẫn một phút về tìm kiếm, điều hướng, vị thế và nghiên cứu.", palette: "Xem giới thiệu nhanh" },
+    ui: { next: "Tiếp", back: "Quay lại", skip: "Bỏ qua", finish: "Bắt đầu khám phá", label: "Giới thiệu nhanh", step: "Bước {n} trên {total}", replay: "Xem lại phần giới thiệu", replayHead: "Giới thiệu nhanh", replayText: "Hướng dẫn một phút về tìm kiếm, điều hướng, vị thế và nghiên cứu.", explore: "Tiếp tục khám phá", account: "Tạo tài khoản miễn phí", palette: "Xem giới thiệu nhanh" },
     steps: {
       welcome: { t: "Chào mừng đến với LEKHA Financials", b: "Không gian làm việc để nghiên cứu doanh nghiệp, theo dõi các vị thế đang nắm giữ và xem danh mục của bạn đang ra sao. Phần giới thiệu này mất khoảng một phút." },
       search: { t: "Bắt đầu từ tìm kiếm", b: "Tìm bất kỳ công ty, ETF, chỉ số hay tiền mã hóa nào theo tên hoặc mã, cùng hồ sơ công bố, tin tức và các trang. Nhấn {key} ở bất cứ đâu.", a: "Chạm vào đây để tìm bất kỳ công ty, ETF, chỉ số hay tiền mã hóa nào, cùng hồ sơ công bố, tin tức và các trang." },
@@ -141,7 +141,7 @@ export const COPY = {
     },
   },
   fr: {
-    ui: { next: "Suivant", back: "Retour", skip: "Passer la visite", finish: "Commencer à explorer", label: "Visite rapide", step: "Étape {n} sur {total}", replay: "Rejouer la visite", replayHead: "Visite rapide", replayText: "Un parcours guidé d'une minute : recherche, navigation, positions et analyse.", palette: "Faire la visite rapide" },
+    ui: { next: "Suivant", back: "Retour", skip: "Passer la visite", finish: "Commencer à explorer", label: "Visite rapide", step: "Étape {n} sur {total}", replay: "Rejouer la visite", replayHead: "Visite rapide", replayText: "Un parcours guidé d'une minute : recherche, navigation, positions et analyse.", explore: "Continuer à explorer", account: "Créer un compte gratuit", palette: "Faire la visite rapide" },
     steps: {
       welcome: { t: "Bienvenue sur LEKHA Financials", b: "Votre espace pour analyser des entreprises, suivre vos positions et voir comment se porte votre portefeuille. Cette visite dure environ une minute." },
       search: { t: "Commencez par la recherche", b: "Trouvez une entreprise, un ETF, un indice ou une cryptomonnaie par nom ou symbole, ainsi que des dépôts réglementaires, des actualités et des pages. Appuyez sur {key} depuis n'importe où.", a: "Touchez ici pour trouver une entreprise, un ETF, un indice ou une cryptomonnaie, ainsi que des dépôts, des actualités et des pages." },

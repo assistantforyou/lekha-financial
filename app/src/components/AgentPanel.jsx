@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
-import { streamChat, readAttachment } from "@/lib/chat"
+import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
 import { cn } from "@/lib/utils"
 
 /* One chat surface for every AI question. Answers arrive as typed parts: reasoning, tool calls, text and evidence.
@@ -74,7 +74,6 @@ function Answer({ m, live }) {
   const tools = (m.parts || []).filter((p) => p.type === "tool")
   const evidence = (m.parts || []).filter((p) => p.type === "evidence").flatMap((p) => p.items || [])
   const error = (m.parts || []).find((p) => p.type === "error")
-  const finish = (m.parts || []).find((p) => p.type === "finish")
   return (
     <div className="space-y-2">
       <Reasoning text={reasoning} live={live && !m.content} />
@@ -88,7 +87,6 @@ function Answer({ m, live }) {
       ) : null}
       <Evidence items={evidence} />
       {error && <Alert variant="warn"><AlertDescription>{error.message}</AlertDescription></Alert>}
-      {finish && !live && <div className="text-[11px] text-[var(--muted)]">{finish.model} · {finish.steps} step{finish.steps === 1 ? "" : "s"} · {Math.round((finish.ms || 0) / 100) / 10}s</div>}
     </div>
   )
 }
@@ -107,8 +105,15 @@ export default function AgentPanel({ symbol, initial }) {
   const started = useRef(false)
 
   const refreshThreads = () => {
-    if (!window.PT_AUTH || !window.PT_AUTH.fetch) return
-    api("/api/ai/threads", { auth: true }).then((j) => setThreads(j.threads || [])).catch(() => {})
+    const local = localThreads()
+    if (!window.PT_AUTH || !window.PT_AUTH.fetch) { setThreads(local); return }
+    api("/api/ai/threads", { auth: true })
+      .then((j) => {
+        const server = j.threads || []
+        const seen = new Set(server.map((t) => t.id))
+        setThreads([...server, ...local.filter((t) => !seen.has(t.id))].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))))
+      })
+      .catch(() => setThreads(local))
   }
   useEffect(refreshThreads, [])
   useEffect(() => { end.current && end.current.scrollIntoView({ block: "end", behavior: "smooth" }) }, [msgs, busy])
@@ -129,13 +134,14 @@ export default function AgentPanel({ symbol, initial }) {
     setBusy(true)
     const ctl = new AbortController()
     abort.current = ctl
+    let reply = ""
     try {
       const out = await streamChat({
         message: q, threadId, mode, symbol, signal: ctl.signal,
         attachments: attached,
         lang: window.PT_I18N ? window.PT_I18N.lang : "en",
         onPart: (p) => {
-          if (p.type === "text") patch(base + 1, (m) => ({ ...m, content: m.content + p.text, parts: [...m.parts, p] }))
+          if (p.type === "text") { reply += p.text; patch(base + 1, (m) => ({ ...m, content: m.content + p.text, parts: [...m.parts, p] })) }
           else if (p.type === "tool") patch(base + 1, (m) => {
             const parts = m.parts.slice(), at = parts.findIndex((x) => x.type === "tool" && x.id === p.id)
             if (at >= 0) parts[at] = p; else parts.push(p)
@@ -150,7 +156,25 @@ export default function AgentPanel({ symbol, initial }) {
           else patch(base + 1, (m) => ({ ...m, parts: [...m.parts, p] }))
         },
       })
-      if (out.threadId) { setThreadId(out.threadId); refreshThreads() }
+      const id = out.threadId || threadId
+      if (id) {
+        // Keep a copy in this browser as well, so a conversation survives a reload even without an account.
+        const now = new Date().toISOString()
+        const prior = localThread(id)
+        saveLocalThread({
+          id,
+          title: (prior && prior.title) || q.slice(0, 60),
+          createdAt: (prior && prior.createdAt) || now,
+          updatedAt: now,
+          messages: [
+            ...(prior ? prior.messages : msgs.map((m) => ({ role: m.role, content: m.content, at: m.at }))),
+            { role: "user", content: q, at: now },
+            ...(reply ? [{ role: "assistant", content: reply, at: now, mode }] : []),
+          ],
+        })
+        setThreadId(id)
+        refreshThreads()
+      }
     } catch (e) {
       if (e.name === "AbortError") patch(base + 1, (m) => ({ ...m, parts: [...m.parts, { type: "error", message: "Stopped." }] }))
       else {
@@ -169,8 +193,12 @@ export default function AgentPanel({ symbol, initial }) {
     if (busy) return
     setErr("")
     try {
-      const j = await api(`/api/ai/threads?id=${encodeURIComponent(id)}`, { auth: true })
-      const t = j.thread || {}
+      let t = null
+      if (window.PT_AUTH && window.PT_AUTH.fetch) {
+        try { const j = await api(`/api/ai/threads?id=${encodeURIComponent(id)}`, { auth: true }); t = j.thread } catch (e) { t = null }
+      }
+      if (!t) t = localThread(id)
+      if (!t) { setErr("That thread is no longer available."); return }
       setThreadId(id)
       setMsgs((t.messages || []).map((m) => ({ role: m.role, content: m.content, parts: [], at: m.at })))
     } catch (e) { setErr(e.message) }
@@ -178,15 +206,22 @@ export default function AgentPanel({ symbol, initial }) {
 
   async function removeThread(id) {
     if (busy) return
-    try { await api(`/api/ai/threads?id=${encodeURIComponent(id)}`, { method: "DELETE", auth: true }); if (id === threadId) { setThreadId(null); setMsgs([]) } refreshThreads() }
-    catch (e) { toast(e.message) }
+    try {
+      await api(`/api/ai/threads?id=${encodeURIComponent(id)}`, { method: "DELETE", auth: true }).catch(() => {})
+      dropLocalThread(id)
+      if (id === threadId) { setThreadId(null); setMsgs([]) }
+      refreshThreads()
+    } catch (e) { toast(e.message) }
   }
 
   async function attach(list) {
-    const picked = Array.from(list || []).slice(0, 3)
+    const picked = Array.from(list || []).slice(0, 4)
     for (const f of picked) {
-      try { const a = await readAttachment(f); setFiles((xs) => (xs.length >= 3 ? xs : [...xs, a])) }
-      catch (e) { toast(e.message) }
+      try {
+        const a = await readAttachment(f)
+        const add = Array.isArray(a) ? a : [a]
+        setFiles((xs) => (xs.length >= 6 ? xs : [...xs, ...add].slice(0, 6)))
+      } catch (e) { toast(e.message) }
     }
   }
 
@@ -211,7 +246,7 @@ export default function AgentPanel({ symbol, initial }) {
               </button>
             </div>
           ))}
-          {!threads.length && <p className="px-2 text-xs text-[var(--muted)]">Saved threads appear here when you are signed in.</p>}
+          {!threads.length && <p className="px-2 text-xs text-[var(--muted)]">Your threads appear here and are kept in this browser.</p>}
         </div>
       </aside>
 
@@ -222,7 +257,7 @@ export default function AgentPanel({ symbol, initial }) {
               <Bot className="mt-0.5 size-5 text-[var(--accent)]" />
               <div className="text-sm">
                 <p className="font-medium">Ask about a company, your portfolio, or the market.</p>
-                <p className="mt-1 text-[var(--muted)]">Answers cite the evidence they use. Attach a screenshot, CSV or text file and ask about it. Deep mode works through tools step by step.</p>
+                <p className="mt-1 text-[var(--muted)]">Answers cite the evidence they use. Attach a PDF, a screenshot, a CSV or a text file and ask about it. Deep mode works through tools step by step.</p>
               </div>
             </CardContent></Card>
           )}
@@ -260,7 +295,7 @@ export default function AgentPanel({ symbol, initial }) {
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <label className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--muted)] hover:bg-[var(--panel-2)]">
               <Paperclip className="size-3.5" /> Attach
-              <input type="file" className="hidden" multiple accept="image/png,image/jpeg,image/webp,.csv,.txt,.md,.json" onChange={(e) => { attach(e.target.files); e.target.value = "" }} disabled={busy} />
+              <input type="file" className="hidden" multiple accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,.csv,.tsv,.txt,.md,.json" onChange={(e) => { attach(e.target.files); e.target.value = "" }} disabled={busy} />
             </label>
             <div className="flex overflow-hidden rounded-md border border-[var(--line)] text-xs">
               {["fast", "deep"].map((m) => (

@@ -4,7 +4,7 @@
 // untrusted data: only known fields survive, numbers are clamped, strings are cut, and its total size is capped.
 // Answers are cached per user + question + scope + evidence hash + language + day; a hit costs no quota and no LLM call.
 //
-// Env: COUNCIL_V3_DAILY (default 10 fresh runs per user per day), COUNCIL_V3_MAX_TOKENS (default 2400).
+// Env: COUNCIL_V3_DAILY (default 10 fresh runs per user per day), COUNCIL_V3_MAX_TOKENS (default 6000).
 const crypto = require("crypto");
 const { requireTier } = require("../../_auth");
 const { tierOf } = require("../../_tiers");
@@ -188,7 +188,7 @@ async function convene({ uid, scope, question, evidence, lang, key }) {
   const info = {};
   const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-council-v3",
     accept: (answer) => !validateCouncil(answer).empty,
-    maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 2400, 256, 16000), deadlineMs: 48000, info });
+    maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 6000, 256, 16000), deadlineMs: 48000, info });
   const v = validateCouncil(ai);
   if (v.empty) throw Object.assign(new Error("empty"), { status: 502 });
 
@@ -243,7 +243,7 @@ module.exports = async (req, res) => {
     if (shared && body.meta) return res.status(status).json({ ...body, meta: { ...body.meta, shared: true } });
     return res.status(status).json(body);
   } catch (e) {
-    console.error(JSON.stringify({ event: "council_failed", status: e?.status || 502 }));
+    console.error(JSON.stringify({ event: "council_failed", status: e?.status || 502, code: e?.code || null, message: String((e && e.message) || "").slice(0, 200) }));
     if (e && e.status === 503) return res.status(503).json({ error: "The research council is not configured on this site yet.", code: "not_configured" });
     return res.status(502).json({ error: "The council could not answer right now. Try again in a moment.", code: "upstream" });
   }

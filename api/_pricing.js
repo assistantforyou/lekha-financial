@@ -3,8 +3,10 @@
 //   DeepSeek https://api-docs.deepseek.com/quick_start/pricing   Gemini https://ai.google.dev/gemini-api/docs/pricing
 const TOKENS = {
   // DeepSeek: peak-hour list prices. Off-peak (outside 01:00-04:00 and 06:00-10:00 UTC, Mon-Fri) is half of these.
-  "deepseek-flash": { in: 0.3, out: 1.2 },
-  "deepseek-v4-pro": { in: 1.32, out: 3.96 },
+  // `hit` is the context-cache price: a cached prompt prefix costs about one fiftieth of a fresh one,
+  // so keeping the system prompt stable is the cheapest optimisation we have.
+  "deepseek-flash": { in: 0.3, hit: 0.006, out: 1.2 },
+  "deepseek-v4-pro": { in: 1.32, hit: 0.044, out: 3.96 },
   "glm-4.7-flash": { in: 0, out: 0 },
   "glm-4.5-flash": { in: 0, out: 0 },
   "glm-4.6v-flash": { in: 0, out: 0 },
@@ -25,10 +27,13 @@ const FIXED_DEFAULTS = [
   { service: "Twelve Data / Alpaca / SEC / FRED", usd_month: 0, note: "Free tiers." },
 ];
 
-function tokenCost(model, inTok, outTok) {
+function tokenCost(model, inTok, outTok, cachedTok) {
   const p = TOKENS[String(model || "").toLowerCase()];
   if (!p) return null;
-  return ((Number(inTok) || 0) * p.in + (Number(outTok) || 0) * p.out) / 1e6;
+  const cached = Math.max(0, Math.min(Number(cachedTok) || 0, Number(inTok) || 0));
+  const fresh = Math.max(0, (Number(inTok) || 0) - cached);
+  const hitPrice = p.hit == null ? p.in : p.hit;
+  return (fresh * p.in + cached * hitPrice + (Number(outTok) || 0) * p.out) / 1e6;
 }
 
 module.exports = { TOKENS, FIXED_DEFAULTS, tokenCost };

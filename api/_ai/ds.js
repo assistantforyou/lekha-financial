@@ -2,10 +2,37 @@
 // goes through here so retries, timeouts, reasoning and usage accounting are defined once.
 // OpenAI-compatible API: https://api.deepseek.com/chat/completions
 const { logUsage } = require("../_costs");
+const { sb } = require("../_lib");
 
 const BASE = "https://api.deepseek.com";
 const KEY = () => String(process.env.DEEPSEEK_API_KEY || "").trim();
-const ready = () => KEY().length > 10;
+// DEEPSEEK_STUB=1 answers locally without a network call, so UI and routes can be tested for free.
+const stub = () => process.env.DEEPSEEK_STUB === "1";
+const ready = () => KEY().length > 10 || stub();
+
+// Hard daily spend ceiling in USD (DEEPSEEK_DAILY_USD, 0 disables it). Checked against today's pt_costs
+// rows before any paid call, so a runaway loop, a stuck crawler or a leaked key cannot drain the balance.
+const dailyCap = () => {
+  const n = Number(process.env.DEEPSEEK_DAILY_USD);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+let spend = { at: 0, usd: 0 };
+async function spentToday() {
+  if (Date.now() - spend.at < 60000) return spend.usd;
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    const rows = await sb(`pt_costs?select=usd&service=eq.DeepSeek&ts=gte.${day}T00:00:00Z`);
+    spend = { at: Date.now(), usd: (Array.isArray(rows) ? rows : []).reduce((a, r) => a + (Number(r.usd) || 0), 0) };
+  } catch (e) {
+    spend = { at: Date.now(), usd: spend.usd };
+  }
+  return spend.usd;
+}
+async function guard() {
+  const cap = dailyCap();
+  if (!cap) return;
+  if (await spentToday() >= cap) throw err("budget_exhausted", 503);
+}
 
 // Model names are configuration, not constants: DeepSeek renames them. A wrong name fails
 // loudly at the first request instead of silently downgrading the answer.
@@ -73,9 +100,14 @@ async function bodyText(res) {
 
 function usageOf(u) {
   const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-  if (!u) return { inTok: 0, outTok: 0, cachedTok: 0 };
+  if (!u) return { inTok: 0, outTok: 0, cachedTok: 0, reasoningTok: 0 };
   const cached = n(u.prompt_cache_hit_tokens || u.prompt_tokens_details?.cached_tokens);
-  return { inTok: n(u.prompt_tokens), outTok: n(u.completion_tokens), cachedTok: cached };
+  return {
+    inTok: n(u.prompt_tokens),
+    outTok: n(u.completion_tokens),
+    cachedTok: cached,
+    reasoningTok: n(u.completion_tokens_details?.reasoning_tokens),
+  };
 }
 
 function log(job, model, usage, extra) {
@@ -86,13 +118,23 @@ function log(job, model, usage, extra) {
     model,
     inTok: usage.inTok,
     outTok: usage.outTok,
-    extra: { cached: usage.cachedTok, ...(extra || {}) },
+    cachedTok: usage.cachedTok,
+    extra: { cached: usage.cachedTok, reasoning: usage.reasoningTok || 0, ...(extra || {}) },
   }).catch(() => {});
 }
 
 // Non-streaming completion. Retries transport failures and throttling, never a usable answer.
 async function complete(o = {}) {
   if (!ready()) throw err("not_configured", 503);
+  if (stub()) {
+    const json = o.responseFormat === "json";
+    return {
+      text: json ? '{"values":[],"summary":"Stub answer. DEEPSEEK_STUB is on, so no model call was made."}' : "Stub answer. DEEPSEEK_STUB is on, so no model call was made.",
+      reasoning: "", toolCalls: [], usage: { inTok: 0, outTok: 0, cachedTok: 0, reasoningTok: 0 },
+      model: "stub", attempts: 1, finishReason: "stop",
+    };
+  }
+  await guard();
   const model = o.model || modelFor(o.kind || "fast");
   const thinking = o.thinking;
   const body = { model, messages: o.messages, stream: false };
@@ -150,6 +192,19 @@ async function complete(o = {}) {
 // message at the end (including tool calls), so the tool loop can pass it back verbatim.
 async function* stream(o = {}) {
   if (!ready()) throw err("not_configured", 503);
+  if (stub()) {
+    const text = "Stub answer. DEEPSEEK_STUB is on, so no model call was made.";
+    if (o.thinking) yield { type: "reasoning", text: "Stub reasoning." };
+    for (const chunk of text.split(" ")) yield { type: "text", text: chunk + " " };
+    yield {
+      type: "done",
+      message: { role: "assistant", content: text },
+      text, reasoning: "", usage: { inTok: 0, outTok: 0, cachedTok: 0, reasoningTok: 0 },
+      model: "stub", finishReason: "stop",
+    };
+    return;
+  }
+  await guard();
   const model = o.model || modelFor(o.kind || "fast");
   const body = { model, messages: o.messages, stream: true, stream_options: { include_usage: true } };
   if (o.tools && o.tools.length) {

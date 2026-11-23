@@ -144,23 +144,30 @@ const TABS = [["overview", "Overview"], ["financials", "Financials"], ["valuatio
 function Workspace({ symbol, route, navigate }) {
   const s = useData("company", { symbol }), wl = useWatchlist(), tab = (route.query && route.query.get("tab")) || "overview"
   const setTab = (t) => navigate(`company/${encodeURIComponent(symbol)}?tab=${t}`)
-  const hasQuote = s.status === "ok" && s.data && s.data.quote && s.data.quote.ok, live = useData("quote", { symbol }, { refresh: 15000, enabled: s.status === "ok" && !!hasQuote }), liveNews = useData("news", { symbol, limit: 60 }, { refresh: 300000 }), b0 = s.data, b = b0 && liveNews.status === "ok" && Array.isArray(liveNews.data) ? { ...b0, news: { ok: true, data: liveNews.data, meta: liveNews.meta } } : b0, q = (live.status === "ok" && live.data) || (b && unwrap(b.quote)), prof = b && unwrap(b.profile), watched = wl.some((w) => w.symbol === symbol)
-  useEffect(() => { if (b && prof) remember({ symbol, name: prof.name }) }, [b && prof && prof.name])
+  // The quote and the news list are cheap and cached on their own, so the header appears in about a second while the
+  // heavier bundle (statements, filings, ratios, peers) fills the tabs behind it.
+  const live = useData("quote", { symbol }, { refresh: 15000 }), liveNews = useData("news", { symbol, limit: 60 }, { refresh: 300000 })
+  const b0 = s.data || null, b = b0 && liveNews.status === "ok" && Array.isArray(liveNews.data) ? { ...b0, news: { ok: true, data: liveNews.data, meta: liveNews.meta } } : b0
+  const q = (live.status === "ok" && live.data) || (b && unwrap(b.quote)), prof = (b && unwrap(b.profile)) || null, watched = wl.some((w) => w.symbol === symbol)
+  const pending = !b && s.status !== "error", failed = !b && s.status === "error"
+  useEffect(() => { if (prof) remember({ symbol, name: prof.name }) }, [prof && prof.name])
   useEffect(() => { if (s.status === "ok") { prefetch("valuation", { symbol }); prefetch("history", { symbol, days: 1900 }) } }, [symbol, s.status])   // warm the tabs people click next so they open instantly
-  if (s.status === "loading") return <DataState s={s} rows={6} />
-  if (s.status === "error") return <ErrorBox message={s.error} attempts={s.attempts} onRetry={s.reload} />
-  const nothing = !q && !prof && !b.annual.ok
+  const nothing = !!b && !q && !prof && !b.annual.ok
   return (<div className="space-y-4">
     <div data-tour="company-head" className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{(prof && prof.name) || (q && q.name) || symbol}</h1><Badge variant="secondary" className="font-mono">{symbol}</Badge>{prof && prof.exchange && <Badge variant="outline">{prof.exchange}</Badge>}{prof && prof.sector && <Badge variant="outline">{prof.sector}</Badge>}</div>
-        {q ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold">{price(q.price, q.currency)}</span><span className={cn("num text-base", tone(q.change))}>{q.change != null ? (q.change > 0 ? "+" : "") + num(q.change) : ""} ({pct(q.changePercent, 2, true)})</span><FreshBadge meta={q.meta} /><SourceTag source={q.source} asOf={q.timestamp} />{live.status === "ok" && <span className="text-[11px] text-muted-foreground" title="Price refreshes every 15 s while this tab is visible">● auto-refresh 15s</span>}</div> : <p className="mt-1 text-sm text-muted-foreground">No live quote available from any provider.</p>}</div>
+        {q ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold">{price(q.price, q.currency)}</span><span className={cn("num text-base", tone(q.change))}>{q.change != null ? (q.change > 0 ? "+" : "") + num(q.change) : ""} ({pct(q.changePercent, 2, true)})</span><FreshBadge meta={q.meta} /><SourceTag source={q.source} asOf={q.timestamp} />{live.status === "ok" && <span className="text-[11px] text-muted-foreground" title="Price refreshes every 15 s while this tab is visible">● auto-refresh 15s</span>}</div>
+          : pending ? <div className="mt-2 flex items-center gap-2"><Skeleton className="h-7 w-28" /><Skeleton className="h-4 w-20" /></div>
+            : <p className="mt-1 text-sm text-muted-foreground">No live quote available from any provider.</p>}</div>
       <div className="flex gap-2"><Button variant="outline" onClick={() => (watched ? removeFromWatchlist(symbol) : addToWatchlist(symbol, prof && prof.name))}>{watched ? <><StarOff />Unwatch</> : <><Star />Watch</>}</Button><Button onClick={() => setTab("ai")}><Bot />Ask AI</Button></div></div>
+    {failed && <ErrorBox message={s.error} attempts={s.attempts} onRetry={s.reload} />}
     {nothing && <Alert variant="warn"><AlertTitle>No data found for {symbol}</AlertTitle><AlertDescription>Check the ticker. US companies resolve through SEC EDGAR; ETFs, indices and crypto use market data providers (examples: SPY, ^GSPC, BTC-USD, 0700.HK).</AlertDescription></Alert>}
     <Tabs value={tab} onValueChange={setTab}><TabsList data-tour="company-tabs" className="h-auto flex-wrap">{TABS.map(([k, l]) => <TabsTrigger key={k} value={k} className="h-8">{l}</TabsTrigger>)}</TabsList>
+      {pending ? <div className="pt-4"><DataState s={s} rows={8} /></div> : failed ? null : <>
       <TabsContent value="overview"><Overview b={b} setTab={setTab} symbol={symbol} /></TabsContent><TabsContent value="financials"><Financials b={b} /></TabsContent>
       <TabsContent value="valuation"><Valuation symbol={symbol} b={b} /></TabsContent><TabsContent value="growth"><Growth b={b} /></TabsContent><TabsContent value="news"><News b={b} /></TabsContent>
       <TabsContent value="filings"><Filings b={b} symbol={symbol} /></TabsContent><TabsContent value="earnings"><Earnings b={b} /></TabsContent><TabsContent value="peers"><Peers b={b} navigate={navigate} /></TabsContent>
-      <TabsContent value="ai"><AgentPanel symbol={symbol} key={symbol} /></TabsContent></Tabs>
+      <TabsContent value="ai"><AgentPanel symbol={symbol} key={symbol} /></TabsContent></>}</Tabs>
   </div>)
 }
 export default function CompanyPage({ route, item, navigate }) {

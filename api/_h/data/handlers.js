@@ -60,8 +60,9 @@ function make(route) {
     try { const value = calc[fn](...args); res.setHeader("Cache-Control", "no-store"); return res.status(200).json({ fn, value, kind: "calculated", note: "Deterministic server-side calculation. Rates are fractions." }); } catch (e) { return res.status(400).json({ error: "Invalid inputs." }); }
   };
   if (route === "agent") return require("./agent-route");
+  if (route === "i18n") return require("./i18n");
   if (route === "diag") return require("./diag");
   if (route === "audit") return require("./audit");
   return null;
 }
-module.exports = { make, routes: [...Object.keys(GET), "quotes", "calc", "agent", "diag", "audit"] };
+module.exports = { make, routes: [...Object.keys(GET), "quotes", "calc", "agent", "i18n", "diag", "audit"] };

@@ -12,6 +12,7 @@ const WF_ICONS = [Search, Building2, Layers, LineChart]
 const reduced = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch (e) { return false } }
 const shortcut = () => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "") ? "⌘K" : "Ctrl\u00a0K")
 const touchOnly = () => { try { return matchMedia("(hover: none)").matches } catch (e) { return false } }
+const signedIn = () => { try { const s = window.PT_AUTH && window.PT_AUTH.session && window.PT_AUTH.session(); return !!(s && s.access_token) } catch (e) { return false } }
 const hashKey = (h) => (/^company\//.test(h) ? "research/company" : h)
 const where = (h) => { const i = FLAT.find((x) => x.key === hashKey(h)); return i ? [i.groupTitle, i.title] : null }
 /* the second highlight: where this page lives in the navigation (the active sidebar entry, or the breadcrumb where the sidebar is hidden) */
@@ -197,7 +198,12 @@ export default function Tour({ navigate }) {
           {!last && <button type="button" className="tour-btn ghost" onClick={skip}>{ui("skip")}</button>}
           <span className="grow" />
           {!first && <button type="button" className="tour-btn" onClick={() => move(-1)} disabled={busy}>{ui("back")}</button>}
-          {last ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button>
+          {last ? <>
+            {!signedIn() && <button type="button" className="tour-btn ghost" onClick={() => finish("completed")}>{ui("explore")}</button>}
+            {signedIn()
+              ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button>
+              : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => { writeStatus("completed"); location.href = "/login.html?mode=signup" }}>{ui("account")}</button>}
+          </>
             : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => move(1)} disabled={busy}>{ui("next")}</button>}
         </div>
       </div>

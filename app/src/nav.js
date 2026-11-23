@@ -28,8 +28,8 @@ export const TREE = [
   { id: "analysis", title: "Deep analysis & council", icon: Brain, items: [
     { id: "value", title: "Intrinsic value & MOS", icon: Scale, panes: ["tab-val"], desc: "DCF and residual-income models per holding, margin of safety, valuation dispersion and history." },
     { id: "deep", title: "Holdings deep analysis", icon: Stethoscope, panes: ["tab-an-deep"], desc: "One holding at a time: price, position, risk, valuation, analysts and headlines." },
-    { id: "council", title: "LLM council", icon: Users, panes: ["tab-an-council"], desc: "Five perspectives and a CEO synthesis, written as one report." },
-    { id: "reports", title: "AI research reports", icon: ScrollText, panes: ["lekha-reports"], desc: "Every saved council report, plus sample reports." },
+    { id: "council", title: "LLM council", icon: Users, page: "council", desc: "Five perspectives and a CEO synthesis, written as one report." },
+    { id: "reports", title: "AI research reports", icon: ScrollText, page: "reports", desc: "Every saved council report." },
     { id: "ask", title: "Ask the analyst", icon: Bot, panes: ["v3-ai-host"], analyst: "chat", desc: "Ask anything about your holdings and get an answer computed from your live portfolio: positions, weights, P&L, concentration, drawdown and what would change the view." },
     { id: "briefing", title: "Daily briefing", icon: BookOpen, panes: ["v3-ai-host"], analyst: "brief", desc: "What moved, what changed and what to watch in your portfolio today." },
     { id: "stress", title: "Stress test", icon: Swords, panes: ["v3-ai-host"], analyst: "sim", desc: "Monte Carlo plus rate-shock, tech-drawdown and recession scenarios on your holdings." },

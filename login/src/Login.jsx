@@ -39,7 +39,12 @@ async function me(token) {
 }
 
 export default function Login() {
-  const [mode, setMode] = React.useState("login")
+  const [mode, setMode] = React.useState(() => {
+    try {
+      const q = new URLSearchParams(location.search)
+      return q.get("mode") === "signup" || q.get("mode") === "setup" ? "setup" : "login"
+    } catch (e) { return "login" }
+  })
   const [busy, setBusy] = React.useState(false)
   const [msg, setMsg] = React.useState({ text: "", kind: "" })
   const [email, setEmail] = React.useState("")

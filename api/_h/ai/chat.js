@@ -1,8 +1,9 @@
 // Chat turn, streamed over SSE. One endpoint for every AI surface: the mode decides depth,
 // the router decides tools. Threads are stored per user in pt_user_state.
 const { requireTier } = require("../../_auth");
+const crypto = require("crypto");
 const { tierOf } = require("../../_tiers");
-const { rateHit } = require("../../_lib");
+const { rateHit, cacheGet, cacheSet } = require("../../_lib");
 const { clientId } = require("../../_history");
 const { listState, putState } = require("../../_state");
 const { langOf, withLang } = require("../ai/_lang");
@@ -88,10 +89,33 @@ module.exports = async function handler(req, res) {
   const id = threadIdOf(b.threadId);
   const persisted = !p.demo && !!p.user_id;
   const existing = persisted ? await loadThread(p.user_id, id) : null;
-  const history = existing ? existing.messages.slice(-8) : [];
+  const history = existing ? existing.messages.slice(-6) : [];
+
+  // An identical first-turn question within ten minutes is served from cache: no model call, same answer.
+  // Follow-ups and attachments always run fresh because their meaning depends on the conversation.
+  const simple = !attachments.length && !history.length;
+  const ck = simple
+    ? "ai/ans/" + crypto.createHash("sha1").update([who, mode, lang, String(b.symbol || ""), message.toLowerCase()].join("|")).digest("hex")
+    : null;
+  let hit = null;
+  if (ck) {
+    try {
+      const c = await cacheGet(ck);
+      if (c && c.text && Date.now() - Number(c.at || 0) < 10 * 60000) hit = c;
+    } catch (e) { hit = null; }
+  }
 
   sse(res);
   send(res, { type: "start", threadId: id, mode, tier });
+
+  if (hit) {
+    if (hit.evidence) send(res, hit.evidence);
+    for (let i = 0; i < hit.text.length; i += 240) send(res, { type: "text", text: hit.text.slice(i, i + 240) });
+    send(res, { type: "finish", answeredBy: "cache", ms: 0 });
+    send(res, { type: "done", threadId: id });
+    try { res.end(); } catch (e) { /* already closed */ }
+    return;
+  }
 
   let aborted = false;
   const ctl = new AbortController();
@@ -99,6 +123,7 @@ module.exports = async function handler(req, res) {
   req.on("close", onClose);
 
   let answer = "";
+  let evidencePart = null;
   try {
     for await (const part of loop.run({
       question: message,
@@ -113,10 +138,20 @@ module.exports = async function handler(req, res) {
       budgetMs: mode === "deep" ? 150000 : 60000,
     })) {
       if (part.type === "text") answer += part.text;
+      if (part.type === "evidence") evidencePart = part;
       send(res, part);
     }
   } catch (e) {
-    send(res, { type: "error", code: String(e.code || "error"), message: "The answer stopped early." });
+    const budget = String(e.code || "") === "budget_exhausted";
+    send(res, {
+      type: "error",
+      code: String(e.code || "error"),
+      message: budget ? "The AI daily budget has been reached. It resets at midnight UTC." : "The answer stopped early.",
+    });
+  }
+
+  if (ck && answer) {
+    try { await cacheSet(ck, { at: Date.now(), text: answer, evidence: evidencePart }); } catch (e) { /* cache is optional */ }
   }
 
   if (persisted && !aborted) {

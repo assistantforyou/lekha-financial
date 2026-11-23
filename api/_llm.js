@@ -17,6 +17,7 @@ function setting(name, fallback, max) {
   return Number.isFinite(n) && n > 0 ? Math.min(max, Math.ceil(n)) : fallback;
 }
 function matches(value, schema) {
+  if (!schema || !schema.type) return false;
   if (value === null) return schema.nullable === true;
   if (schema.enum && !schema.enum.includes(value)) return false;
   switch (schema.type.toLowerCase()) {
@@ -100,12 +101,12 @@ function importTries(input) {
   return [{ name: "deepseek", run: async (budget) => {
     const timeoutMs = Math.max(1000, budget);
     if (input.text != null) {
-      return dsJson({ job: "import", timeoutMs, temperature: 0, model: process.env.LLM_TEXT_MODEL || ds.MODELS.fast, system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, content: "Statement text:\n" + input.text + "\n\n" + ask });
+      return dsJson({ job: "import", timeoutMs, temperature: 0, model: process.env.LLM_TEXT_MODEL || ds.modelFor("fast"), system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA, content: "Statement text:\n" + input.text + "\n\n" + ask });
     }
     // scanned PDFs arrive as page images rendered in the browser (input.images); a raw PDF cannot be read here
     const imgs = input.images || (/^image\//.test(input.mime) ? [{ mime: input.mime, base64: input.base64 }] : null);
     if (!imgs) throw err("pdf_needs_text", 502);
-    return dsJson({ job: "import", timeoutMs, temperature: 0, model: process.env.LLM_VISION_MODEL || ds.MODELS.vision, system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA,
+    return dsJson({ job: "import", timeoutMs, temperature: 0, model: process.env.LLM_VISION_MODEL || ds.modelFor("vision"), system: SYSTEM_PROMPT, schema: RESPONSE_SCHEMA,
       content: [...imgs.slice(0, 4).map((im) => ({ type: "image_url", image_url: { url: `data:${im.mime};base64,${im.base64}` } })), { type: "text", text: ask }] });
   } }];
 }
@@ -134,7 +135,7 @@ async function extractVerified(input) {
 async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", maxTokens, deadlineMs, info = {}, accept }) {
   if (!ready()) throw err("not_configured", 503);
   const budget = Math.min(deadlineMs || timeoutMs, setting("LLM_DEADLINE_MS", 50000, 55000));
-  const m = model || process.env.NEWS_MODEL || ds.MODELS.fast;
+  const m = model || process.env.NEWS_MODEL || ds.modelFor("fast");
   Object.assign(info, { provider: "DeepSeek", model: m, retries: 0, requests: 0, fallback: null });
   const answer = await ds.complete({
     job,
@@ -157,9 +158,9 @@ async function generateJson({ system, user, schema, model, timeoutMs = 50000, jo
 // Which model serves each job (shown on the Settings page; no secrets).
 function describe() {
   if (!ready()) return { import: "not configured", news: "not configured", fallback: "none" };
-  const text = process.env.LLM_TEXT_MODEL || ds.MODELS.fast;
-  const vision = process.env.LLM_VISION_MODEL || ds.MODELS.vision;
-  const news = process.env.NEWS_MODEL || ds.MODELS.fast;
+  const text = process.env.LLM_TEXT_MODEL || ds.modelFor("fast");
+  const vision = process.env.LLM_VISION_MODEL || ds.modelFor("vision");
+  const news = process.env.NEWS_MODEL || ds.modelFor("fast");
   return {
     import: `DeepSeek ${text} (text) / ${vision} (images)`,
     news: `DeepSeek ${news}`,

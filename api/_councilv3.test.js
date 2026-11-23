@@ -92,7 +92,7 @@ const FULL = {
   assert.strictEqual(r._c, 200, JSON.stringify(r._j));
   assert.strictEqual(llmCalls.length, 1, "one LLM request"); assert.strictEqual(rateCalls, 1, "one quota hit");
   const o = llmCalls[0];
-  assert.equal(o.deadlineMs, 48000); assert.equal(o.maxTokens, 2400);
+  assert.equal(o.deadlineMs, 48000); assert.equal(o.maxTokens, 6000);
   assert.equal(o.accept({}), false); assert.equal(o.accept(FULL), true);
   assert.ok(/Thai/.test(o.system), "language rule applied");
   assert.ok(/Kelly/.test(o.system) && /haircut/.test(o.system) && /do not repeat/i.test(o.system), "allocator Kelly + no-repeat rule");
