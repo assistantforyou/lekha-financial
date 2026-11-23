@@ -96,8 +96,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   report("Build configuration", build);
   if (live) report("Live Stripe integration", live);
   else console.log("Live Stripe integration: not run (--offline)");
+  // --warn-only (owner decision, 23 Nov 2026): report every issue but let the build continue. Checkout still refuses
+  // a price that is not the advertised amount (api/_h/billing/checkout.js), so no customer is charged a mismatched price.
+  // Remove the flag from vercel.json to make the check blocking again.
+  const warnOnly = process.argv.includes("--warn-only");
   if (build.length || (live && live.length)) {
-    console.error("Deployment held. Nothing was deployed. See docs/COMMERCIAL_RELEASE.md and docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md.");
-    process.exitCode = 1;
+    if (warnOnly) console.error("WARNING: release checks failed (warn-only mode, deployment continues). Paid launch is not cleared. See docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md.");
+    else {
+      console.error("Deployment held. Nothing was deployed. See docs/COMMERCIAL_RELEASE.md and docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md.");
+      process.exitCode = 1;
+    }
   } else console.log("Release checks passed. This is configuration evidence only, not a billing test.");
 }

@@ -19,9 +19,16 @@ test("deployment checks hold an unprotected preview, shared database and live St
   assert.ok(releaseIssues({ ...preview, STRIPE_LEGACY_PREMIUM_PRICES: "old699,p1" }).some(i => /one plan only/.test(i)));
   assert.ok(releaseIssues({ ...preview, STRIPE_LEGACY_PAID_PRICES: "p2" }).some(i => /one plan only/.test(i)));
   assert.deepEqual(releaseIssues({ ...preview, STRIPE_LEGACY_PREMIUM_PRICES: "old699", STRIPE_LEGACY_PAID_PRICES: "old299" }), []);
-  // the check runs before the Vercel build again: a failing check stops the deployment
+  // the check runs first in the Vercel build. Owner decision (23 Nov 2026): warn-only for now, so it reports but does not stop
   const vercel = JSON.parse(require("node:fs").readFileSync(require("node:path").join(__dirname, "../vercel.json"), "utf8"));
-  assert.match(vercel.buildCommand, /^node scripts\/check-release-config\.mjs && /);
+  assert.match(vercel.buildCommand, /^node scripts\/check-release-config\.mjs( --warn-only)? && /);
+  const { spawnSync } = require("node:child_process"), script = require("node:path").join(__dirname, "../scripts/check-release-config.mjs");
+  const run = (args) => spawnSync(process.execPath, [script, "--offline", ...args], { env: { PATH: process.env.PATH }, encoding: "utf8" });
+  const blocking = run([]), warned = run(["--warn-only"]);
+  assert.equal(blocking.status, 1, "without the flag a failing check stops the build");
+  assert.equal(warned.status, 0, "warn-only lets the build continue");
+  assert.match(warned.stderr, /HELD: VERCEL_ENV/);
+  assert.match(warned.stderr, /warn-only mode, deployment continues/);
   const issues = releaseIssues({ ...preview, VERCEL_ENV: "production" });
   for (const requirement of ["COMMERCIAL_DATA_APPROVAL", "VITE_PRIVACY_URL", "VITE_TERMS_URL"]) assert.ok(issues.includes(requirement));
 });
