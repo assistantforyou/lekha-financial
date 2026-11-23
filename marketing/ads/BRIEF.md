@@ -1,6 +1,8 @@
 # LEKHA Financials: Facebook and Instagram ad set
 
 Three sets, 31 creatives, all rendered by `node marketing/ads/build.mjs` (PNGs in `out/`, preview in `index.html`).
+
+> **23 Nov 2026 repricing: the PNGs in `out/` are stale.** Plans are now Free THB 0, Paid THB 399, Premium THB 599. `build.mjs` and the HTML sources in `src/` are updated; the PNGs and `index.html` still show the earlier THB 299 Paid price and must be re-rendered (`node marketing/ads/build.mjs`, needs Playwright and Chromium) before any creative is used.
 Style: LEKHA Light palette (cream #FCF7F0, navy #17223B, teal #0A7A6A), Inter, the LEKHA serif logo, no screenshots, no emoji.
 
 | Set | Objective | Creatives |
@@ -12,7 +14,7 @@ Style: LEKHA Light palette (cream #FCF7F0, navy #17223B, teal #0A7A6A), Inter, t
 Stories and Reels keep text inside the safe zone (250 px top, 270 px bottom).
 
 ## Prices shown
-LEKHA Paid THB 299 per month, Premium THB 599 per month (live Stripe prices created 23 Nov 2026).
+LEKHA Free THB 0, Paid THB 399 per month, Premium THB 599 per month (`api/_tiers.js` PRICING). Checkout refuses to open unless the configured Stripe price matches these amounts, so confirm the live price IDs before the campaign starts.
 Everything in the creatives is in Thai baht. Competitor USD list prices are converted at 1 USD = 32.70 THB and rounded to the whole baht (the rate is stated on each price slide). Change `FX` in `build.mjs` and rebuild if the rate moves.
 
 | Platform | USD list price | THB per month | Source |
@@ -27,26 +29,28 @@ Everything in the creatives is in Thai baht. Competitor USD list prices are conv
 | TIKR Plus | $24.95 a month | 816 | https://www.tikr.com/pricing |
 | Seeking Alpha Premium | $299 a year | 815 | https://about.seekingalpha.com/premium-subscription-price-update |
 | Stock Analysis Pro | $9.99 a month | 327 | https://stockanalysis.com/pro/ |
-| LEKHA Premium | THB 599 a month | 599 | live Stripe price |
-| LEKHA Paid | THB 299 a month | 299 | live Stripe price |
+| LEKHA Premium | THB 599 a month | 599 | `api/_tiers.js` PRICING; live Stripe price to be confirmed |
+| LEKHA Paid | THB 399 a month | 399 | `api/_tiers.js` PRICING; live Stripe price |
 
 Re-check every figure on the vendor page on the day the ads go live. Bloomberg publishes no rate card, so that number rests on third-party reports.
 The chart compares monthly list prices. Several competitors are cheaper on annual billing (for example TIKR Plus about $17.95 a month and Stock Analysis Pro $79 a year), and LEKHA bills monthly only, so do not claim LEKHA is cheaper on an annual basis.
 Considered and left out because no current list price could be confirmed: YCharts (quote-based), Simply Wall St (official page showed no price in search).
 
 ## Claims policy used in the creatives
-- Price claim: "LEKHA Paid is priced below every platform shown" is true for the plans and monthly billing listed above (LEKHA Premium is above Stock Analysis Pro, so the headline names Paid), and the source note is on every price slide.
+- Price claim: at THB 399 LEKHA Paid is above Stock Analysis Pro (THB 327), so "priced below every platform shown" is no longer true. `build.mjs` now computes the headline from the table: "LEKHA Paid is priced below 9 of the 10 platforms shown". The source note is on every price slide.
 - No "same features" claim. Slide A5 compares primary focus only and says it is not a full feature list; the feature slides (Set C) describe LEKHA only. Do not add a competitor feature matrix without verifying each cell on the vendor site.
-- No performance, return or advice claims. Monte Carlo, stress tests and council reports are marked Premium.
+- No performance, return or advice claims. Monte Carlo, stress tests, the Projection Lab and council reports are marked Premium. The AI portfolio analyst and daily briefing are Paid and Premium.
+- Simulation counts: "up to 1M requested paths per run"; the app shows the completed count on every result. Never describe the engine as running a billion simulations.
+- The demo is a free preview with a sample portfolio, not a plan. It does not unlock Paid or Premium features, so do not say "everything unlocked".
 
 ## Ad copy (Set A, conversions)
 Primary text
-1. Institutional-grade research from THB 299 a month. Portfolio, filings, valuation, macro data and an AI analyst that cites its sources, in one workspace. Try the live demo, no account needed.
-2. A professional terminal costs THB 1,045,746 a year. LEKHA Financials starts at THB 299 a month. See the comparison.
+1. Institutional-grade research from THB 399 a month. Portfolio, filings, valuation, macro data and an AI analyst that cites its sources, in one workspace. Try the live demo, no account needed.
+2. A professional terminal costs THB 1,045,746 a year. LEKHA Financials paid plans start at THB 399 a month. See the comparison.
 3. Every number the AI analyst states is checked against the evidence it cites. Fact, calculated, interpretation, speculation: each claim is labelled.
 
-Headlines: "Institutional-grade research" · "LEKHA Paid is priced below every platform shown" · "An analyst that shows its work"
-Description: "Plans from THB 299 a month." · "Cancel any time."
+Headlines: "Institutional-grade research" · "LEKHA Paid is priced below 9 of the 10 platforms shown" · "An analyst that shows its work"
+Description: "Paid plans from THB 399 a month." · "Cancel any time."
 CTA button: Learn more (or Sign up). Link: https://lekhafinancial.com with UTM `utm_source=meta&utm_medium=paid&utm_campaign=paid_subscription&utm_content=<creative>`.
 
 ## Ad copy (Set B, awareness)
@@ -57,7 +61,7 @@ CTA button: Follow / Learn more.
 
 ## Ad copy (Set C, features)
 1. Everything a research desk needs: portfolio and risk, company research, valuation, macro, simulation and cited AI. Swipe to see each capability.
-2. Intrinsic value with explicit assumptions, relative rotation graphs, Monte Carlo up to 1M paths. Explore the live demo.
+2. Intrinsic value with explicit assumptions, relative rotation graphs, Monte Carlo up to 1M requested paths per run (Premium). Explore the live demo.
 CTA button: Learn more.
 
 ## Targeting and setup (to confirm in Ads Manager)

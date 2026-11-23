@@ -14,7 +14,7 @@ const LOGO = "data:image/png;base64," + readFileSync(join(here, "assets", "lekha
 
 /* ---------- Pricing facts ---------- */
 const FX = 32.7; // THB per USD (Stripe checkout conversion, docs/LAUNCH_GAP_PLAN.md)
-const PAID = 299, PREM = 599;
+const PAID = 399, PREM = 599; // api/_tiers.js PRICING (Free THB 0 / Paid THB 399 / Premium THB 599, from 23 Nov 2026)
 const usd = (thb) => (Math.round((thb / FX) * 100) / 100).toFixed(2);
 const baht = (n) => "฿" + Math.round(n).toLocaleString("en-US");
 const money = (n) => "$" + Number(n).toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
@@ -29,11 +29,15 @@ const PLATFORMS = [
   { n: "Morningstar Investor", list: "$34.95 / mo", v: 34.95, focus: "Ratings and portfolio tools" },
   { n: "TIKR Plus", list: "$24.95 / mo", v: 24.95, focus: "Global financials and valuation" },
   { n: "Seeking Alpha Premium", list: "$299 / yr", v: 299 / 12, focus: "Analyst ratings and news" },
-  { n: "LEKHA Premium", list: "฿599 / mo", v: Number(usd(PREM)), us: 1, thb: PREM, focus: "Portfolio, filings, valuation, macro, AI" },
+  { n: "LEKHA Premium", list: "฿" + PREM + " / mo", v: Number(usd(PREM)), us: 1, thb: PREM, focus: "Portfolio, filings, valuation, macro, AI" },
   { n: "Stock Analysis Pro", list: "$9.99 / mo", v: 9.99, focus: "Financial statements and data" },
-  { n: "LEKHA Paid", list: "฿299 / mo", v: Number(usd(PAID)), us: 1, thb: PAID, focus: "Portfolio, filings, valuation, macro, AI" },
+  { n: "LEKHA Paid", list: "฿" + PAID + " / mo", v: Number(usd(PAID)), us: 1, thb: PAID, focus: "Portfolio, filings, valuation, macro, AI" },
 ];
 for (const p of PLATFORMS) p.t = p.us ? p.thb : Math.round(p.v * FX);
+PLATFORMS.sort((a, b) => b.t - a.t); // chart order follows the converted price
+/* the price headline is computed, never asserted: "every platform shown" only when it is literally true */
+const OTHERS = PLATFORMS.filter((p) => !p.us), BELOW = OTHERS.filter((p) => p.t > PAID).length;
+const PRICE_CLAIM = BELOW === OTHERS.length ? `LEKHA Paid is priced below<br><span class="acc">every platform shown.</span>` : `LEKHA Paid is priced below<br><span class="acc">${BELOW} of the ${OTHERS.length} platforms shown.</span>`;
 const SRC_NOTE = `Monthly price in baht at list price on monthly billing, checked 23 Nov 2026. USD list prices converted at 1 USD = ${FX.toFixed(2)} THB. Seeking Alpha is $299 a year and Bloomberg is $31,980 a year per third-party reports (one terminal), both divided by 12. Annual billing lowers several competitor prices.`;
 const DISC = "Analysis software, not investment advice. Data may be delayed. Prices in THB, billed monthly through Stripe, renew until cancelled.";
 
@@ -110,13 +114,13 @@ add("A2-problem", W, H, "A", `<div class="pad">${head("The problem")}<div class=
 <p class="lead">Most independent investors never get that depth of data and analysis. LEKHA Financials is built to close the gap at a fraction of the price.</p>
 <div class="grow"></div><div class="foot">Bloomberg Terminal, one terminal, $31,980 a year per third-party reports, converted at 1 USD = ${FX.toFixed(2)} THB. Bloomberg does not publish a rate card.</div></div>`);
 
-add("A3-prices", W, H, "A", `<div class="pad">${head("Monthly price compared")}${sp(50)}<h2>LEKHA Paid is priced below<br><span class="acc">every platform shown.</span></h2>${sp(24)}
+add("A3-prices", W, H, "A", `<div class="pad">${head("Monthly price compared")}${sp(50)}<h2>${PRICE_CLAIM}</h2>${sp(24)}
 ${chart(W - 168, 55, 21)}<div class="grow"></div><div class="foot">${SRC_NOTE}</div></div>`);
 
-add("A4-plans", W, H, "A", `<div class="pad">${head("Plans")}${sp(56)}<h2>Two plans.<br>One clear monthly price.</h2>${sp(40)}
+add("A4-plans", W, H, "A", `<div class="pad">${head("Plans")}${sp(56)}<h2>Two paid plans.<br>One clear monthly price.</h2>${sp(40)}
 <div style="display:flex;gap:28px">
-${[["Paid", PAID, ["Unlimited holdings", "Full price history", "Unlimited valuation symbols", "Cited research agent", "SEC filings, news and macro", "Sector rotation analysis"]],
-   ["Premium", PREM, ["Everything in Paid", "AI analyst and daily briefing", "Monte Carlo, up to 1M paths", "Stress tests", "LLM council reports", "80 research requests a day"]]].map(([nm, p, li], i) => `
+${[["Paid", PAID, ["Unlimited holdings and full history", "Valuation and deep analysis", "Market and sector rotation", "Market intelligence and risk appetite", "AI portfolio analyst and briefing", "Cited research agent"]],
+   ["Premium", PREM, ["Everything in Paid", "Monte Carlo, up to 1M requested paths", "Stress tests and Projection Lab", "LLM council reports", "Higher AI allowances", "80 research requests a day"]]].map(([nm, p, li], i) => `
 <div style="flex:1;background:var(--panel);border:1px solid ${i ? "var(--accent)" : "var(--line)"};border-top:4px solid ${i ? "var(--accent)" : "var(--fg)"};padding:34px 32px 28px">
 <div class="eyebrow">${nm}</div><div class="fig" style="font-size:84px;margin:14px 0 4px">฿${p}</div><div style="font-size:22px;color:var(--muted)">per month</div>
 <div class="rule" style="margin:24px 0 8px"></div>${li.map((t) => `<div style="font-size:24px;line-height:1.35;padding:11px 0;border-bottom:1px solid var(--line)">${t}</div>`).join("")}</div>`).join("")}</div>
@@ -136,9 +140,9 @@ add("A7-cta", W, H, "A", `<div class="pad">${head("Get started")}<div class="gro
 <p class="lead">Premium is ฿${PREM}. Explore the live demo first, no account needed. Cancel any time.</p>${sp(48)}<div><span class="btn">lekhafinancial.com</span></div><div class="grow"></div><div class="foot">${DISC}</div></div>`);
 
 add("A-story1", W, SH, "A", sPad(`${head("Investment intelligence")}${sp(100)}<h1 style="font-size:92px">Institutional-grade research.<br><span class="acc">From ฿${PAID} a month.</span></h1>${sp(44)}<p class="lead">Portfolio, filings, valuation, macro data and a cited AI analyst in one workspace.</p><div class="grow"></div>`));
-add("A-story2", W, SH, "A", sPad(`${head("Monthly price compared")}${sp(50)}<h2>LEKHA Paid is priced below<br><span class="acc">every platform shown.</span></h2>${sp(34)}${chart(W - 168, 80, 23)}<div class="grow"></div><div class="foot">${SRC_NOTE}</div>`));
+add("A-story2", W, SH, "A", sPad(`${head("Monthly price compared")}${sp(50)}<h2>${PRICE_CLAIM}</h2>${sp(34)}${chart(W - 168, 80, 23)}<div class="grow"></div><div class="foot">${SRC_NOTE}</div>`));
 add("A-story3", W, SH, "A", sPad(`${head("Get started")}<div class="grow"></div><h1 style="font-size:92px">฿${PAID} a month.<br><span class="acc">฿${PREM} for Premium.</span></h1>${sp(50)}<div><span class="btn">lekhafinancial.com</span></div><div class="grow"></div><div class="foot">${DISC}</div>`));
-add("A-square", W, W, "A", `<div class="pad" style="padding:64px 72px 56px">${head("Monthly price compared")}${sp(26)}<h2 style="font-size:46px">LEKHA Paid is priced below<br><span class="acc">every platform shown.</span></h2>${sp(4)}${chart(W - 144, 38, 18)}<div class="grow"></div><div class="foot" style="font-size:16px;margin-top:8px;padding-top:12px">${SRC_NOTE}</div></div>`);
+add("A-square", W, W, "A", `<div class="pad" style="padding:64px 72px 56px">${head("Monthly price compared")}${sp(26)}<h2 style="font-size:46px">${PRICE_CLAIM}</h2>${sp(4)}${chart(W - 144, 38, 18)}<div class="grow"></div><div class="foot" style="font-size:16px;margin-top:8px;padding-top:12px">${SRC_NOTE}</div></div>`);
 
 /* ================= SET B: brand awareness ================= */
 add("B1-intro", W, H, "B", `<div class="pad">${head("LEKHA Financials")}<div class="grow"></div><h1>One workspace for the<br>whole <span class="acc">research process.</span></h1>${sp(36)}
@@ -175,7 +179,7 @@ feat("C5-macro", "04 · Macro and rotation", "Context for every position.", "Rat
   ["Relative rotation graph", "Sector quadrants with trails: leading, weakening, lagging and improving."],
   ["Breadth and leadership", "Constituent breadth, RSI bands, overbought and oversold detection, factor-adjusted strength."]]);
 feat("C6-simulation", "05 · Simulation", "Probabilities, not point estimates.", "Run scenarios on your actual holdings.", [
-  ["Monte Carlo", "Up to 1M paths on worker threads: fan chart, return distribution and value at risk."],
+  ["Monte Carlo", "Up to 1M requested paths per run on worker threads, with the completed count shown: fan chart, return distribution and value at risk."],
   ["Stress tests", "Rate shock, technology drawdown and recession scenarios on your portfolio."],
   ["Projection lab", "Growth scenarios across five horizons with dated catalysts."]], "Monte Carlo, stress tests and council reports are Premium features. Simulations are hypothetical.");
 feat("C7-ai", "06 · AI research", "An analyst that cites its sources.", "Thirteen tools, evidence first, answer second.", [
