@@ -16,7 +16,7 @@ fbq('track', 'PageView');
    - onceKey makes an event fire at most once per browser (localStorage), so a reload cannot double count it.
    - eventID is generated so a future server-side (Conversions API) copy of the same event can be de-duplicated. */
 (function () {
-  var PLAN_THB = { paid: 399, premium: 599 };
+  var PLAN_THB = { paid: 699, premium: 1299 };
   function once(key) {
     if (!key) return true;
     try {

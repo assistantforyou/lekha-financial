@@ -497,8 +497,8 @@
         "<h3>Fixed monthly lines</h3><ul class='set-fixed'>" + j.fixed.map(function (f) { return "<li><b>" + h(f.service) + "</b> " + usd(Number(f.usd_month) || 0) + "/mo <span class='muted'>" + h(f.note || "") + "</span></li>"; }).join("") + "</ul>" +
         "<h3>Which AI model does what</h3><ul class='set-fixed'><li><b>Statement import:</b> " + h(j.models.import) + "</li><li><b>News briefing:</b> " + h(j.models.news) + "</li><li><b>Fallback:</b> " + h(j.models.fallback) + "</li></ul>" +
         "<h3>Check the bills at the source</h3><ul class='set-fixed'>" +
-        "<li><a href='https://z.ai/manage-apikey/billing' target='_blank' rel='noopener'>Z.ai billing &amp; usage</a> (GLM models)</li>" +
-        "<li><a href='https://aistudio.google.com/usage' target='_blank' rel='noopener'>Google AI Studio usage</a> (Gemini fallback)</li>" +
+        "<li><a href='https://platform.deepseek.com/usage' target='_blank' rel='noopener'>DeepSeek usage</a> (chat, statements, news)</li>" +
+        "<li><a href='https://aistudio.google.com/usage' target='_blank' rel='noopener'>Google AI Studio usage</a> (filing embeddings)</li>" +
         "<li><a href='https://vercel.com/dashboard' target='_blank' rel='noopener'>Vercel → Settings → Billing</a> (hosting)</li>" +
         "<li><a href='https://supabase.com/dashboard/org/_/billing' target='_blank' rel='noopener'>Supabase → Organization → Billing</a> (database)</li>" +
         "<li><a href='https://www.alphavantage.co/premium/' target='_blank' rel='noopener'>Alpha Vantage plans</a> (free key now)</li>" +
