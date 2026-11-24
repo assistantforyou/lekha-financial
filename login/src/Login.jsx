@@ -6,6 +6,23 @@ import { Label } from "@/components/ui/label"
 
 const SKEY = "ptpub.v1.session"
 
+// Where to send the visitor once they are signed in. The wall on the analyst
+// passes ?next=<path they came from>; only same-origin paths are accepted so a
+// crafted link cannot bounce someone off-site.
+function nextUrl() {
+  try {
+    let p = new URLSearchParams(location.search).get("next")
+    if (!p) return "/"
+    // The wall encodes it once so the link survives; URLSearchParams already
+    // decoded one layer, so undo a second layer only when it decodes cleanly.
+    try { p = decodeURIComponent(p) } catch (e) {}
+    if (!p.startsWith("/") || p.startsWith("//")) return "/"
+    return p
+  } catch (e) {
+    return "/"
+  }
+}
+
 function session() {
   try {
     return JSON.parse(localStorage.getItem(SKEY) || "null")
@@ -63,7 +80,7 @@ export default function Login() {
     const s = session()
     if (s && s.access_token) {
       me(s.access_token).then((u) => {
-        if (u) location.replace("/")
+        if (u) location.replace(nextUrl())
       })
     }
     return () => {
@@ -96,7 +113,7 @@ export default function Login() {
         setMsg({ text: "That session could not be verified.", kind: "err" })
         return
       }
-      location.replace("/")
+      location.replace(nextUrl())
     } catch {
       setMsg({ text: "Could not reach the server.", kind: "err" })
     } finally {
@@ -125,7 +142,7 @@ export default function Login() {
       try { window.ptTrack && window.ptTrack("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB" }, "reg") } catch {}
       if (r.j.session) {
         save(r.j.session)
-        location.replace("/")
+        location.replace(nextUrl())
       } else {
         setMode("login")
         setPassword("")

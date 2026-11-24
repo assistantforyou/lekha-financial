@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { LineChart } from "@/components/common"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
+import { trackCustom } from "@/lib/pixel"
 import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
 import { cn } from "@/lib/utils"
 
@@ -112,6 +113,8 @@ export default function AgentPanel({ symbol, initial }) {
   const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState("")
+  /* The free question an anonymous visitor is allowed before the signup wall. */
+  const [wall, setWall] = useState(false)
   const abort = useRef(null)
   const end = useRef(null)
   const started = useRef(false)
@@ -128,6 +131,14 @@ export default function AgentPanel({ symbol, initial }) {
       .catch(() => setThreads(local))
   }
   useEffect(refreshThreads, [])
+  useEffect(() => {
+    /* Back from signup: give the question the visitor typed before the wall a place to be asked, instead of losing it. */
+    try {
+      const q = localStorage.getItem("ptpub.v1.pendingAsk")
+      const s = window.PT_AUTH && window.PT_AUTH.session && window.PT_AUTH.session()
+      if (q && s && s.access_token) { localStorage.removeItem("ptpub.v1.pendingAsk"); setInput(q) }
+    } catch (e) {}
+  }, [])
   useEffect(() => { end.current && end.current.scrollIntoView({ block: "end", behavior: "smooth" }) }, [msgs, busy])
 
   const patch = (i, fn) => setMsgs((ms) => ms.map((m, k) => (k === i ? fn(m) : m)))
@@ -136,6 +147,9 @@ export default function AgentPanel({ symbol, initial }) {
     const q = String(text || "").trim()
     if (!q || busy) return
     setErr("")
+    setWall(false)
+    /* Funnel signal for the retargeting audience: who tried the analyst. No question text is sent to Meta. */
+    trackCustom("AskAnalyst", { content_category: "analyst", content_type: "product" })
     const attached = files
     setFiles([])
     setInput("")
@@ -189,6 +203,13 @@ export default function AgentPanel({ symbol, initial }) {
       }
     } catch (e) {
       if (e.name === "AbortError") patch(base + 1, (m) => ({ ...m, parts: [...m.parts, { type: "error", message: "Stopped." }] }))
+      else if (e.code === "signup_required") {
+        /* Keep the question so the account flow can hand it back after signup. */
+        try { localStorage.setItem("ptpub.v1.pendingAsk", q) } catch (x) {}
+        patch(base + 1, (m) => ({ ...m, content: "", parts: [] }))
+        setMsgs((ms) => ms.slice(0, base + 1))
+        setWall(true)
+      }
       else {
         const msg = e.code === "deep_unavailable" ? "Deep mode needs the Paid plan. Switch to Fast, or upgrade in Account."
           : e.status === 429 ? e.message
@@ -243,8 +264,9 @@ export default function AgentPanel({ symbol, initial }) {
     ask(initial)
   }, [initial])
 
+  const wallNext = (() => { try { return encodeURIComponent(location.pathname + location.search + location.hash) } catch (e) { return "%2F" } })()
   return (
-    <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[240px_1fr]" data-tour="ask">
       <aside className="order-2 space-y-2 lg:order-1">
         <Button variant="outline" size="sm" className="w-full justify-start gap-1.5" onClick={() => { setThreadId(null); setMsgs([]); setErr("") }} disabled={busy}>
           <Plus className="size-4" /> New thread
@@ -298,6 +320,26 @@ export default function AgentPanel({ symbol, initial }) {
                 <button type="button" onClick={() => setFiles((xs) => xs.filter((_, k) => k !== i))} aria-label={`Remove ${f.name}`}>×</button>
               </Badge>
             ))}
+          </div>
+        )}
+
+        {wall && (
+          <div className="rounded-lg border border-[color-mix(in_srgb,var(--accent)_45%,var(--line))] bg-[var(--panel-2)] p-3">
+            <div className="flex items-start gap-2">
+              <Bot className="mt-0.5 size-4 shrink-0 text-[var(--accent)]" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">That was your free question.</p>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--muted)]">
+                  You saw it work: every figure cited from filings, live quotes and news, with no arithmetic left to the model.
+                  Create a free account to keep asking, and the analyst answers about your own holdings instead of the sample portfolio.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <Button size="sm" asChild><a href={`/login.html?mode=signup&next=${wallNext}`}>Create a free account</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/login.html?next=${wallNext}`}>I already have one</a></Button>
+                </div>
+                <p className="mt-2 text-[11px] text-[var(--muted)]">Free plan, no card. Your question is saved and waiting for you.</p>
+              </div>
+            </div>
           </div>
         )}
 

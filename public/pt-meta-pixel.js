@@ -26,13 +26,16 @@ fbq('track', 'PageView');
     } catch (e) {}
     return true;
   }
-  window.ptTrack = function (name, params, onceKey) {
+  function fire(kind, name, params, onceKey) {
     try {
       if (!window.fbq || !once(onceKey)) return;
       var id = name + "-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-      fbq("track", name, params || {}, { eventID: id });
+      fbq(kind, name, params || {}, { eventID: id });
     } catch (e) {}
-  };
+  }
+  window.ptTrack = function (name, params, onceKey) { fire("track", name, params, onceKey); };
+  /* Custom (non-standard) events, e.g. AskAnalyst. Kept separate because fbq('track') only accepts Meta's own event names. */
+  window.ptTrackCustom = function (name, params, onceKey) { fire("trackCustom", name, params, onceKey); };
   window.ptPlanValue = function (plan) {
     return PLAN_THB[plan] ? { value: PLAN_THB[plan], currency: "THB", content_name: plan === "premium" ? "Premium" : "Paid", content_category: "subscription", content_type: "product", content_ids: [plan] } : null;
   };
