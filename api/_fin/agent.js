@@ -78,8 +78,11 @@ const toolList = () => Object.entries(TOOLS).map(([name, t]) => `${name}(${Objec
 const STOP = new Set(["I", "A", "WHY", "THE", "AND", "FOR", "ARE", "WAS", "HOW", "WHAT", "DID", "DO", "IS", "IT", "OF", "ON", "TO", "IN", "AT", "BY", "MY", "ME", "US", "AI", "PE", "EPS", "FCF", "CEO", "GDP", "CPI", "FED", "SEC", "ETF", "DCF", "ROE", "ROIC", "USD", "THB", "YOY", "QOQ", "TTM", "Q1", "Q2", "Q3", "Q4", "NEW", "TODAY", "FALL", "DROP",
   // Ordinary English words that also happen to be, or look like, listed symbols. Without these,
   // "what is the current state of nvda" resolved to CURRENT.NS and the quote tool came back empty.
-  "CURRENT", "CUR", "STATE", "LATEST", "PRICE", "PRICES", "STOCK", "STOCKS", "MARKET", "VALUE", "VALUES", "COMPANY", "SHARE", "SHARES", "PLEASE", "TELL", "ABOUT", "NOW", "GOING", "DOING", "LOOK", "LOOKING", "NEWS", "GOOD", "BAD", "BEST", "WORST", "BUY", "SELL", "HOLD", "LONG", "SHORT", "RISK", "VIEW", "REVIEW", "CHECK", "SHOW", "GIVE", "MAKE", "THINK", "KNOW", "GET", "WITH", "FROM", "THIS", "THAT", "HAVE", "HAS", "BEEN", "WILL", "WOULD", "COULD", "SHOULD", "CAN", "MAY", "MIGHT", "NOT", "ANY", "ALL", "SOME", "MORE", "LESS", "OVER", "UNDER", "THAN", "THEN", "ALSO", "JUST", "ONLY", "VERY", "MUCH", "MANY", "SINCE", "STILL", "YOUR", "THEIR", "OUR", "ITS", "ONE", "TWO", "BIG", "SMALL", "TOP", "UP", "DOWN", "OUT", "OFF", "SET", "PUT", "OWN", "WELL", "BACK", "NEXT", "LAST", "WEEK", "MONTH", "YEAR", "DAY", "DAYS", "TIME", "ONCE", "EVER", "BEEN"]);
-async function resolveSymbols(question, hint) {
+  "CURRENT", "CUR", "STATE", "LATEST", "PRICE", "PRICES", "STOCK", "STOCKS", "MARKET", "VALUE", "VALUES", "COMPANY", "SHARE", "SHARES", "PLEASE", "TELL", "ABOUT", "NOW", "GOING", "DOING", "LOOK", "LOOKING", "NEWS", "GOOD", "BAD", "BEST", "WORST", "BUY", "SELL", "HOLD", "LONG", "SHORT", "RISK", "VIEW", "REVIEW", "CHECK", "SHOW", "GIVE", "MAKE", "THINK", "KNOW", "GET", "WITH", "FROM", "THIS", "THAT", "HAVE", "HAS", "BEEN", "WILL", "WOULD", "COULD", "SHOULD", "CAN", "MAY", "MIGHT", "NOT", "ANY", "ALL", "SOME", "MORE", "LESS", "OVER", "UNDER", "THAN", "THEN", "ALSO", "JUST", "ONLY", "VERY", "MUCH", "MANY", "SINCE", "STILL", "YOUR", "THEIR", "OUR", "ITS", "ONE", "TWO", "BIG", "SMALL", "TOP", "UP", "DOWN", "OUT", "OFF", "SET", "PUT", "OWN", "WELL", "BACK", "NEXT", "LAST", "WEEK", "MONTH", "YEAR", "DAY", "DAYS", "TIME", "ONCE", "EVER", "BEEN",
+  // Words from portfolio questions. "outlook" name-searched into OTLK (Outlook Therapeutics), a stock the user never mentioned.
+  "OUTLOOK", "OUTLOOKS", "PORTFOLIO", "PORTFOLIOS", "HOLDING", "HOLDINGS", "POSITION", "POSITIONS", "BOOK", "WHATS", "HOWS", "LIKE", "LOOKS", "PERFORMANCE", "ALLOCATION", "EXPOSURE", "RETURN", "RETURNS", "GAIN", "GAINS", "LOSS", "LOSSES", "TREND", "FORECAST", "SUMMARY", "OVERVIEW", "ANALYSIS", "ANALYZE", "ANALYSE", "ACCOUNT", "INVESTMENT", "INVESTMENTS", "GRAPH", "CHART", "TABLE", "COMPARE", "BREAKDOWN", "WEIGHT", "WEIGHTS", "DIVERSIFIED", "CONCENTRATION", "BALANCE", "STATUS", "UPDATE", "WEEKLY", "DAILY"]);
+/* names:false skips the company-name search. Portfolio questions ("what is the outlook of my portfolio") contain ordinary words that match some listed company; only an explicit ticker counts there. */
+async function resolveSymbols(question, hint, { names = true } = {}) {
   const out = []; if (hint) out.push(String(hint).toUpperCase());
   const caps = (question.match(/\$?\b[A-Z]{1,5}(?:[.-][A-Z]{1,2})?\b/g) || []).map((x) => x.replace("$", "")).filter((x) => !STOP.has(x));
   for (const c of caps) if (!out.includes(c) && (SP[c] || /^\$/.test(c) || c.length >= 3)) out.push(c);
@@ -92,7 +95,7 @@ async function resolveSymbols(question, hint) {
       if (out.length >= 3) break;
     }
   }
-  if (out.length < 1) {
+  if (out.length < 1 && names) {
     // Two-word company names are the commonest miss: "state street" and "general motors" both begin
     // with an ordinary English word, so a single-word pass throws them away before the pair exists
     // (and "general" alone matches GENERAL ...). Pairs come first, built from the raw tokens, then
