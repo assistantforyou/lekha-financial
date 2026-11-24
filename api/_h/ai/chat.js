@@ -73,7 +73,9 @@ module.exports = async function handler(req, res) {
   const message = String(b.message == null ? "" : b.message).slice(0, 8000).trim();
   if (message.length < 2) return res.status(400).json({ error: "Type a message first.", code: "empty_message" });
 
-  const tier = tierOf(p) || (p.demo ? "demo" : "free");
+  // tierOf() maps a demo profile to "free" (it only knows the subscription plans), so the anonymous
+  // case has to be named first or the demo quota would silently become the free quota.
+  const tier = p.demo ? "demo" : tierOf(p) || "free";
   const lim = LIMITS[tier] || LIMITS.free;
   const mode = b.mode === "deep" ? "deep" : "fast";
   if (mode === "deep" && !lim.deep) {
