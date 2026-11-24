@@ -1,3 +1,4 @@
+import { track, planParams } from "@/lib/pixel"
 import { ReleasePolicies } from "../components/ReleasePolicies"
 import { useEffect, useRef, useState } from "react"
 import { AlertTriangle, Check, CircleHelp, Download, LogOut, RefreshCw, Upload } from "lucide-react"
@@ -32,7 +33,7 @@ function AuthForms() {
     e.preventDefault(); setBusy(true); setMsg(null)
     try {
       if (mode === "recover") { const j = await A.recover(email); setMsg({ ok: true, t: j.message }) }
-      else { const j = mode === "login" ? await A.login(email, pw) : await A.signup(email, pw); if (j.confirm) setMsg({ ok: true, t: j.message }); else { toast.success("Signed in. Loading your account…"); setTimeout(() => (location.href = location.pathname + "#/portfolio/overview"), 200); setTimeout(() => location.reload(), 350) } }
+      else { const j = mode === "login" ? await A.login(email, pw) : await A.signup(email, pw); if (mode === "signup") track("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB" }, "reg"); if (j.confirm) setMsg({ ok: true, t: j.message }); else { toast.success("Signed in. Loading your account…"); setTimeout(() => (location.href = location.pathname + "#/portfolio/overview"), 200); setTimeout(() => location.reload(), 350) } }
     } catch (err) { setMsg({ ok: false, t: errMsg(err) }) } finally { setBusy(false) }
   }
   return (<Card><CardHeader><CardTitle>{mode === "login" ? "Sign in" : mode === "signup" ? "Create your free account" : "Reset your password"}</CardTitle><CardDescription>{isDemo() ? "You are exploring the demo. An account keeps your own holdings, watchlist, layout and settings on every device and switches to real market data." : "Use your email and password."}</CardDescription></CardHeader>
@@ -149,7 +150,7 @@ const PLANS = [
 ]
 export function Plans({ item, navigate, me }) {
   const sess = useSession(), demo = isDemo(), signedIn = !!(sess && sess.access_token) && !demo, cur = signedIn ? (me ? me.tier : "free") : null, [busy, setBusy] = useState(null)
-  const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
+  const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const pp = planParams(plan); if (pp) track("InitiateCheckout", { ...pp, num_items: 1 }); const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   const manage = async () => { setBusy("portal"); try { const j = await A.portal(); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
     <div className="grid gap-4 lg:grid-cols-3" data-plan-cards="3">{PLANS.map((t) => <Card key={t.id} data-plan={t.id} className={cn("flex flex-col", cur === t.id && "border-primary", t.id === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}>

@@ -1,3 +1,4 @@
+import { track, planParams } from "@/lib/pixel"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronRight, FlaskConical, PanelLeftOpen } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -36,6 +37,7 @@ export default function App() {
   /* The desktop tree can be collapsed to give a wide screen entirely to the data. The choice is remembered. */
   const [nav, setNav] = useState(() => { try { return localStorage.getItem("ptpub.v1.app.nav") !== "closed" } catch (e) { return true } })
   const toggleNav = useCallback(() => setNav((v) => { try { localStorage.setItem("ptpub.v1.app.nav", v ? "closed" : "open") } catch (e) {} return !v }), [])
+  useEffect(() => { if (search) track("Search", { content_category: "command_palette" }) }, [search])
   const me = useMe(), sess = useSession()
   const navigate = useCallback((path) => { const h = "#/" + path.replace(/^#?\/?/, ""); if (location.hash === h) window.dispatchEvent(new HashChangeEvent("hashchange")); else location.hash = h }, [])
   useEffect(() => { window.LEKHA_SHELL && window.LEKHA_SHELL._register(navigate) }, [navigate])
@@ -51,6 +53,7 @@ export default function App() {
     document.title = `${route.param ? route.param + " · " : ""}${item.title} · LEKHA Financials`
     try { if (route.t !== "company") localStorage.setItem("ptpub.v1.app.route", JSON.stringify(route.key)) } catch (e) {}
     window.scrollTo(0, 0); setMenu(false)
+    track("ViewContent", { content_name: item.title, content_category: item.groupTitle || route.t || "app", content_type: "product" })
     if (!isPane && window.LEKHA_SHELL) window.LEKHA_SHELL._setRoute({ t: route.t, s: route.s }, false)
   }, [route.key, route.param])
   const qs = route.query ? route.query.toString() : "", r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param, qs])   // query (?tab=…) must be a dependency or tab links never switch
@@ -80,6 +83,7 @@ export default function App() {
     if (!confirming || !tier) return
     if (firstTier.current === undefined) { firstTier.current = tier; if (!(feature && gated === false)) return }
     if (tier !== firstTier.current || (feature && gated === false)) {
+      if (tier !== firstTier.current && (tier === "paid" || tier === "premium")) { const pp = planParams(tier); if (pp) { track("Subscribe", { ...pp, predicted_ltv: pp.value * 12 }, "sub-" + tier); track("Purchase", pp, "buy-" + tier) } }
       setConfirming(false); toast.success(`Your account is on the ${tier[0].toUpperCase() + tier.slice(1)} plan.`)
       // the classic engine, its data source and the feature modules read the plan once at load: reload so they start on the verified plan
       if (tier !== firstTier.current) setTimeout(() => location.reload(), 1500)
