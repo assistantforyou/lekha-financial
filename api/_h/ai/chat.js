@@ -13,7 +13,9 @@ const DAY = 86400000;
 const MAX_MESSAGES = 40;
 
 const LIMITS = {
-  demo: { turns: 15, deep: 0 },
+  // One question before an account is the hook: an anonymous visitor gets to see the analyst answer from real
+  // evidence, then the next one asks for a free signup. Keyed per client per day, so clearing cookies resets it.
+  demo: { turns: 1, deep: 0 },
   free: { turns: 30, deep: 0 },
   paid: { turns: 150, deep: 20 },
   premium: { turns: 400, deep: 100 },
@@ -75,7 +77,10 @@ module.exports = async function handler(req, res) {
   const who = p.demo ? "d-" + clientId(req) : p.user_id;
   const day = Math.floor(Date.now() / DAY);
   const under = await rateHit(`ai/chat/${who}/${day}`, lim.turns).catch(() => false);
-  if (!under) return res.status(429).json({ error: "Daily AI limit reached. It resets at midnight UTC.", code: "ai_limit" });
+  if (!under) {
+    if (p.demo) return res.status(429).json({ error: "That was your free question. Create a free account to keep asking.", code: "signup_required", need_signup: true });
+    return res.status(429).json({ error: "Daily AI limit reached. It resets at midnight UTC.", code: "ai_limit" });
+  }
   if (mode === "deep") {
     const deepOk = await rateHit(`ai/chat-deep/${who}/${day}`, lim.deep).catch(() => false);
     if (!deepOk) return res.status(429).json({ error: "Deep-thinking limit reached for today.", code: "deep_limit" });
