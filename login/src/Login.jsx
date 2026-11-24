@@ -122,6 +122,7 @@ export default function Login() {
         setMsg({ text: r.j?.error || "Could not create the account.", kind: "err" })
         return
       }
+      try { window.ptTrack && window.ptTrack("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB" }, "reg") } catch {}
       if (r.j.session) {
         save(r.j.session)
         location.replace("/")
