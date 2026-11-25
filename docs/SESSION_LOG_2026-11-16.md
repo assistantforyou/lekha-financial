@@ -1,5 +1,7 @@
 # Portfolio Terminal: session log, 16 Nov 2026 (done by James, with Claude)
 
+> **Superseded (2026-11-25).** Z.ai/GLM was removed. The only conversational AI provider is now DeepSeek (`api/_llm.js`, `api/_ai/ds.js`); Gemini remains only for document embeddings. A stale `ZAI_API_KEY` is ignored. The Z.ai material below is kept as history, not as setup instructions.
+
 For the Todoist task "Sex Project" (project Lekha) and "Idea Dumps". The Todoist connector didn't connect this session, so this file holds the entries to copy in.
 
 ## Done
@@ -57,7 +59,7 @@ For the Todoist task "Sex Project" (project Lekha) and "Idea Dumps". The Todoist
 ## Task dump
 - Finnhub signup skipped: it has no Google sign-in. It would add free sector-wide recommendation trends.
 - 13F refresh: run `scripts/build-13f.mjs` on the home server after each SEC release (end of Feb, May, Aug, Nov).
-- Optional: Z.ai GLM-OCR (needs a few dollars of prepaid balance, then set `LLM_OCR=1`) for harder scans.
+- ~~Optional: Z.ai GLM-OCR (needs a few dollars of prepaid balance, then set `LLM_OCR=1`) for harder scans.~~ Removed with Z.ai on 2026-11-25.
 - Optional: a Vercel API token so the costs page shows real Vercel billing.
 
 ## Idea dump (for "Idea Dumps")

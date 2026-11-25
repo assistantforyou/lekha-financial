@@ -198,7 +198,7 @@ async function convene({ uid, scope, question, evidence, lang, key }) {
     ceo: v.ceo,
     meta: {
       provider: info.provider,
-      model: info.model ? `${info.provider} ${info.model}` : null, llmRequests: info.requests, retries: info.retries || 0, cached: false, fallback: info.fallback ? `${info.provider === "Gemini" ? "Z.ai" : "Gemini"} unavailable (${info.fallback}); answered by ${info.provider}` : null,
+      model: info.model ? `${info.provider} ${info.model}` : null, llmRequests: info.requests, retries: info.retries || 0, cached: false, fallback: null,
       generatedAt: new Date().toISOString(),
       dataAsOf: prune({ ...(evidence.asOf || {}), portfolio: ctx && ctx.valDate ? clean(ctx.valDate, 40) : null,
         macro: market && market.macro && market.macro.asOf ? clean(market.macro.asOf, 40) : null,

@@ -4,6 +4,24 @@
    holdings (browser storage). Nothing is saved on the server. Needs window.PT_HOLD {load, save, apply} exposed by the holdings editor. */
 (function () {
   var MAX = 3 * 1024 * 1024, MAX_FILES = 10;
+  var IMG_RE = /^image\//i, IMG_EXT = /\.(png|jpe?g|webp|gif|bmp|tiff?|heic|heif|avif)$/i;
+  var EXT_MIME = {
+    pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+    webp: "image/webp", gif: "image/gif", bmp: "image/bmp", tif: "image/tiff", tiff: "image/tiff",
+    heic: "image/heic", heif: "image/heif", avif: "image/avif",
+    csv: "text/csv", tsv: "text/tab-separated-values", txt: "text/plain", json: "application/json",
+    ofx: "application/x-ofx", qfx: "application/x-qfx", xml: "text/xml",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    xls: "application/vnd.ms-excel"
+  };
+  function mimeOf(f) {
+    var t = (f.type || "").toLowerCase();
+    if (t) return t;
+    var m = /\.([a-z0-9]+)$/i.exec(f.name || "");
+    return (m && EXT_MIME[m[1].toLowerCase()]) || "application/octet-stream";
+  }
+  var overrides = {}; // file key -> edited JPEG blob
   var anchor = document.getElementById("ph-clear");
   var H = window.PT_HOLD;
   if (!anchor || !H) return;
@@ -11,6 +29,16 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function maskDigits(t) { return String(t).replace(/\b\d{8,}\b/g, function (m) { return new Array(m.length - 3).join("*") + m.slice(-4); }); }
   function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; }
+  function fileKey(f) { return f.name + "|" + f.size + "|" + (f.lastModified || 0); }
+  function isImage(f) { return IMG_RE.test(f.type || "") || IMG_EXT.test(f.name || ""); }
+  function dataUrl(blob) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result)); };
+      r.onerror = reject;
+      r.readAsDataURL(blob);
+    });
+  }
 
   var note = document.querySelector("#h-hold + .note");
   if (note) note.textContent = "Stored in this browser (local storage). Imported statements are only read when you choose them, and you review every line first.";
@@ -30,6 +58,14 @@
     "#imp-dlg .imp-pw{display:flex;gap:6px;min-width:0}#imp-dlg .imp-pw input{flex:1 1 auto}" +
     "#imp-dlg .imp-eye{font:inherit;font-size:12px;padding:4px 9px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--muted);cursor:pointer;flex:0 0 auto}" +
     "#imp-dlg .imp-files{display:grid;gap:2px;font-size:12px;color:var(--muted);margin-top:-2px}" +
+    "#imp-crop{max-width:920px;width:calc(100% - 24px);background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:14px}" +
+    "#imp-crop::backdrop{background:rgba(0,0,0,.6)}#imp-crop h3{margin:0 0 6px;font-family:var(--f-display);font-size:15px}" +
+    "#imp-crop .imp-cwrap{position:relative;display:flex;justify-content:center;background:#000;border-radius:4px;overflow:hidden;touch-action:none}" +
+    "#imp-crop canvas{max-width:100%;max-height:58vh;display:block;cursor:crosshair;touch-action:none}" +
+    "#imp-crop .imp-row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}" +
+    "#imp-crop .imp-hint{font-size:12px;color:var(--muted);margin-top:8px}" +
+    "#imp-dlg .imp-files .imp-frow{display:flex;gap:8px;align-items:center;justify-content:space-between}" +
+    "#imp-dlg .imp-edit{font:inherit;font-size:11px;padding:2px 7px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--accent);cursor:pointer}" +
     "#imp-dlg .imp-sr{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}" +
     "#imp-dlg .imp-tbl{overflow:auto;max-height:42vh;margin-top:10px;-webkit-overflow-scrolling:touch}#imp-dlg table{width:100%;border-collapse:collapse;font-size:12px}#imp-dlg td,#imp-dlg th{padding:3px 4px;text-align:left;vertical-align:middle}" +
     "#imp-dlg td input[type=number]{width:92px}#imp-dlg td input[type=text]{width:84px}#imp-dlg .imp-ev{color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#imp-dlg .imp-ev.imp-flag{color:var(--warn,#e0a030);white-space:normal;min-width:180px}" +
@@ -54,9 +90,9 @@
   dlg.innerHTML =
     "<form id='imp-form' name='statement-import' novalidate autocomplete='on'>" +
     "<input type='text' class='imp-sr' name='username' autocomplete='username' value='statement-import' tabindex='-1' aria-hidden='true' readonly>" +
-    "<h3>Import holdings from statements</h3><div class='muted' style='font-size:12px'>PDF, screenshot or CSV from your broker or bank. Pick one or several at once — each file is read automatically and you review every line before anything is added.</div>" +
+    "<h3>Import holdings from statements</h3><div class='muted' style='font-size:12px'>PDF, screenshot, photo, spreadsheet or CSV from your broker or bank. Pick one or several at once — crop or rotate a photo first if you like, then every file is read automatically and you review each line before anything is added.</div>" +
     "<div class='imp-f'>" +
-    "<label class='imp-lab' for='imp-file'>Statements (you can pick several)<input type='file' id='imp-file' name='statements' multiple accept='.pdf,.png,.jpg,.jpeg,.webp,.csv,.tsv,.txt,application/pdf,image/png,image/jpeg,image/webp,text/csv,text/plain'></label>" +
+    "<label class='imp-lab' for='imp-file'>Statements (you can pick several)<input type='file' id='imp-file' name='statements' multiple accept='.pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.heic,.heif,.avif,.csv,.tsv,.txt,.json,.ofx,.qfx,.xml,.docx,.xlsx,.xls,application/pdf,image/*,text/*,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'></label>" +
     "<div class='imp-files' id='imp-files' hidden></div>" +
     "</div>" +
     "<div id='imp-prog' hidden></div>" +
@@ -66,6 +102,14 @@
     "<div id='imp-review' hidden></div>";
   document.body.appendChild(dlg);
 
+  var cropDlg = document.createElement("dialog");
+  cropDlg.id = "imp-crop";
+  cropDlg.innerHTML = "<h3>Crop / rotate</h3><div class='muted' style='font-size:12px'>Drag a box around the table you want read. Rotate if the photo is sideways. Apply replaces this image before it is uploaded; the original file is never changed.</div>" +
+    "<div class='imp-cwrap'><canvas id='imp-crop-cv'></canvas></div>" +
+    "<div class='imp-hint' id='imp-crop-hint'>No crop selected — Apply uses the whole rotated image.</div>" +
+    "<div class='imp-row'><button class='btn' id='imp-crop-reset' type='button'>Reset</button><button class='btn' id='imp-crop-rot' type='button'>Rotate 90°</button><button class='btn' id='imp-crop-cancel' type='button'>Cancel</button><button class='btn' id='imp-crop-apply' type='button' style='border-color:var(--accent);color:var(--accent)'>Apply</button></div>";
+  document.body.appendChild(cropDlg);
+
   function $(id) { return document.getElementById(id); }
   function say(t, bad) { var m = $("imp-msg"); m.textContent = t; m.style.color = bad ? "var(--down)" : "var(--muted)"; }
   function chosen() { return Array.prototype.slice.call($("imp-file").files || []); }
@@ -73,10 +117,21 @@
   function listFiles() {
     var fs = chosen(), box = $("imp-files");
     box.hidden = !fs.length;
-    box.innerHTML = fs.map(function (f) { return "<div>" + esc(f.name) + " · " + fmtSize(f.size) + "</div>"; }).join("");
+    box.innerHTML = fs.map(function (f) {
+      var edited = !!overrides[fileKey(f)];
+      return "<div class='imp-frow'><span>" + esc(f.name) + " · " + fmtSize(f.size) + (edited ? " · cropped" : "") + "</span>" +
+        (isImage(f) ? "<button class='imp-edit' type='button' data-k='" + esc(fileKey(f)) + "'>" + (edited ? "Re-crop" : "Crop") + "</button>" : "") + "</div>";
+    }).join("");
   }
 
-  $("imp-file").addEventListener("change", listFiles);
+  $("imp-file").addEventListener("change", function () { overrides = {}; listFiles(); });
+  $("imp-files").addEventListener("click", function (ev) {
+    var b = ev.target.closest ? ev.target.closest(".imp-edit") : null;
+    if (!b) return;
+    var k = b.getAttribute("data-k");
+    var f = chosen().filter(function (x) { return fileKey(x) === k; })[0];
+    if (f) openCrop(f);
+  });
   function openDlg() {
     $("imp-file").value = "";
     $("imp-files").hidden = true; $("imp-files").innerHTML = "";
@@ -133,10 +188,120 @@
     return { images: images };
   }
 
+  /* ---- crop / rotate editor (runs entirely in the browser) ---- */
+  var CP = { file: null, img: null, rot: 0, base: null, sel: null, drag: null };
+  function openCrop(f) {
+    if (!isImage(f)) return;
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      CP.file = f; CP.img = img; CP.rot = 0; CP.sel = null;
+      renderCrop(); cropDlg.showModal();
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      say("This image format cannot be previewed in the browser. It will be sent as-is — crop it in your phone's photo editor first if the table is hard to read.", true);
+    };
+    img.src = url;
+  }
+  function renderCrop() {
+    var img = CP.img, rot = ((CP.rot % 360) + 360) % 360, w = img.naturalWidth, h = img.naturalHeight;
+    var bw = rot % 180 ? h : w, bh = rot % 180 ? w : h;
+    var sc = Math.min(1, 1600 / bw, 1000 / bh);
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(bw * sc)); c.height = Math.max(1, Math.round(bh * sc));
+    var g = c.getContext("2d");
+    g.save(); g.translate(c.width / 2, c.height / 2); g.rotate(rot * Math.PI / 180);
+    g.drawImage(img, -w * sc / 2, -h * sc / 2, w * sc, h * sc); g.restore();
+    CP.base = c; CP.sel = null; CP.drag = null; drawCrop();
+  }
+  function drawCrop() {
+    var cv = $("imp-crop-cv"), b = CP.base; if (!b) return;
+    cv.width = b.width; cv.height = b.height;
+    var g = cv.getContext("2d"); g.drawImage(b, 0, 0);
+    var s = CP.sel;
+    if (s) {
+      g.fillStyle = "rgba(0,0,0,.5)";
+      g.fillRect(0, 0, cv.width, s.y); g.fillRect(0, s.y, s.x, s.h);
+      g.fillRect(s.x + s.w, s.y, cv.width - s.x - s.w, s.h); g.fillRect(0, s.y + s.h, cv.width, cv.height - s.y - s.h);
+      g.strokeStyle = "#39d0c4"; g.lineWidth = 2; g.strokeRect(s.x + 1, s.y + 1, Math.max(0, s.w - 2), Math.max(0, s.h - 2));
+    }
+    $("imp-crop-hint").textContent = s ? "Crop selected — Apply keeps only this area." : "No crop selected — Apply uses the whole rotated image.";
+  }
+  function cropPos(ev) {
+    var cv = $("imp-crop-cv"), r = cv.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(cv.width, (ev.clientX - r.left) * cv.width / r.width)),
+      y: Math.max(0, Math.min(cv.height, (ev.clientY - r.top) * cv.height / r.height)),
+    };
+  }
+  (function wireCrop() {
+    var cv = $("imp-crop-cv");
+    cv.addEventListener("pointerdown", function (ev) {
+      if (!CP.base) return;
+      ev.preventDefault();
+      try { cv.setPointerCapture(ev.pointerId); } catch (e) {}
+      CP.drag = cropPos(ev); CP.sel = { x: CP.drag.x, y: CP.drag.y, w: 0, h: 0 }; drawCrop();
+    });
+    cv.addEventListener("pointermove", function (ev) {
+      if (!CP.drag) return;
+      ev.preventDefault();
+      var p = cropPos(ev);
+      CP.sel = { x: Math.min(CP.drag.x, p.x), y: Math.min(CP.drag.y, p.y), w: Math.abs(p.x - CP.drag.x), h: Math.abs(p.y - CP.drag.y) };
+      drawCrop();
+    });
+    function endDrag() { if (!CP.drag) return; CP.drag = null; if (CP.sel && (CP.sel.w < 8 || CP.sel.h < 8)) CP.sel = null; drawCrop(); }
+    cv.addEventListener("pointerup", endDrag);
+    cv.addEventListener("pointercancel", endDrag);
+    $("imp-crop-reset").addEventListener("click", function () { CP.sel = null; drawCrop(); });
+    $("imp-crop-rot").addEventListener("click", function () { CP.rot = (CP.rot + 90) % 360; renderCrop(); });
+    $("imp-crop-cancel").addEventListener("click", function () { cropDlg.close(); });
+    $("imp-crop-apply").addEventListener("click", function () {
+      var b = CP.base; if (!b || !CP.file) return cropDlg.close();
+      var s = CP.sel || { x: 0, y: 0, w: b.width, h: b.height };
+      if (s.w < 8 || s.h < 8) return say("Drag a larger crop box first.", true);
+      var out = document.createElement("canvas");
+      out.width = Math.max(1, Math.round(s.w)); out.height = Math.max(1, Math.round(s.h));
+      out.getContext("2d").drawImage(b, s.x, s.y, s.w, s.h, 0, 0, out.width, out.height);
+      out.toBlob(function (blob) {
+        if (!blob) return say("Could not prepare the cropped image.", true);
+        overrides[fileKey(CP.file)] = blob;
+        cropDlg.close(); listFiles();
+        say("Image prepared. It will upload as a clean JPEG.");
+      }, "image/jpeg", 0.9);
+    });
+  })();
+
+  function normaliseImage(f) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(f), img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth, h = img.naturalHeight, sc = Math.min(1, 2200 / Math.max(w, h));
+        var c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(w * sc)); c.height = Math.max(1, Math.round(h * sc));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(function (b) {
+          if (!b) return resolve(null);
+          dataUrl(b).then(function (d) { resolve({ mime: "image/jpeg", data: d.split(",")[1] || "" }); }, function () { resolve(null); });
+        }, "image/jpeg", 0.9);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+  async function imageBody(f) {
+    var edited = overrides[fileKey(f)];
+    if (edited) return { mime: "image/jpeg", data: (await dataUrl(edited)).split(",")[1] || "" };
+    var normal = await normaliseImage(f);
+    if (normal) return normal;
+    return { mime: mimeOf(f), data: (await dataUrl(f)).split(",")[1] || "" };
+  }
+
   function readFile(f) {
     return new Promise(function (resolve, reject) {
-      var isText = /^text\//.test(f.type) || /\.(csv|tsv|txt)$/i.test(f.name);
-      var isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name);
+      var isText = /^text\//.test(f.type || "") || /\.(csv|tsv|txt|json|ofx|qfx|xml)$/i.test(f.name);
+      var isPdf = (f.type || "").toLowerCase() === "application/pdf" || /\.pdf$/i.test(f.name);
       var r = new FileReader();
       r.onerror = function () { reject(new Error("Could not read the file.")); };
       if (isText) { r.onload = function () { resolve({ text: maskDigits(String(r.result)) }); }; r.readAsText(f); }
@@ -149,24 +314,11 @@
         };
         r.readAsArrayBuffer(f);
       }
+      else if (isImage(f)) {
+        imageBody(f).then(resolve, reject);
+      }
       else {
-        r.onload = function () {
-          var raw = { mime: f.type, data: String(r.result).split(",")[1] || "" };
-          // screenshots/photos: re-encode as JPEG (a 1.2 MB PNG becomes ~300 KB) so the upload and the model read are faster
-          if (!/^image\/(png|jpe?g|webp)$/i.test(f.type)) return resolve(raw);
-          var img = new Image();
-          img.onload = function () {
-            try {
-              var k = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
-              var c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-              var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
-              var j = c.toDataURL("image/jpeg", 0.85).split(",")[1] || "";
-              resolve(j && j.length < raw.data.length ? { mime: "image/jpeg", data: j } : raw);
-            } catch (e) { resolve(raw); }
-          };
-          img.onerror = function () { resolve(raw); };
-          img.src = "data:" + f.type + ";base64," + raw.data;
-        };
+        r.onload = function () { resolve({ mime: mimeOf(f), data: String(r.result).split(",")[1] || "" }); };
         r.readAsDataURL(f);
       }
     });
