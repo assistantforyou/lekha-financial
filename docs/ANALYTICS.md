@@ -62,27 +62,21 @@ ph.identify(userId, { plan: "paid" });
 
 ## Warehouse sources
 
-PostHog data warehouse connections (Supabase Postgres, Stripe) are configured in PostHog, not in this repo. Use the PostHog wizard in an interactive terminal:
+Both connections live in PostHog (project 767236, Data pipeline -> Sources), not in this repo. They were created on 2026-11-25 through the PostHog API with a personal key that has the data warehouse write scope. The wizard CLI is not required and could not reach `us.posthog.com` from some networks.
 
-```bash
-npx -y @posthog/wizard@latest warehouse source --project-id 767236
-```
-
-It signs in with OAuth (or a personal API key, `phx_...`, from PostHog user settings) and then asks for the source credentials.
-
-Supabase (choose Postgres):
+Supabase Postgres, source prefix `supabase`, status Completed, full sync then every 6 hours:
 
 | Field | Value |
 |---|---|
-| Host | `db.<project-ref>.supabase.co` (or the session-pooler host shown in the dashboard) |
+| Host | `aws-1-ap-northeast-1.pooler.supabase.com` (Supavisor pooler; the direct `db.<ref>.supabase.co` host is IPv6-only and unreachable) |
 | Port | `5432` |
 | Database | `postgres` |
-| User | `postgres`, or a read-only role created for PostHog |
+| User | `postgres.<project-ref>` |
 | Password | the database password from Project settings -> Database |
-| SSL | required |
+| SSL | required, `verify_server_certificate` false (the pooler certificate does not verify) |
 
-Useful tables: `pt_profiles` (plan and subscription state), `pt_audit` (API usage and provider metadata), `pt_av_cache` (fundamentals and price cache), `pt_costs` (model token spend), `pt_state` (saved documents). Prefer a read-only role so the warehouse can never write to production.
+Tables: `pt_audit` (API usage and provider metadata), `pt_av_budget`, `pt_av_cache` (fundamentals and price cache), `pt_cost_fixed`, `pt_costs` (model token spend), `pt_profiles` (plan and subscription state; the e-mail column is flagged sensitive in PostHog), `pt_rag_docs`, `pt_rate`, `pt_user_state`. Prefer a read-only role if the connection is ever recreated.
 
-Stripe: use a restricted key with read access to charges, customers, subscriptions, invoices, products and prices; the account id is detected from the key. The same connections can be added in the PostHog UI under Data pipeline -> Sources.
+Stripe, source prefix `stripe`, OAuth connection (Stripe Apps marketplace). A restricted API key also works and needs read access to charges, customers, subscriptions, invoices, products and prices; creating one requires the account's two-factor code. The OAuth app grants the granular Stripe App permissions, so the revenue tables sync (Customer, Charge, Invoice, Subscription, SubscriptionItem, Product, Price, Plan, Coupon, PromotionCode, Dispute, Payout) while tables outside its permission set (PaymentIntent, CheckoutSession, Event, TaxRate and the Billing credit tables) report a permission error until the connection is reauthorised with a restricted key that has those scopes.
 
 The project is "Lekha" on US Cloud, project id `767236`. The public ingestion key is set as `POSTHOG_KEY` in Vercel for production, preview and development; `/api/ph` serves it at runtime.
