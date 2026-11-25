@@ -1,0 +1,42 @@
+{
+  "_comment": "Feature access matrix (23 Nov 2026): Free THB 0, Paid THB 399/month, Premium THB 599/month. Read by api/_tiers.js (server, authoritative) and app/src/lib/entitlements.js (display only). Demo is a non-billable preview and never appears in a feature list. A route not listed here keeps its existing Free entitlement.",
+  "features": {
+    "marketRotation": { "tiers": ["paid", "premium"], "title": "Market rotation", "summary": "Relative strength across sectors and styles, measured against the S&P 500." },
+    "marketIntel": { "tiers": ["paid", "premium"], "title": "Market intelligence", "summary": "The daily AI-labelled market briefing built from public headlines, with impact and reasoning per story." },
+    "riskAppetite": { "tiers": ["paid", "premium"], "title": "Risk appetite", "summary": "XLY/XLP consumer risk appetite, VIX and VIXEQ implied dispersion history." },
+    "valuation": { "tiers": ["paid", "premium"], "title": "Intrinsic value and margin of safety", "summary": "DCF and residual-income models for every holding, margin of safety, valuation dispersion and history." },
+    "deepAnalysis": { "tiers": ["paid", "premium"], "title": "Holdings deep analysis", "summary": "One holding at a time: price, position, risk, valuation, analyst revisions and headlines." },
+    "analyst": { "tiers": ["paid", "premium"], "title": "Ask the analyst", "summary": "Questions about your own portfolio answered from your live positions, weights, P&L, concentration and drawdown." },
+    "briefing": { "tiers": ["paid", "premium"], "title": "Daily briefing", "summary": "A written summary of what moved, what changed and what to watch in your portfolio today." },
+    "sectorRotation": { "tiers": ["paid", "premium"], "title": "Sector rotation", "summary": "Relative rotation graph, leadership quality, earnings revisions and sector breadth." },
+    "council": { "tiers": ["premium"], "title": "LLM council", "summary": "Five analytical perspectives and a CEO synthesis, written by one model in one structured report." },
+    "councilReports": { "tiers": ["premium"], "title": "AI research reports", "summary": "Your saved LLM council reports, available to reread and to the research agent." },
+    "simulation": { "tiers": ["premium"], "title": "Simulation engine", "summary": "Monte Carlo portfolio scenarios, return distributions, stress tests and the Projection Lab." }
+  },
+  "routes": {
+    "macro/rotation": "marketRotation",
+    "macro/intel": "marketIntel",
+    "macro/appetite": "riskAppetite",
+    "analysis/value": "valuation",
+    "analysis/deep": "deepAnalysis",
+    "analysis/ask": "analyst",
+    "analysis/briefing": "briefing",
+    "analysis/council": "council",
+    "analysis/reports": "councilReports",
+    "analysis/stress": "simulation",
+    "sector/now": "sectorRotation",
+    "sector/lead": "sectorRotation",
+    "sector/breadth": "sectorRotation",
+    "simulation/main": "simulation",
+    "simulation/projection": "simulation"
+  },
+  "groups": {
+    "sector": "sectorRotation",
+    "simulation": "simulation"
+  },
+  "quotas": {
+    "analystQuestionsPerDay": { "paid": 20, "premium": 40 },
+    "briefingGenerationsPerDay": { "paid": 1, "premium": 3 },
+    "expertQuestionsPerDay": { "paid": 30, "premium": 80 }
+  }
+}

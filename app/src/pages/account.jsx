@@ -1,5 +1,9 @@
+import { track, planParams } from "@/lib/pixel"
+import { ReleasePolicies } from "../components/ReleasePolicies"
 import { useEffect, useRef, useState } from "react"
-import { AlertTriangle, Check, Download, LogOut, RefreshCw, Upload } from "lucide-react"
+import { AlertTriangle, Check, CircleHelp, Download, LogOut, RefreshCw, Upload } from "lucide-react"
+import { ui } from "@/tour/copy"
+import { startTour } from "@/tour/store"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +20,7 @@ import * as A from "@/lib/account"
 import { isDemo, setCurrency, useCurrency, useSession, useMe, useTier } from "@/lib/engine"
 import { date, dateTime, num, pct } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
+import { QUOTAS } from "@/lib/entitlements"
 
 const Field = ({ label, id, children, hint }) => <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label>{children}{hint && <p className="text-[12px] text-muted-foreground">{hint}</p>}</div>
 const Seg = ({ value, onChange, options, label }) => <div role="group" aria-label={label} className="inline-flex rounded-md border border-border p-0.5">{options.map(([v, l]) => <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)} className={cn("rounded px-3 py-1.5 text-[13px] transition", value === v ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>{l}</button>)}</div>
@@ -28,12 +33,13 @@ function AuthForms() {
     e.preventDefault(); setBusy(true); setMsg(null)
     try {
       if (mode === "recover") { const j = await A.recover(email); setMsg({ ok: true, t: j.message }) }
-      else { const j = mode === "login" ? await A.login(email, pw) : await A.signup(email, pw); if (j.confirm) setMsg({ ok: true, t: j.message }); else { toast.success("Signed in. Loading your account…"); setTimeout(() => (location.href = location.pathname + "#/portfolio/overview"), 200); setTimeout(() => location.reload(), 350) } }
+      else { const j = mode === "login" ? await A.login(email, pw) : await A.signup(email, pw); if (mode === "signup") track("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB" }, "reg"); if (j.confirm) setMsg({ ok: true, t: j.message }); else { toast.success("Signed in. Loading your account…"); setTimeout(() => (location.href = location.pathname + "#/portfolio/overview"), 200); setTimeout(() => location.reload(), 350) } }
     } catch (err) { setMsg({ ok: false, t: errMsg(err) }) } finally { setBusy(false) }
   }
   return (<Card><CardHeader><CardTitle>{mode === "login" ? "Sign in" : mode === "signup" ? "Create your free account" : "Reset your password"}</CardTitle><CardDescription>{isDemo() ? "You are exploring the demo. An account keeps your own holdings, watchlist, layout and settings on every device and switches to real market data." : "Use your email and password."}</CardDescription></CardHeader>
     <form onSubmit={submit}><CardContent className="space-y-3"><Field label="Email" id="auth-email"><Input id="auth-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
       {mode !== "recover" && <Field label="Password" id="auth-pw" hint={mode === "signup" ? "8 to 72 characters." : undefined}><Input id="auth-pw" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} maxLength={72} value={pw} onChange={(e) => setPw(e.target.value)} /></Field>}
+      {mode === "signup" && <ReleasePolicies />}
       {msg && <Alert variant={msg.ok ? "success" : "destructive"}><AlertDescription>{msg.t}</AlertDescription></Alert>}</CardContent>
       <CardFooter className="flex-wrap"><Button type="submit" disabled={busy}>{busy ? "One moment…" : mode === "login" ? "Sign in" : mode === "signup" ? "Create account" : "Send reset link"}</Button>
         {mode !== "login" && <Button type="button" variant="ghost" onClick={() => setMode("login")}>Have an account? Sign in</Button>}{mode === "login" && <><Button type="button" variant="outline" onClick={() => setMode("signup")}>Create account</Button><Button type="button" variant="ghost" onClick={() => setMode("recover")}>Forgot password?</Button></>}</CardFooter></form></Card>)
@@ -56,82 +62,98 @@ export function Profile({ item, navigate, me }) {
 }
 
 /* ---------------- Preferences ---------------- */
+/* Grouped the way people think about it: how it looks, what language and money it speaks, where it starts,
+   and how to get the walkthrough again. Every control writes the same preferences the classic engine reads. */
+const ZOOM = { S: 0.92, M: 1, L: 1.12, XL: 1.25 }
+const QUICK_THEMES = [["lekha-teal", "LEKHA Teal", "#0f766e"], ["lekha-navy", "LEKHA Navy", "#1e3a5f"], ["lekha-teal-light", "LEKHA Teal Light", "#0d9488"], ["lekha-light", "LEKHA Light", "#475569"]]
+const START_SCREENS = [["portfolio", "My portfolio", "Your holdings, today's change and the performance chart."], ["macro", "Macro dashboard", "Rates, inflation and the economic regime."]]
+
 export function Preferences({ item, navigate }) {
   const [, force] = useState(0), cur = useCurrency(), I = window.PT_I18N, bump = () => force((x) => x + 1)
   const theme = A.getPref("theme", "lekha-teal"), size = A.getPref("size", "M"), density = A.getPref("density", "comfortable")
   const [start, setStart] = useState(() => { try { return JSON.parse(localStorage.getItem("ptpub.v1.v3.start") || "null") || "portfolio" } catch (e) { return "portfolio" } })
-  const quick = [["lekha-teal", "LEKHA Teal"], ["lekha-navy", "LEKHA Navy"], ["lekha-teal-light", "LEKHA Teal Light"], ["lekha-light", "LEKHA Light"]]
+  const lang = I ? I.LANGS.find((l) => l.code === I.lang) : null
   return (<div><PageHeader title={item.title} description={item.desc} />
-    <div className="grid gap-4 xl:grid-cols-2">
-      <Card><CardHeader><CardTitle>Appearance</CardTitle><CardDescription>Saved in this browser and synced to your account.</CardDescription></CardHeader><CardContent className="space-y-5">
-        <Field label="Theme" id="th"><div className="grid grid-cols-2 gap-2">{quick.map(([id, l]) => <button key={id} onClick={() => { A.setPref("theme", id); bump() }} aria-pressed={theme === id} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm", theme === id ? "border-primary bg-accent" : "border-border hover:bg-accent/50")}>{theme === id && <Check className="size-4 text-primary" />}{l}</button>)}</div>
-          <Button variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event("lekha:theme"))}>Browse all 100 themes…</Button></Field>
-        <Field label="Text size" id="sz"><Seg label="Text size" value={size} onChange={(v) => { A.setPref("size", v); document.documentElement.style.setProperty("--zoom", { S: 0.92, M: 1, L: 1.12, XL: 1.25 }[v]); bump() }} options={[["S", "Small"], ["M", "Medium"], ["L", "Large"], ["XL", "Extra large"]]} /></Field>
-        <Field label="Density" id="dn"><Seg label="Density" value={density} onChange={(v) => { A.setPref("density", v); document.documentElement.toggleAttribute("data-density", v === "compact"); if (v === "compact") document.documentElement.setAttribute("data-density", "compact"); bump() }} options={[["comfortable", "Comfortable"], ["compact", "Compact"]]} /></Field></CardContent></Card>
-      <Card><CardHeader><CardTitle>Language, currency, start screen</CardTitle></CardHeader><CardContent className="space-y-5">
-        <Field label="Language" id="lg" hint="Changes every label and the language the AI analyst answers in. Live headlines and filings stay in their original language.">
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">{(I ? I.LANGS : []).map((l) => <button key={l.code} translate="no" onClick={() => l.code !== I.lang && I.setLang(l.code)} aria-pressed={I.lang === l.code} className={cn("notranslate rounded-lg border px-3 py-2 text-left text-sm", I.lang === l.code ? "border-primary bg-accent font-semibold" : "border-border hover:bg-accent/50")}>{l.native}</button>)}</div></Field>
-        <Field label="Show money in" id="cy" hint="Per-share prices stay in each stock's own currency."><Seg label="Currency" value={cur} onChange={setCurrency} options={[["USD", "USD $"], ["THB", "THB ฿"]]} /></Field>
-        <Field label="Open the app on" id="st"><Seg label="Start screen" value={start} onChange={(v) => { setStart(v); localStorage.setItem("ptpub.v1.v3.start", JSON.stringify(v)); toast.success("Saved") }} options={[["portfolio", "My portfolio"], ["macro", "Macro dashboard"]]} /></Field></CardContent></Card>
-      <Card className="xl:col-span-2"><CardHeader><CardTitle>Reset</CardTitle><CardDescription>Restores display preferences to their defaults. Your holdings and data are not touched.</CardDescription></CardHeader><CardFooter><Button variant="outline" onClick={() => { ["theme", "size", "density"].forEach((k) => A.setPref(k, k === "theme" ? "lekha-teal" : k === "size" ? "M" : "comfortable")); toast.success("Preferences reset"); setTimeout(() => location.reload(), 300) }}><RefreshCw />Reset display preferences</Button></CardFooter></Card>
+    <div className="max-w-4xl space-y-4">
+      <Card><CardHeader><CardTitle>How it looks</CardTitle><CardDescription>Theme, text size and spacing. Changes apply straight away and follow you to other devices.</CardDescription></CardHeader>
+        <CardContent className="space-y-5">
+          <Field label="Theme" id="th">
+            <div className="grid gap-2 sm:grid-cols-2">{QUICK_THEMES.map(([id, name, swatch]) => <button key={id} onClick={() => { A.setPref("theme", id); bump() }} aria-pressed={theme === id} className={cn("flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left text-sm", theme === id ? "border-primary bg-accent" : "border-border hover:bg-accent/50")}><span aria-hidden="true" className="size-4 shrink-0 rounded-full border border-border" style={{ background: swatch }} />{name}{theme === id && <Check className="ml-auto size-4 text-primary" />}</button>)}</div>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event("lekha:theme"))}>Browse all 100 themes</Button>
+          </Field>
+          <Field label="Text size" id="sz" hint="Enlarges every screen. Useful on a large monitor or a small laptop."><Seg label="Text size" value={size} onChange={(v) => { A.setPref("size", v); document.documentElement.style.setProperty("--zoom", ZOOM[v]); bump() }} options={[["S", "Small"], ["M", "Medium"], ["L", "Large"], ["XL", "Extra large"]]} /></Field>
+          <Field label="Spacing" id="dn" hint="Compact fits more rows on screen; comfortable leaves more air between them."><Seg label="Spacing" value={density} onChange={(v) => { A.setPref("density", v); if (v === "compact") document.documentElement.setAttribute("data-density", "compact"); else document.documentElement.removeAttribute("data-density"); bump() }} options={[["comfortable", "Comfortable"], ["compact", "Compact"]]} /></Field>
+        </CardContent></Card>
+
+      <Card><CardHeader><CardTitle>Language and money</CardTitle><CardDescription>{lang ? `Currently ${lang.native}.` : ""} Language changes every label and the language the AI analyst answers in. Headlines and filings stay in the language the publisher wrote them.</CardDescription></CardHeader>
+        <CardContent className="space-y-5">
+          <Field label="Language" id="lg">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">{(I ? I.LANGS : []).map((l) => <button key={l.code} translate="no" onClick={() => l.code !== I.lang && I.setLang(l.code)} aria-pressed={I.lang === l.code} className={cn("notranslate rounded-lg border px-3 py-2 text-left text-sm", I.lang === l.code ? "border-primary bg-accent font-semibold" : "border-border hover:bg-accent/50")}>{l.native}</button>)}</div>
+          </Field>
+          <Field label="Show money in" id="cy" hint="Totals and portfolio values convert at the daily rate. Each share price stays in the currency the stock trades in."><Seg label="Currency" value={cur} onChange={setCurrency} options={[["USD", "US dollar"], ["THB", "Thai baht"]]} /></Field>
+        </CardContent></Card>
+
+      <Card><CardHeader><CardTitle>Where the app opens</CardTitle><CardDescription>The first screen after you sign in. The rest is one click away in the sidebar.</CardDescription></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2">{START_SCREENS.map(([id, name, why]) => <button key={id} onClick={() => { setStart(id); localStorage.setItem("ptpub.v1.v3.start", JSON.stringify(id)); toast.success("Start screen saved") }} aria-pressed={start === id} className={cn("rounded-lg border px-3 py-2.5 text-left", start === id ? "border-primary bg-accent" : "border-border hover:bg-accent/50")}><div className="flex items-center gap-2 text-sm font-medium">{name}{start === id && <Check className="size-4 text-primary" />}</div><p className="mt-0.5 text-[12px] text-muted-foreground">{why}</p></button>)}</div>
+          <Separator />
+          <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-sm font-medium">Panels and sidebar</div><p className="text-[12px] text-muted-foreground">Choose which sections appear, and in what order.</p></div><Button variant="outline" onClick={() => navigate("account/layout")}>Open layout</Button></div>
+        </CardContent></Card>
+
+      <Card><CardHeader><CardTitle translate="no">{ui("replayHead")}</CardTitle><CardDescription translate="no">{ui("replayText")}</CardDescription></CardHeader>
+        <CardFooter><Button variant="outline" translate="no" onClick={() => startTour(0)}><CircleHelp />{ui("replay")}</Button></CardFooter></Card>
+
+      <Card><CardHeader><CardTitle>Back to defaults</CardTitle><CardDescription>Restores the theme, text size and spacing only. Holdings, watchlist and layouts are not touched.</CardDescription></CardHeader>
+        <CardFooter><Button variant="outline" onClick={() => { A.setPref("theme", "lekha-teal"); A.setPref("size", "M"); A.setPref("density", "comfortable"); toast.success("Display preferences reset"); setTimeout(() => location.reload(), 300) }}><RefreshCw />Reset display preferences</Button></CardFooter></Card>
     </div></div>)
 }
 
 /* ---------------- Plans & billing ---------------- */
-const PRICE = { demo: "Free", free: "Free", paid: "฿699/mo", premium: "฿1,299/mo" }
-const TIERS = [
-  {
-    id: "demo", name: "Demo", tagline: "Everything unlocked, no account.",
-    body: "Open the full terminal with every panel switched on. The portfolio is a deterministic sample and every price, filing and AI answer is computed from that sample data in this browser — nothing is saved, nothing is sent to an account, and nothing is billed.",
-    points: [
-      ["Whole app, no sign-up", "All portfolio, research, sector, macro, simulation, council and analyst screens are available immediately."],
-      ["Premium AI features included", "Ask the analyst, the daily briefing, the five-perspective council and the 1M-path simulation engine all run in the demo."],
-      ["Sample data, real maths", "Quotes, fundamentals and history come from a fixed simulated dataset; every ratio, weight, P&L and simulation is calculated from it with the same code the paid tiers use."],
-      ["Nothing persisted", "Holdings, layouts and settings stay in this browser only, and reset whenever you clear site data."],
-    ],
-  },
+/* Exactly three subscription plans (Free, Paid, Premium). The Demo is a preview offered separately, never a plan
+   card. Copy mirrors api/_data/entitlements.json and the quotas the server enforces; the server is the authority. */
+const PRICE = { free: "฿0/mo", paid: "฿399/mo", premium: "฿599/mo" }
+const Q = (name, tier) => (QUOTAS[name] || {})[tier]
+const PLANS = [
   {
     id: "free", name: "Free", tagline: "Real market data, your own portfolio.",
-    body: "For tracking a real portfolio with real quotes and filings. Data comes from the free provider tiers, so history is shorter, the symbol cap is lower and the AI researcher has a daily question limit.",
+    body: "For tracking a real portfolio with real quotes and filings. Data comes from the free provider tiers, so history is shorter and holdings are capped.",
     points: [
-      ["Real quotes and filings", "Live-ish US quotes (IEX feed), SEC EDGAR financial statements, FRED macro series and publisher headlines instead of the simulated ones."],
-      ["Up to 20 holdings", "Enough for a personal portfolio. Every lot, cost basis, weight, unrealized P&L and performance chart works as in the paid plans."],
-      ["5 years of history", "Enough for drawdowns, rolling returns and a 1-year simulation; longer studies need Paid or Premium."],
-      ["12 valuation symbols", "DCF and residual-income models for your twelve largest names; the rest of the valuation tab stays locked."],
-      ["30 AI research questions a day", "The cited research agent that retrieves filings and news before answering. The premium analyst, council and 1M-path runs are not included."],
+      ["Real quotes and filings", "US quotes (IEX feed), SEC EDGAR financial statements, FRED macro series and publisher headlines."],
+      ["Up to 20 holdings", "Every lot, cost basis, weight, unrealized P&L, the risk screen and the performance chart."],
+      ["5 years of history", "Enough for drawdowns and rolling returns on your own portfolio."],
+      ["Macro dashboard and regime", "Rates, inflation, the yield curve, the regime model and CNN Fear & Greed."],
+      ["30 AI research questions a day", "The cited research agent that retrieves filings and news before answering. The portfolio analyst, Council and simulations are not included."],
     ],
   },
   {
-    id: "paid", name: "Paid", tagline: "Unlimited tracking and full history.",
-    body: "The working tier: no caps on holdings, symbols or history, and the full indicator and valuation set. It does not include the premium AI analyst, the LLM council or the 1M-path engine — those are Premium.",
+    id: "paid", name: "Paid", tagline: "The full research set and the portfolio analyst.",
+    body: "No caps on holdings or history, every market and sector screen, valuation for every holding, and the AI analyst for your own portfolio. Simulation and the LLM Council are Premium.",
     points: [
-      ["Unlimited holdings and symbols", "Track as many accounts, currencies and positions as you like. Valuation models cover every holding, not just the first twelve."],
-      ["Full price history", "The entire available daily series per symbol, so multi-year drawdowns, rolling beta, factor regressions and volatility studies are usable."],
-      ["All advanced indicators", "Sector breadth internals, relative rotation trails, risk appetite, factor and peer valuation, volatility cones and overbought/oversold bands."],
-      ["Standard stress testing", "Rate-shock, tech-drawdown and recession scenarios on your actual weights, run on the standard path count."],
-      ["30 AI research questions a day", "Same cited research agent as Free, without the sample-size squeeze on portfolio-size limits."],
+      ["Market rotation, intelligence and risk appetite", "Relative strength across sectors and styles, the daily AI-labelled market briefing, XLY/XLP, VIX and VIXEQ."],
+      ["Intrinsic value and deep analysis", "DCF and residual-income models with margin of safety for every holding, plus the one-holding-at-a-time deep analysis."],
+      ["Sector rotation", "Relative rotation graph, leadership quality with earnings revisions, and sector breadth."],
+      ["AI analyst and daily briefing", `Ask about your own positions: ${Q("analystQuestionsPerDay", "paid")} analyst questions and ${Q("briefingGenerationsPerDay", "paid")} new briefing a day, plus 30 cited research questions a day.`],
+      ["Unlimited holdings and full history", "Track every account and position with the full daily series each source serves."],
     ],
   },
   {
-    id: "premium", name: "Premium", tagline: "The analyst, the council and 1M paths.",
-    body: "Everything in Paid plus the AI layer: a portfolio analyst you can question, a daily briefing written from your holdings, the five-perspective LLM council with a CEO synthesis, and the full 1M-path simulation engine.",
+    id: "premium", name: "Premium", tagline: "Everything in Paid, plus simulation and the Council.",
+    body: "Adds the simulation engine and the LLM Council to everything in Paid, with higher AI allowances.",
     points: [
-      ["AI investment analyst", "Ask about positions, concentration, drawdowns or what would change the view, and get an answer computed from your live weights and history — plus a briefing every day."],
-      ["LLM council", "Five independent perspectives on one question, then a CEO synthesis that names the disagreements. Saved as a report you can reread."],
-      ["1B simulation engine", "Up to one million Monte Carlo paths on worker threads: fan chart, terminal distribution, VaR and probability of loss at five horizons."],
-      ["Advanced stress testing", "The full scenario library plus custom shocks on rates, sectors and factors, applied to your real weights."],
-      ["80 AI research questions a day", "Roughly three times the Paid allowance across the analyst, research agent and council."],
-      ["Everything in Paid", "Unlimited holdings, full history, unlimited valuation coverage and every advanced indicator."],
+      ["Simulation engine", "Monte Carlo on your holdings: up to 1,000,000 requested paths per run for up to 25 invested holdings. The completed path count is shown on every result."],
+      ["Stress tests and Projection Lab", "Rate-shock, tech-drawdown and recession scenarios on your weights, and the illustrative Projection Lab."],
+      ["LLM council and saved reports", "One model writes five role-based perspectives and a CEO synthesis in a single structured response, saved as a report you can reread. 10 new reports a day."],
+      ["Higher AI allowances", `${Q("analystQuestionsPerDay", "premium")} analyst questions and ${Q("briefingGenerationsPerDay", "premium")} new briefings a day, and 80 cited research questions a day.`],
+      ["Everything in Paid", "Every market, sector, valuation and analyst feature."],
     ],
   },
 ]
 export function Plans({ item, navigate, me }) {
-  const sess = useSession(), signedIn = !!(sess && sess.access_token) && !isDemo(), cur = signedIn ? (me ? me.tier : "free") : "demo", [busy, setBusy] = useState(null), qs = new URLSearchParams(location.search), billing = qs.get("billing")
-  useEffect(() => { if (billing) { try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {} if (billing === "success") { toast.success("Payment received. Your plan switches on as soon as Stripe confirms it."); setTimeout(() => location.reload(), 4500) } else toast("Checkout cancelled. Nothing was charged.") } }, [])
-  const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
+  const sess = useSession(), demo = isDemo(), signedIn = !!(sess && sess.access_token) && !demo, cur = signedIn ? (me ? me.tier : "free") : null, [busy, setBusy] = useState(null)
+  const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const pp = planParams(plan); if (pp) track("InitiateCheckout", { ...pp, num_items: 1 }); const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   const manage = async () => { setBusy("portal"); try { const j = await A.portal(); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
-    <div className="grid gap-4 md:grid-cols-2">{TIERS.map((t) => <Card key={t.id} className={cn("flex flex-col", cur === t.id && "border-primary", t.id === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}>
+    <div className="grid gap-4 lg:grid-cols-3" data-plan-cards="3">{PLANS.map((t) => <Card key={t.id} data-plan={t.id} className={cn("flex flex-col", cur === t.id && "border-primary", t.id === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}>
       <CardHeader className="gap-2 pb-3">
         <div className="flex items-center justify-between gap-3"><CardTitle className="text-xl">{t.name}</CardTitle>{cur === t.id && <Badge variant="default">Current</Badge>}</div>
         <div className="num text-2xl font-semibold">{PRICE[t.id]}</div>
@@ -140,13 +162,17 @@ export function Plans({ item, navigate, me }) {
       </CardHeader>
       <CardContent className="flex-1 space-y-3 pt-1">
         {t.points.map(([title, detail]) => <div key={title} className="rounded-lg border border-border/60 bg-background/40 p-3">
-          <div className="flex items-start gap-2 text-[13.5px] font-semibold"><Check className={cn("mt-0.5 size-4 shrink-0", t.id === "demo" ? "text-[var(--warn)]" : "text-[var(--up)]")} />{title}</div>
+          <div className="flex items-start gap-2 text-[13.5px] font-semibold"><Check className="mt-0.5 size-4 shrink-0 text-[var(--up)]" />{title}</div>
           <p className="ml-6 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{detail}</p>
         </div>)}
       </CardContent>
-      <CardFooter className="pt-0">{t.id === "demo" ? (cur !== "demo" ? <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button> : <span className="text-[12.5px] text-muted-foreground">You are in the demo. Everything is already unlocked.</span>) : t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
-    {signedIn && me && me.tier !== "free" && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · renews {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button></CardContent></Card>}
-    <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. The demo needs no account; entitlements for paid tiers are enforced on the server.</p></div>)
+      <CardFooter className="pt-0">{t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => cur === "paid" ? manage() : go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
+    <Card className="mt-4" data-demo-preview><CardContent className="flex flex-wrap items-center gap-3 pt-5">
+      <div className="min-w-0 flex-1 text-sm"><div className="font-semibold">Not ready to sign up? Try the demo.</div><p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">The demo is a free preview, not a plan. It shows the Free screens on a sample portfolio with simulated data, needs no account and saves nothing to the service. Paid and Premium features stay locked in the demo.</p></div>
+      {demo ? <span className="text-[12.5px] text-muted-foreground">You are in the demo.</span> : <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button>}
+    </CardContent></Card>
+    {signedIn && me?.can_manage_billing && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · period ends {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button>{["past_due", "unpaid", "incomplete"].includes(me.sub_status) && <Alert className="basis-full"><AlertTriangle className="size-4" /><AlertTitle>Payment not received</AlertTitle><AlertDescription>The latest charge for your subscription failed, so paid features are paused. Update the card in Manage subscription; access returns as soon as Stripe confirms the payment.</AlertDescription></Alert>}</CardContent></Card>}
+    <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. Investment values can fall. Data may be delayed, and projections are hypothetical.</p><ReleasePolicies /></div>)
 }
 
 /* ---------------- Dashboard layout (the classic layout editor, framed) ---------------- */
@@ -165,7 +191,7 @@ export function Layout({ item }) {
 /* ---------------- Knowledge base (pgvector) ---------------- */
 const kbJson = (r) => r.json().catch(() => ({}))
 const kbCall = (body) => (window.PT_AUTH && PT_AUTH.fetch ? PT_AUTH.fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }) : fetch("/api/rag", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).then(kbJson)
-const kbLocalHoldings = () => { try { return JSON.parse(localStorage.getItem((window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.") + "db.holdings/all") || "null") } catch (e) { return null } }
+const kbLocalHoldings = () => { try { return JSON.parse(localStorage.getItem((window.PT_STORAGE_NS) + "db.holdings/all") || "null") } catch (e) { return null } }
 function KnowledgeBase() {
   const demo = isDemo(), [st, set] = useState({ status: "loading" }), [busy, setBusy] = useState(null), did = useRef(false)
   const load = async () => { try { const j = await kbCall({ action: "status" }); set({ status: "ok", data: j }) } catch (e) { set({ status: "error", error: errMsg(e) }) } }

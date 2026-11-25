@@ -26,6 +26,11 @@ The old modular "main" skin (`public/app.js`, `views/`, `core/ui` etc.) was **re
 * Build: `npm run build:app` (runs `scripts/build-app.mjs`, the login build, then the app build). Vercel runs the same. **Generated files are committed**; never hand-edit `public/app/*`, `app/stage.html`, `public/assets/*`, `public/v3/*` (except `public/v3/src/*`).
 * Local dev: `.claude/launch.json` config `pt-restore` (port 3477) or `node scripts/dev-server.mjs 3477` with keys from `~/.config/portfolio-terminal/keys.env`. The dev server `require()`-caches API modules: **restart it after editing `api/`**.
 
+## Quick Tour (first-run onboarding, `app/src/tour/`)
+* `Tour.jsx` (mounted in `App.jsx`) spotlights real DOM, navigates real routes and waits for each target; `steps.js` lists the ten steps and their targets (selector functions, with `data-tour` hooks in `Banner.jsx`, `App.jsx` aside and `pages/company.jsx`); `layout.js` is the pure placement maths (tested in `api/_tour.test.js`); `copy.js` carries the copy in all ten languages (the React shell is outside the classic dictionary pipeline, so the tour has its own; keep every language in step, the test enforces it); `store.js` holds the state.
+* State `not_started | in_progress | completed | skipped` in `ptpub.v1.app.tour`; finishing also writes `prefs.tour` through `PT_UI.setPref`, so it syncs with the account. Auto-starts for anyone who has not completed or skipped it (existing users included) and resumes if interrupted. Replay: sidebar footer, command palette, Account -> Preferences.
+* Adding a step: add it to `STEPS`, add its copy to every language in `copy.js`. A step whose target is missing is skipped, never shown broken.
+
 ## Financial data layer (`api/_fin/`, served at `/api/data/*`)
 
 `FinancialDataService` (`api/_fin/service.js`) is the only thing the UI and the AI agent talk to. Providers never leak their own schemas.
@@ -39,6 +44,9 @@ The old modular "main" skin (`public/app.js`, `views/`, `core/ui` etc.) was **re
 * Observability (`obs.js`): per-provider calls/errors/latency, cache hit rate, tool failures; daily rollup in `pt_av_cache` (`fin/stats/<day>`); admin page **Account → Diagnostics** (`GET /api/data/diag`, admins only) also shows token usage from `pt_costs` and which env vars are set (booleans only).
 * Routes: `search quote quotes history company profile statements facts filings news earnings estimates peers ratios valuation macro fx calc agent diag` (one function, `api/data.js`; Vercel Hobby allows 12 functions, 10 used).
 
+## Plans and feature access (23 Nov 2026)
+Free ฿0 / Paid ฿399 / Premium ฿599; the Demo is a preview, never a plan. The feature matrix is `api/_data/entitlements.json`, read by `api/_tiers.js` (server, authoritative: `requireFeature`, `canUse`, `quota`) and `app/src/lib/entitlements.js` (display). A new restricted screen needs: a route entry in that JSON, `requireFeature` (plus `lockCache` for shared data) on every endpoint it reads, and the dataset in `GATED` in `public/pt-datasource.js` / `LOCKED_*` in `public/pt-demo.js`. Details and limitations: `docs/TIERS.md`, `docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md`. `api/_scripts-parse.test.js` fails if any browser script stops parsing.
+
 ## Account backend additions
 `api/auth/[action].js` gained `email` (confirmation-link email change) and `delete` (password re-check + typed `DELETE`; refuses while a paid subscription is active). **`delete` is not exercised against production**; test with a throwaway account before relying on it.
 
@@ -46,6 +54,7 @@ The old modular "main" skin (`public/app.js`, `views/`, `core/ui` etc.) was **re
 See `docs/INTEGRATION_AUDIT.md`. Headlines: three overlapping price paths and no shared schema; implicit units; cache without policy or hit-rate accounting; `ai/ask` was portfolio-only (no price/news/filings/macro tools, no citations); no provider health view; the contact-less SEC User-Agent in `_edgar.js` (fixed to use `SEC_USER_AGENT`); AV budget shared with existing features. No FMP/Finnhub keys exist locally or (per notes) in production, so everything defaults to free providers.
 
 ## Rules
+* **House style: clean and professional.** This is a tool for financial professionals. No emoji, emoticons, stickers, confetti, mascots or decorative pictographs anywhere: UI copy, status messages, review flags, e-mails, documents and anything a model writes. Use plain text, the existing line icons (`lucide-react`) and typographic symbols (arrows, triangles for price direction, the middle dot). Copy is neutral and precise: no exclamation marks, no jokes, no shouting in capitals. `api/_style.test.js` fails the build if a pictograph appears in the site's code (including `\uXXXX` escapes); `api/_llm.js` tells every model call the same rule and strips pictographs from model output.
 * Do not add a paid provider without checking free tier, limits, display licensing and redistribution (table in the audit). Yahoo is **personal-use only**: replace before a commercial launch.
 * Keys are server-side only. Add new ones to `keys.env.example` (the repo's `.gitignore` ignores `.env*`, so the template file is `keys.env.example`).
 * New UI uses shadcn components in `app/src/components/ui`. Format numbers with `app/src/lib/fmt.js`; show provenance with `SourceTag`; use `DataState`/`ErrorBox`/`EmptyBox` for loading/error/empty.

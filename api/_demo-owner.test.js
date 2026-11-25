@@ -1,0 +1,11 @@
+const assert = require("node:assert/strict");
+const { knowledgeOwner } = require("./_demo-owner");
+const demo = {demo:true};
+const req = value => ({headers:{"x-lekha-demo-key":value}});
+assert.equal(knowledgeOwner(demo, req()), null);
+assert.equal(knowledgeOwner(demo, req("invalid")), null);
+const one = req("a".repeat(64)), two = req("b".repeat(64));
+assert.notEqual(knowledgeOwner(demo, one), knowledgeOwner(demo, two));
+assert.equal(knowledgeOwner(demo, one), knowledgeOwner(demo, one));
+assert.equal(knowledgeOwner({user_id:"fixture-owner"}, one), "fixture-owner");
+console.log("Private demo and account knowledge namespaces passed");

@@ -37,11 +37,12 @@ function docText(key, data) {
   if (/^holdings\//.test(key)) {
     const items = Array.isArray(data.items) ? data.items : [];
     if (!items.length) return null;
-    const total = items.reduce((a, h) => a + (Number(h.qty) || 0) * (Number(h.px) || 0), 0);
-    return `My portfolio holds ${items.length} positions (USD/THB ${data.usdthb || 34.25}, HKD/USD ${data.hkdusd || 0.1282}).\n` + items.map((h) => {
-      const val = (Number(h.qty) || 0) * (Number(h.px) || 0), cost = Number(h.cost) || (Number(h.qty) || 0) * (Number(h.avg) || 0), pnl = cost ? (val - cost) / cost : null;
-      return `${h.tk || h.ticker} (${h.theme || "unclassified"}, ${h.cur || "USD"}): ${h.qty} units at cost ${money(cost)}, last price ${money(h.px)}, value ${money(val)}` +
-        `${total ? ", " + ((val / total) * 100).toFixed(2) + "% of the book" : ""}${pnl != null ? ", unrealized P&L " + pct(pnl) : ""}${h.acct ? ", account " + h.acct : ""}.`;
+    const isCash = (h) => /^cash$/i.test(String(h.tk || h.ticker || "")) || /^cash$/i.test(String(h.theme || "")), px = (h) => (isCash(h) ? 1 : Number(h.px) > 0 ? Number(h.px) : null)   // a missing stored price is "unknown", never $0
+    const total = items.reduce((a, h) => a + (Number(h.qty) || 0) * (px(h) || 0), 0), nPx = items.filter((h) => px(h)).length
+    return `My portfolio holds ${items.length} positions (USD/THB ${data.usdthb || 34.25}, HKD/USD ${data.hkdusd || 0.1282}).${nPx < items.length ? " Live prices are not stored in this document, so market value and unrealized P&L are unknown for positions marked 'price not stored'; do not assume zero." : ""}\n` + items.map((h) => {
+      const p = px(h), val = p ? (Number(h.qty) || 0) * p : null, cost = Number(h.cost) || (Number(h.qty) || 0) * (Number(h.avg) || 0), pnl = cost && val != null ? (val - cost) / cost : null;
+      return `${h.tk || h.ticker} (${h.theme || "unclassified"}, ${h.cur || "USD"}): ${h.qty} units at cost ${money(cost)}, ` + (p ? `last price ${money(p)}, value ${money(val)}` : "price not stored") +
+        `${total && val != null && nPx === items.length ? ", " + ((val / total) * 100).toFixed(2) + "% of the book" : ""}${pnl != null ? ", unrealized P&L " + pct(pnl) : ""}${h.acct ? ", account " + h.acct : ""}.`;
     }).join("\n");
   }
   if (/^val\/settings$/.test(key)) return "My valuation assumptions and discount-rate settings:\n" + Object.entries(data).slice(0, 40).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n");

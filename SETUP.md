@@ -175,7 +175,7 @@ These need keys and will show errors or empty panels until the file is filled in
 - Analyst data, price history, all-time highs (Alpha Vantage, Twelve Data)
 - Billing (Stripe)
 
-The site's plans (Demo / Free / Paid ฿699 / Premium ฿1,299) and exactly what each tier
+The site's plans (Free ฿0 / Paid ฿399 / Premium ฿599, plus the non-billable Demo preview) and exactly what each tier
 gets are documented in **`docs/TIERS.md`**. The two Stripe price ids
 (`STRIPE_PRICE_PAID`, `STRIPE_PRICE_PREMIUM`) only need to be filled in for paid-plan
 checkout; without them checkout returns a friendly "not set up" message and everything

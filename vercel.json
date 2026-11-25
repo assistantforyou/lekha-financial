@@ -1,7 +1,10 @@
 {
-  "buildCommand": "npm run build:app",
+  "buildCommand": "node scripts/check-release-config.mjs --warn-only && npm run build:app",
   "outputDirectory": "public",
   "functions": {
+    "api/ai.js": {
+      "maxDuration": 300
+    },
     "api/**/*.js": {
       "maxDuration": 60
     }
@@ -22,6 +25,10 @@
     {
       "path": "/api/cron/insiders?run=3",
       "schedule": "10 5 * * *"
+    },
+    {
+      "path": "/api/cron/prune",
+      "schedule": "45 4 * * *"
     }
   ],
   "rewrites": [

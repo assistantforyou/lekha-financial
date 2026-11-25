@@ -1,7 +1,8 @@
-// GET /api/ai/briefing — Premium only. A daily personal portfolio briefing built from the user's
+// GET /api/ai/briefing — Paid and Premium (feature "briefing"). A daily personal portfolio briefing built from the user's
 // own snapshot plus the shared cached market briefing/macro; generated at most a few times a day,
 // then served from the shared cache until the day rolls over.
-const { requireTier } = require("../../_auth");
+const { requireFeature } = require("../../_auth");
+const { tierOf, quota } = require("../../_tiers");
 const { cached, cacheGet, rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { userContext, portfolioBlock, marketBlock } = require("./_ctx");
@@ -31,7 +32,7 @@ const clean = (s, n) => String(s || "").replace(/[\u0000-\u001f]/g, " ").trim().
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") return res.status(405).json({ error: "GET only." });
-  const p = await requireTier(req, res, ["demo", "free", "paid", "premium"]);
+  const p = await requireFeature(req, res, "briefing");
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   const uid = p.user_id, day = new Date().toISOString().slice(0, 10);
@@ -41,7 +42,8 @@ module.exports = async (req, res) => {
     const hit = await cacheGet(key);
     if (hit && hit.payload) return res.status(200).json({ cached: true, briefing: hit.payload });
 
-    const ok = await rateHit(`ai/briefgen/${uid}/${Math.floor(Date.now() / DAY)}`, p.demo ? 30 : 3);
+    const limit = quota("briefingGenerationsPerDay", tierOf(p));
+    const ok = limit > 0 && await rateHit(`ai/briefgen/${uid}/${Math.floor(Date.now() / DAY)}`, limit);
     if (!ok) return res.status(429).json({ error: "Briefing refresh limit reached for today; the cached briefing will return tomorrow.", code: "ai_limit" });
 
     const ctx = await userContext(uid);

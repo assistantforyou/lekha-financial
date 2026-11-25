@@ -10,7 +10,7 @@
 // period / currency / unit / filingDate. `kind` is "reported" (taken as published) or "calculated" (our deterministic code).
 
 const num = (v) => { if (v == null || v === "") return null; const n = typeof v === "number" ? v : parseFloat(String(v).replace(/,/g, "")); return Number.isFinite(n) ? n : null; };
-const iso = (t) => { const d = t instanceof Date ? t : new Date(t); return Number.isNaN(+d) ? null : d.toISOString(); };
+const iso = (t) => { if (t == null || t === "") return null; const d = t instanceof Date ? t : new Date(t); return Number.isNaN(+d) ? null : d.toISOString(); };
 
 function meta({ source, asOf = null, kind = "reported", freshness = "delayed", currency = "USD", unit = null, period = null, filingDate = null, delaySec = null, note = null } = {}) {
   return { source, asOf: asOf ? iso(asOf) : null, fetchedAt: new Date().toISOString(), kind, freshness, currency, unit, period, filingDate, delaySec, note };
@@ -23,7 +23,7 @@ function quote(o) {
   const changePercent = o.changePercent != null ? num(o.changePercent) : change != null && prev ? change / prev : null; // fraction
   return { symbol: String(o.symbol || "").toUpperCase(), name: o.name || null, price, change, changePercent, previousClose: prev, open: num(o.open), high: num(o.high), low: num(o.low),
     volume: num(o.volume), marketCap: num(o.marketCap), currency: o.currency || "USD", exchange: o.exchange || null, timestamp: iso(o.timestamp), delay: o.delay != null ? o.delay : null,
-    source: o.source, meta: meta({ source: o.source, asOf: o.timestamp, freshness: o.freshness || "delayed", currency: o.currency || "USD", unit: "USD/share", delaySec: o.delay != null ? o.delay : null }) };
+    source: o.source, meta: meta({ source: o.source, asOf: o.timestamp, freshness: o.freshness || "delayed", currency: o.currency || "USD", unit: (o.currency || "USD") + "/share", delaySec: o.delay != null ? o.delay : null }) };
 }
 
 // One reporting period. Money fields are in plain currency units.
@@ -33,11 +33,11 @@ const STMT_FIELDS = ["revenue", "costOfRevenue", "grossProfit", "operatingIncome
 function statement(o) {
   const out = { company: { symbol: String(o.symbol || "").toUpperCase(), name: o.name || null, cik: o.cik || null }, period: o.period, periodType: o.periodType || "annual",
     fiscalPeriod: o.fiscalPeriod || null, fiscalYear: o.fiscalYear || null, periodStart: o.periodStart || null, periodEnd: o.periodEnd || o.period, filingDate: o.filingDate || null,
-    form: o.form || null, accession: o.accession || null, currency: o.currency || "USD", unit: "USD", source: o.source };
+    form: o.form || null, accession: o.accession || null, currency: o.currency || "USD", unit: o.currency || "USD", source: o.source };
   for (const k of STMT_FIELDS) out[k] = num(o[k]);
   if (out.grossProfit == null && out.revenue != null && out.costOfRevenue != null) out.grossProfit = out.revenue - out.costOfRevenue;
   if (out.freeCashFlow == null && out.operatingCashFlow != null && out.capex != null) out.freeCashFlow = out.operatingCashFlow - Math.abs(out.capex);
-  out.meta = meta({ source: o.source, asOf: o.periodEnd || o.period, kind: "reported", freshness: "historical", currency: out.currency, unit: "USD", period: `${out.fiscalYear || ""}${out.fiscalPeriod ? " " + out.fiscalPeriod : ""}`.trim() || o.period, filingDate: o.filingDate || null });
+  out.meta = meta({ source: o.source, asOf: o.periodEnd || o.period, kind: "reported", freshness: "historical", currency: out.currency, unit: out.currency, period: `${out.fiscalYear || ""}${out.fiscalPeriod ? " " + out.fiscalPeriod : ""}`.trim() || o.period, filingDate: o.filingDate || null });
   return out;
 }
 

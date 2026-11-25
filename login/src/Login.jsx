@@ -1,9 +1,27 @@
+import { ReleasePolicies } from "../../app/src/components/ReleasePolicies"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 const SKEY = "ptpub.v1.session"
+
+// Where to send the visitor once they are signed in. The wall on the analyst
+// passes ?next=<path they came from>; only same-origin paths are accepted so a
+// crafted link cannot bounce someone off-site.
+function nextUrl() {
+  try {
+    let p = new URLSearchParams(location.search).get("next")
+    if (!p) return "/"
+    // The wall encodes it once so the link survives; URLSearchParams already
+    // decoded one layer, so undo a second layer only when it decodes cleanly.
+    try { p = decodeURIComponent(p) } catch (e) {}
+    if (!p.startsWith("/") || p.startsWith("//")) return "/"
+    return p
+  } catch (e) {
+    return "/"
+  }
+}
 
 function session() {
   try {
@@ -38,7 +56,12 @@ async function me(token) {
 }
 
 export default function Login() {
-  const [mode, setMode] = React.useState("login")
+  const [mode, setMode] = React.useState(() => {
+    try {
+      const q = new URLSearchParams(location.search)
+      return q.get("mode") === "signup" || q.get("mode") === "setup" ? "setup" : "login"
+    } catch (e) { return "login" }
+  })
   const [busy, setBusy] = React.useState(false)
   const [msg, setMsg] = React.useState({ text: "", kind: "" })
   const [email, setEmail] = React.useState("")
@@ -57,7 +80,7 @@ export default function Login() {
     const s = session()
     if (s && s.access_token) {
       me(s.access_token).then((u) => {
-        if (u) location.replace("/")
+        if (u) location.replace(nextUrl())
       })
     }
     return () => {
@@ -90,7 +113,7 @@ export default function Login() {
         setMsg({ text: "That session could not be verified.", kind: "err" })
         return
       }
-      location.replace("/")
+      location.replace(nextUrl())
     } catch {
       setMsg({ text: "Could not reach the server.", kind: "err" })
     } finally {
@@ -108,7 +131,7 @@ export default function Login() {
     setBusy(true)
     setMsg({ text: "", kind: "" })
     try {
-      const r = await post("/api/auth/setup", {
+      const r = await post("/api/auth/signup", {
         email: email.trim(),
         password,
       })
@@ -116,9 +139,10 @@ export default function Login() {
         setMsg({ text: r.j?.error || "Could not create the account.", kind: "err" })
         return
       }
+      try { window.ptTrack && window.ptTrack("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB" }, "reg") } catch {}
       if (r.j.session) {
         save(r.j.session)
-        location.replace("/")
+        location.replace(nextUrl())
       } else {
         setMode("login")
         setPassword("")
@@ -225,6 +249,7 @@ export default function Login() {
           </Button>
         </form>
 
+        {setup && <ReleasePolicies />}
         {!setup && (
           <Button
             type="button"

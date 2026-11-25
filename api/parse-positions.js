@@ -1,21 +1,15 @@
 // POST /api/parse-positions  {mime, data (base64) | text}  -> {account, asOf, positions[], cash[], warnings[]}
-// Passcode-gated (header X-PT-Passcode vs env PT_IMPORT_PASSCODE), daily-capped, and stores nothing: the file is
+// Daily-capped (no passcode), and stores nothing: the file is
 // forwarded to the AI provider and the validated result is returned. Statement contents are never logged.
-const crypto = require("crypto");
-const { checkUpload, normalizeResult, maskDigits, MAX_BYTES } = require("./_import");
-const { extractStatement } = require("./_llm");
+const { checkUpload, normalizeResult, crossCheck, fillQuantities, classifyThemes, maskDigits, MAX_BYTES } = require("./_import");
+const { extractVerified, generateJson } = require("./_llm");
 const { rateHit } = require("./_lib");
 
 const DAILY_LIMIT = Number(process.env.IMPORT_DAILY_LIMIT) || 40;
-const sha = (s) => crypto.createHash("sha256").update(String(s)).digest();
-const same = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
 const fail = (res, status, error) => { res.setHeader("Cache-Control", "no-store"); return res.status(status).json({ error }); };
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return fail(res, 405, "Use POST.");
-  const pass = process.env.PT_IMPORT_PASSCODE;
-  if (!pass) return fail(res, 503, "Statement import is not configured on this site.");
-  if (!same(req.headers["x-pt-passcode"] || "", pass)) return fail(res, 401, "Wrong or missing import passcode.");
   const b = req.body && typeof req.body === "object" ? req.body : {};
   let input;
   if (typeof b.text === "string") {
@@ -45,16 +39,22 @@ module.exports = async (req, res) => {
   // daily cap, counted atomically in the database (fails closed)
   const day = new Date().toISOString().slice(0, 10);
   if (!(await rateHit("import/day/" + day, DAILY_LIMIT))) return fail(res, 429, "Daily import limit reached. Try again tomorrow.");
+  const t0 = Date.now();
   try {
-    const raw = await extractStatement(input);
+    const { raw, second } = await extractVerified(input);
+    let out = normalizeResult(raw);
+    if (second) out = crossCheck(out, normalizeResult(second));
+    out = await fillQuantities(out, (syms) => require("./_fin/service").getQuotes(syms));
+    if (Date.now() - t0 < 42000) out = await classifyThemes(out, generateJson); // AI picks each holding's theme; skipped when time is short
     res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json(normalizeResult(raw));
+    return res.status(200).json(out);
   } catch (e) {
-    console.error("parse-positions failed:", /^(upstream_\w+|blocked|empty|not_configured|bad_json|aborted|network|pdf_needs_text)$/.test(e.message) ? e.message : "other"); // fixed codes only, never statement content
+    const code = /^(upstream_\w+|blocked|empty|not_configured|bad_json|aborted|network|pdf_needs_text|sparse)$/.test(e.message) ? e.message : "other"; // fixed codes only, never statement content
+    console.error("parse-positions failed:", code);
     const msg = e.status === 429 ? "The AI service is rate-limited right now. Try again in a minute."
       : e.status === 503 ? "Statement import is not configured on this site."
       : "The AI service could not read this file. Try a clearer PDF or a CSV export.";
-    return fail(res, e.status === 429 || e.status === 503 ? e.status : 502, msg);
+    return fail(res, e.status === 429 || e.status === 503 ? e.status : 502, msg + " (reason: " + code + ")");
   }
 };
 module.exports.config = { api: { bodyParser: { sizeLimit: "4.4mb" } } };

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Verifies the 100 editor-style themes in public/pt-themes.js: counts, ids, hex format, and WCAG contrast
+// Verifies the 100 editor-style themes in public/v2/pt-themes.js: counts, ids, hex format, and WCAG contrast
 // of every derived token on the page, panel and raised-panel backgrounds. Exits 1 on any failure.
 //   node scripts/check-themes.mjs [--verbose]
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
-const T = require(join(dirname(fileURLToPath(import.meta.url)), "..", "public", "pt-themes.js"));
+const T = require(join(dirname(fileURLToPath(import.meta.url)), "..", "public", "v2", "pt-themes.js"));
 const verbose = process.argv.includes("--verbose");
 const fails = [], notes = [];
 const fail = (t, m) => fails.push(`${t.id}: ${m}`);

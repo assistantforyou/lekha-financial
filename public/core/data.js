@@ -209,7 +209,7 @@ export async function loadStreet() {
 /* the saved valuation snapshot (written by the classic terminal's valuation tab), if there is one */
 export function loadValuation() {
   try {
-    const pre = (isDemo() ? "ptpub.v1.demo." : "ptpub.v1.") + "db.valhist/"; let best = null;
+    const pre = (window.PT_STORAGE_NS) + "db.valhist/"; let best = null;
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(pre)) { const v = JSON.parse(localStorage.getItem(k)); if (v && v.items && (!best || String(v.date) > String(best.date))) best = v; } }
     if (best) D.val = Object.fromEntries(Object.entries(best.items).filter(([, v]) => v && v.base > 0).map(([k, v]) => [k, { base: v.base, bear: v.bear, bull: v.bull, px: v.px, date: best.date }]));
   } catch (e) { /* none */ }

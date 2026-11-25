@@ -4,3 +4,6 @@ private-tools/
 node_modules
 .DS_Store
 .playwright-mcp/
+
+# macOS AppleDouble files from external drives
+._*

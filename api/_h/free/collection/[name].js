@@ -1,4 +1,4 @@
-const { requireTier } = require("../../../_auth");
+const { requireFeature, lockCache } = require("../../../_auth");
 const { limitsOf } = require("../../../_tiers");
 const { newsDocs } = require("../../../_news");
 const { etfCollection } = require("../../../_etf");
@@ -10,12 +10,14 @@ const { insiderCollection } = require("../../../_insiders");
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const name = String((req.query && req.query.name) || "");
-  // fund and rev are built from the caller's holdings -> signed-in only.
-  // etf / ins / news are shared market data: public and CDN-cacheable.
-  const PERSONAL = name === "fund" || name === "rev";
+  // fund and rev are built from the caller's holdings; news is the AI-labelled market briefing.
+  // All three feed only Paid/Premium screens, so they need the feature and are never cached publicly.
+  // etf / ins are shared market data: public and CDN-cacheable.
+  const GATED = { fund: ["valuation", "deepAnalysis"], rev: ["sectorRotation", "deepAnalysis"], news: ["marketIntel", "deepAnalysis"] };
   let limits = null;
-  if (PERSONAL) {
-    const p = await requireTier(req, res, ["free", "paid", "premium"]);
+  if (GATED[name]) {
+    lockCache(res);
+    const p = await requireFeature(req, res, GATED[name]);
     if (!p) return;
     limits = limitsOf(p);
   }

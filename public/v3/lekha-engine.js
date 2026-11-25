@@ -10,7 +10,7 @@
      browser's localStorage and syncs to the account when signed in.
    - Entitlement checks are NOT done here: client-side checks are not security.
      They belong on the server that implements PT_DATA_SOURCE. */
-const PT_NS = window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.";
+const PT_NS = window.PT_STORAGE_NS;
 const PT_MARKET_DOCS = new Set(["meta/macro","meta/fredhist","meta/regime_val","meta/factor_val","meta/f13","meta/cftc","meta/tic","meta/vixeq_hist","meta/valin","meta/fgi"]);
 const PT_MARKET_COLS = new Set(["news","fund","rev","etf","ins"]);
 const PT_USER_DOCS = /^(val\/settings|valhist\/[\w-]+|quant\/[\w-]+|snapshots\/[\w-]+|holdings\/[\w-]+)$/;
@@ -1416,13 +1416,16 @@ function renderValTable(){const tb=$("val-tbody");if(!S.vres){tb.innerHTML="";re
   tb.querySelectorAll("tr").forEach(tr=>tr.onclick=()=>{S.vSel=tr.dataset.t;S.vCustom=null;renderValAll(true);$("h-valc").scrollIntoView({behavior:"smooth",block:"start"})});
   document.querySelectorAll("#val-tbl th").forEach(th=>{th.onclick=()=>{const kk=th.dataset.k;S.vTbl=S.vTbl.k===kk?{k:kk,d:-S.vTbl.d}:{k:kk,d:kk==="ticker"?1:-1};renderValTable()};th.setAttribute("aria-sort",th.dataset.k===k?(d>0?"ascending":"descending"):"none")})}
 /* ---- settings ---- */
+const VS_INFO={quality:"Wide-moat, consistently profitable businesses with steady cash flow. The smallest discount is required because the estimate of what they are worth is the most reliable.",growth:"Faster-growing companies whose value depends on profits that have not happened yet. A bigger discount protects you if growth disappoints.",cyclical:"Businesses whose profits swing with the economy (energy, materials, industrials). Today's earnings may be far from normal, so a larger discount is required.",speculative:"Unprofitable, early-stage or low-confidence names. Their value estimate is the least reliable, so the largest discount is required.",erp:"Equity risk premium: the extra yearly return investors demand for owning stocks instead of risk-free Treasuries. A higher number raises the discount rate and lowers every intrinsic value.",sbc:"Stock-based pay is a real cost to shareholders because it dilutes them. Counting it lowers free cash flow and therefore value. Untick to use reported cash flow without that deduction."};
+const vsI=k=>'<span class="vs-i" tabindex="0" role="button" aria-label="About this setting: '+VS_INFO[k]+'" data-tip="'+VS_INFO[k]+'">i</span>';
+if(!document.getElementById("vs-i-css")){const st=document.createElement("style");st.id="vs-i-css";st.textContent=".vs-i{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:6px;border:1px solid var(--line,#555);border-radius:50%;font:italic 600 10px/1 serif;color:var(--muted);cursor:help;position:relative;vertical-align:middle}.vs-i:hover,.vs-i:focus,.vs-i.open{color:var(--fg);border-color:var(--accent)}.vs-i:hover::after,.vs-i:focus::after,.vs-i.open::after{content:attr(data-tip);position:absolute;z-index:30;left:50%;top:calc(100% + 6px);transform:translateX(-30%);width:min(280px,72vw);padding:8px 10px;border:1px solid var(--line,#555);border-radius:8px;background:var(--panel,#111);color:var(--fg);font:400 12px/1.45 system-ui,sans-serif;font-style:normal;text-align:left;white-space:normal;box-shadow:0 6px 20px rgba(0,0,0,.35)}";document.head.appendChild(st)}
 function renderValSettings(){const el=$("val-set");const m=S.vset.mos;
-  el.innerHTML=`<div class="vs-grid">${["quality","growth","cyclical","speculative"].map(k=>`<label><span>${V_CLS[k]}</span><span><input type="number" min="0" max="80" step="1" value="${m[k]}" data-k="${k}"> %</span></label>`).join("")}
-    <label><span>Equity risk premium <span class="muted">(Damodaran implied, 1 Nov 2026: 4.41)</span></span><span><input type="number" min="2" max="9" step="0.01" value="${S.vset.erp}" id="vs-erp"> %</span></label>
-    <label class="chk"><input type="checkbox" id="vs-sbc" ${S.vset.sbc?"checked":""}> Treat stock-based pay as a cost</label></div>
+  el.innerHTML=`<div class="vs-grid">${["quality","growth","cyclical","speculative"].map(k=>`<label><span>${V_CLS[k]}${vsI(k)}</span><span><input type="number" min="0" max="80" step="1" value="${m[k]}" data-k="${k}"> %</span></label>`).join("")}
+    <label><span>Equity risk premium <span class="muted">(Damodaran implied, 1 Nov 2026: 4.41)</span>${vsI("erp")}</span><span><input type="number" min="2" max="9" step="0.01" value="${S.vset.erp}" id="vs-erp"> %</span></label>
+    <label class="chk"><input type="checkbox" id="vs-sbc" ${S.vset.sbc?"checked":""}> Treat stock-based pay as a cost${vsI("sbc")}</label></div>
     <div class="vs-act"><button class="btn" id="vs-save">Save settings</button><span class="note" id="vs-msg">${S.vsetLoaded?"Saved settings loaded.":"Defaults until saved settings load."}</span></div>`;
   const apply=()=>{el.querySelectorAll("input[data-k]").forEach(i=>{const v=+i.value;if(isFinite(v))S.vset.mos[i.dataset.k]=Math.max(0,Math.min(80,v))});const e=+$("vs-erp").value;if(isFinite(e)&&e>0)S.vset.erp=e;S.vset.sbc=$("vs-sbc").checked;S.vCustom=null;computeVal();renderValAll(false,true)};
-  el.querySelectorAll("input").forEach(i=>i.addEventListener("change",apply));
+  el.querySelectorAll("input").forEach(i=>i.addEventListener("change",apply));el.querySelectorAll(".vs-i").forEach(i=>{i.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();const o=i.classList.contains("open");el.querySelectorAll(".vs-i.open").forEach(x=>x.classList.remove("open"));if(!o)i.classList.add("open")});i.addEventListener("keydown",e=>{if(e.key==="Escape")i.classList.remove("open")})});
   $("vs-save").onclick=async()=>{const db=await PT_ADAPTER.use("db");if(!db){$("vs-msg").textContent="Saving is not available in this view.";return}
     try{await db.doc("val/settings").set({...S.vset,updatedAt:new Date().toISOString()});$("vs-msg").textContent="Saved."}catch(e){$("vs-msg").textContent="Could not save: "+(e&&e.code||"error")}}}
 /* ---- valuation history ---- */
@@ -1481,7 +1484,7 @@ function renderPortfolioChart(){
   $("pf-note").textContent="Today's holdings valued at each day's closing prices and today's exchange rates"+(S.snapshots.length?`; amber dots are the ${S.snapshots.length} recorded daily total${S.snapshots.length>1?"s":""}.`:".")}
 function renderMacro(){renderRegime();renderSummary();
   document.querySelectorAll("#mc-range button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.r===S.mcRange)));
-  const m=S.macro;const el=$("mc-chart");if(!m){el.innerHTML='<div class="empty">Rates and inflation: no market-data source connected.</div>';return}
+  const m=S.macro;const el=$("mc-chart");if(!m){el.innerHTML='<div class="empty">Rates and inflation data did not load. It retries automatically; reload the page if it is still empty after a minute.</div>';return}
   const toMs=a=>(a||[]).map(([d,v])=>[Date.parse(d+"T00:00:00Z"),v]);
   const cpi=toMs(m.cpiYoY),ff=toMs(m.fedFunds),ty=toMs(m.tenYear);
   if(S.tnx!=null&&ty.length)ty.push([ptNow(),S.tnx]);
@@ -1652,7 +1655,7 @@ function applyEngine(text,source,at){const p=parseEngine(text);if(!p.rows.length
   db.collection("fund").onSnapshot(sn=>{const m={},ms={};sn.docs.forEach(d=>{const v=d.data();if(v&&v.t){if(v.missing)ms[v.t]=v;else m[v.t]=v}});S.fund=m;S.fundMissing=ms;S.fundLoaded=true;S.fundErr=null;renderValAll()},e=>{S.fundErr=handleErr(e,"fundamentals");S.fundLoaded=true;renderValAll()});
   db.doc("val/settings").onSnapshot(d=>{if(d.exists){const v=d.data();S.vset={...S.vset,...v,mos:{...S.vset.mos,...(v.mos||{})}}}S.vsetLoaded=true;renderValAll()},()=>{S.vsetLoaded=true});
   db.collection("rev").onSnapshot(sn=>{S.revs=sn.docs.map(d=>d.data()).filter(r=>r&&r.date&&r.items).sort((a,b)=>a.date<b.date?1:-1);S.revsLoaded=true;S.rvM=null;renderLead()},()=>{S.revsLoaded=true});
-  db.doc("meta/fredhist").onSnapshot(d=>{if(d.exists){S.fred=d.data();S.fredErr=null}else S.fredErr="Macro history: no market-data source connected.";S.rgM=null;renderRegime()},()=>{S.fredErr="Macro history could not load.";renderRegime()});
+  db.doc("meta/fredhist").onSnapshot(d=>{if(d.exists){S.fred=d.data();S.fredErr=null}else S.fredErr="Macro history did not load. It retries automatically; reload the page if it is still empty after a minute.";S.rgM=null;renderRegime()},()=>{S.fredErr="Macro history could not load.";renderRegime()});
   db.doc("meta/regime_val").onSnapshot(d=>{S.rgVal=d.exists?d.data():null;renderRegime()},()=>{});
   db.doc("meta/factor_val").onSnapshot(d=>{S.factorVal=d.exists?d.data():null;renderLead()},()=>{});
   {const need=new Set(["etf","ins","f13","cftc","tic"]);const done=k=>{need.delete(k);if(!need.size&&!S.flowReady){S.flowReady=true}renderFlow()};
@@ -1674,7 +1677,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   else if(c==="needs_reauth")msg="data source needs re-authentication";
   else if(c==="not_in_manifest"||c==="approval_required")msg="Google Drive not allowed for this page";
   else if(c==="server_unavailable")msg="Google Drive did not answer, retrying";
-  else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else if(c==="rate_limited")msg="too many requests to the "+what+" source; wait a few minutes and retry";else if(c==="no_data")msg="the price source returned nothing for your holdings";else if(/^source_http_/.test(c||""))msg=what+" source error (HTTP "+c.slice(12)+")";else msg="Live "+what+" unavailable";return msg}
+  else if(c==="plan_required")msg="included in the Paid and Premium plans";else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else if(c==="rate_limited")msg="too many requests to the "+what+" source; wait a few minutes and retry";else if(c==="no_data")msg="the price source returned nothing for your holdings";else if(/^source_http_/.test(c||""))msg=what+" source error (HTTP "+c.slice(12)+")";else msg="Live "+what+" unavailable";return msg}
 (async()=>{
   mcp=await PT_ADAPTER.use("mcp");
   if(!mcp){if(S.source!=="snapshot")setPill("st-prices","Prices: live feed unavailable in this view","stale");return}
@@ -1769,7 +1772,7 @@ function phRender(){const st=phLoad();const tb=document.querySelector("#ph-table
   if($("ph-usdthb")&&document.activeElement!==$("ph-usdthb"))$("ph-usdthb").value=st.usdthb||"";
   if($("ph-hkdusd")&&document.activeElement!==$("ph-hkdusd"))$("ph-hkdusd").value=st.hkdusd||"";
   const f=v=>v==null||v===""?"–":Number(v).toLocaleString("en-US",{maximumFractionDigits:4});
-  tb.innerHTML=st.items.map((h,i)=>`<tr><td class="l">${esc(h.acct||"Account")}</td><td class="l"><span class="tk">${esc(h.tk)}</span></td><td class="l muted">${esc(h.tk==="CASH"?"Cash":h.theme)}</td><td>${esc(h.cur)}</td><td>${f(h.qty)}</td><td>${f(h.cost)}</td><td>${h.tk==="CASH"?"–":f(h.px)}</td><td>${f(h.tk==="CASH"?h.qty:(h.px>0?h.qty*h.px:null))}</td><td><button class="btn" data-del="${i}" type="button">Remove</button></td></tr>`).join("");
+  tb.innerHTML=st.items.map((h,i)=>`<tr><td class="l">${esc(h.acct||"Account")}</td><td class="l"><span class="tk">${esc(h.tk)}</span></td><td class="l muted">${esc(h.tk==="CASH"?"Cash":h.theme)}</td><td>${esc(h.cur)}</td><td>${f(h.qty)}</td><td>${f(h.cost)}</td><td>${h.tk==="CASH"?"–":f(h.px)}</td><td>${f(h.tk==="CASH"?h.qty:(h.px>0?h.qty*h.px:null))}</td><td style="white-space:nowrap"><button class="btn" data-edit="${i}" type="button" aria-label="Edit ${esc(h.tk)}">Edit</button> <button class="btn" data-del="${i}" type="button" aria-label="Remove ${esc(h.tk)}">Remove</button></td></tr>`).join("");
   const missFx=st.items.some(h=>phFx(h.cur,st)==null),missPx=st.items.some(h=>h.tk!=="CASH"&&!(h.px>0)&&!(window.PT_LIVE&&window.PT_LIVE[h.tk]));
   const R=phRates(st),fx=window.PT_FX;
   if($("ph-usdthb"))$("ph-usdthb").placeholder=fx&&fx.usdthb?"auto "+fx.usdthb:"";if($("ph-hkdusd"))$("ph-hkdusd").placeholder=fx&&fx.hkdusd?"auto "+fx.hkdusd:"";
@@ -1783,9 +1786,9 @@ function phApply(){const csv=ptHoldingsCsv();phRender();if(window.PT_ONHOLD)wind
     if(!tk||!(qty>=0)){$("ph-msg").textContent="Ticker and quantity are required.";return}
     const cost=d.get("cost")===""?null:parseFloat(d.get("cost")),px=d.get("px")===""?null:parseFloat(d.get("px"));
     const h={acct:String(d.get("acct")||"").trim().slice(0,40),tk,theme:String(d.get("theme")||"Other"),cur:String(d.get("cur")||"USD"),qty,cost:isFinite(cost)?cost:null,px:isFinite(px)?px:null};
-    const i=st.items.findIndex(x=>x.tk===h.tk&&(x.acct||"")===h.acct);if(i>=0)st.items[i]=h;else st.items.push(h);phSave(st);form.reset();phApply()});
-  $("ph-table").addEventListener("click",e=>{const b=e.target.closest("button[data-del]");if(!b)return;const st=phLoad();st.items.splice(Number(b.dataset.del),1);phSave(st);phApply()});
-  $("ph-clear").onclick=()=>{phSave({items:[],usdthb:phLoad().usdthb,hkdusd:phLoad().hkdusd});phApply()};
+    const i=st.items.findIndex(x=>x.tk===h.tk&&(x.acct||"")===h.acct);if(i>=0){const o=st.items[i];if(h.theme==="Other"&&o.theme)h.theme=o.theme;if(h.cur==="USD"&&o.cur)h.cur=o.cur;if(h.px==null&&o.px!=null)h.px=o.px;st.items[i]=h}else st.items.push(h);phSave(st);form.reset();$("ph-msg").textContent="";phApply()});
+  $("ph-table").addEventListener("click",e=>{const ed=e.target.closest("button[data-edit]");if(ed){const h=phLoad().items[Number(ed.dataset.edit)];if(h){const f=form.elements;if(h.theme&&![...f.theme.options].some(o=>o.value===h.theme))f.theme.add(new Option(h.theme,h.theme));f.acct.value=h.acct||"";f.tk.value=h.tk;f.theme.value=h.theme||"Other";f.cur.value=h.cur||"USD";f.qty.value=h.qty;f.cost.value=h.cost==null?"":h.cost;f.px.value=h.px==null?"":h.px;f.qty.focus();form.scrollIntoView({block:"center",behavior:"smooth"});$("ph-msg").textContent="Editing "+h.tk+": change the values, then press Add / update."}return}const b=e.target.closest("button[data-del]");if(!b)return;const st=phLoad();st.items.splice(Number(b.dataset.del),1);phSave(st);phApply()});
+  $("ph-clear").onclick=()=>{if(!confirm("Remove ALL holdings? This cannot be undone."))return;phSave({items:[],usdthb:phLoad().usdthb,hkdusd:phLoad().hkdusd});phApply()};
   for(const [id,k] of [["ph-usdthb","usdthb"],["ph-hkdusd","hkdusd"]])$(id).addEventListener("change",e=>{const st=phLoad();const v=parseFloat(e.target.value);st[k]=v>0?v:null;phSave(st);phApply()});
   phRender()})();
 

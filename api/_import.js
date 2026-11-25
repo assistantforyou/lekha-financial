@@ -13,7 +13,17 @@ const SYSTEM_PROMPT = [
   "total_cost: total cost basis in the position's currency if printed, otherwise null. price: latest price per unit if printed, otherwise null.",
   "currency: ISO code of the position (USD, THB, HKD, or the printed code).",
   "reported_total_value: the statement's printed total portfolio value, if any, with total_currency; otherwise null.",
-  "evidence: the short text snippet (max 100 chars) next to the number that supports the quantity.",
+  "market_value: the line's printed market value in the position's currency, if printed, otherwise null. Copy it exactly; never compute it.",
+  "evidence: REQUIRED for every line: the short text snippet (max 100 chars), copied exactly as printed, that contains the quantity.",
+  "Broker apps show tables with column headers: map each number to the field its HEADER names, never by position alone. Cells often stack two values: e.g. 'Mkt Value/Qty' = market value on top and share count underneath; 'Last/Avg Price' = last price on top and the average cost per share underneath (often prefixed with $).",
+  "avg_cost: average cost per share/unit if printed (e.g. the 'Avg Price' or 'Cost per Share' figure), otherwise null. unrealized_pl: the printed unrealized profit/loss AMOUNT for the line in the position's currency (negative for a loss), otherwise null. Do not use percentages.",
+  "quantity: if the screen shows NO share count for a line (some apps show only holding value), set quantity to null and still return market_value and unrealized_pl; do not guess a quantity.",
+  "Screenshots are often scrolled: ignore any row that is cut off at the top or bottom edge or hidden behind a menu/tab bar unless its ticker AND numbers are fully legible; in that case do NOT return it, and instead add a warning like 'partly hidden row at bottom'. Overlapping screenshots will cover it. Never read text from a logo or icon (e.g. 'iShares', 'Vanguard') as a ticker.",
+  "currency: take it from column headers like 'Holding Value (USD)' / '(THB)' when the line itself shows none. account: the account name printed on screen (e.g. 'Individual Cash'); if none, the broker/app name visible in a logo or watermark (e.g. 'Dime'); otherwise null.",
+  "reported_count: if the screen prints how many holdings there are (e.g. 'My Positions (10)', '10 assets'), return that number, otherwise null.",
+  "The statement may be in any language (English, Thai, Chinese, Japanese, Korean, Spanish, French, Hindi, Vietnamese...). Keep tickers and numbers exactly as printed.",
+  "Numbers: handle thousands separators and decimal commas (1.234,56 = 1234.56), parentheses or a minus sign for negatives, and currency symbols. Output plain numbers.",
+  "Read EVERY page and EVERY row, including the last row of each table and rows split across pages. Never summarise, skip or merge lines. If a line is hard to read, still include it and say so in warnings.",
   "If the document is not a holdings statement, return empty arrays and explain in warnings.",
 ].join("\n");
 
@@ -24,6 +34,7 @@ const RESPONSE_SCHEMA = {
     account: { type: "STRING", nullable: true },
     as_of: { type: "STRING", nullable: true },
     reported_total_value: NUM,
+    reported_count: NUM,
     total_currency: { type: "STRING", nullable: true },
     positions: {
       type: "ARRAY",
@@ -33,17 +44,25 @@ const RESPONSE_SCHEMA = {
           kind: { type: "STRING", enum: ["security", "cash"] },
           ticker: { type: "STRING", nullable: true },
           name: { type: "STRING", nullable: true },
-          quantity: NUM, total_cost: NUM, price: NUM,
+          quantity: NUM, total_cost: NUM, price: NUM, market_value: NUM, avg_cost: NUM, unrealized_pl: NUM,
           currency: { type: "STRING", nullable: true },
           evidence: { type: "STRING", nullable: true },
         },
-        required: ["kind", "quantity"],
+        required: ["kind", "ticker", "name", "quantity", "market_value", "price", "total_cost", "avg_cost", "unrealized_pl", "currency", "evidence"],
       },
     },
     warnings: { type: "ARRAY", items: { type: "STRING" } },
   },
   required: ["positions"],
 };
+
+// A reading is "sparse" when most lines carry neither a quantity nor a market value (a lazy model returning bare tickers).
+function isSparse(raw) {
+  const items = Array.isArray(raw && raw.positions) ? raw.positions.filter((p) => p && p.kind !== "cash") : [];
+  if (!items.length) return false;
+  const useful = items.filter((p) => num(p.quantity) != null || num(p.market_value) != null).length;
+  return useful < items.length / 2;
+}
 
 function checkUpload({ mime, size }) {
   if (!MIME.has(String(mime || "").toLowerCase())) return "Unsupported file type. Use PDF, PNG, JPG, WEBP, CSV or text.";
@@ -59,36 +78,55 @@ const clean = (s, n) => String(s == null ? "" : s).replace(/[\u0000-\u001f]/g, "
 
 // Re-validate whatever the model returned into holdings items {tk, cur, qty, cost, px, name, evidence}.
 function normalizeResult(raw) {
-  const out = { account: maskDigits(clean(raw && raw.account, 40)), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], warnings: [] };
+  const out = { account: maskDigits(clean(raw && raw.account, 40)), asOf: clean(raw && raw.as_of, 20), positions: [], cash: [], unresolved: [], warnings: [], notes: [], reportedCount: (() => { const n = num(raw && raw.reported_count); return n != null && n > 0 && n < 1000 ? Math.round(n) : null; })() };
   const warn = (w) => { if (out.warnings.length < 30) out.warnings.push(clean(w, 200)); };
-  for (const w of Array.isArray(raw && raw.warnings) ? raw.warnings.slice(0, 10) : []) warn(w);
+  for (const w of Array.isArray(raw && raw.warnings) ? raw.warnings.slice(0, 10) : []) { const t = clean(w, 200); if (t) out.notes.push(t); } // the reader's own remarks ("row partly hidden"): shown collapsed, not as problems
   const items = Array.isArray(raw && raw.positions) ? raw.positions.slice(0, 300) : [];
   const merged = new Map();
   for (const p of items) {
     if (!p || typeof p !== "object") continue;
     const qty = num(p.quantity);
     let cur = clean(p.currency, 5).toUpperCase();
-    if (!CURRENCIES.has(cur)) { if (cur) warn(`Currency ${cur} is not supported by the page; set to USD, check the amounts.`); cur = "USD"; }
+    const flags = [];
+    if (!CURRENCIES.has(cur)) { if (cur) { warn(`Currency ${cur} is not supported by the page; set to USD, check the amounts.`); flags.push(`printed currency ${cur}, saved as USD`); } cur = "USD"; }
     if (p.kind === "cash") {
       if (qty === null || qty < 0) { warn("A cash line had no valid amount and was skipped."); continue; }
       out.cash.push({ tk: "CASH", cur, qty, name: clean(p.name, 60), evidence: clean(p.evidence, 100) });
       continue;
     }
-    const tk = clean(p.ticker, 16).toUpperCase().replace(/[^A-Z0-9.\-:]/g, "");
-    if (!tk) { warn(`"${clean(p.name, 50) || "A holding"}" has no ticker symbol; add it manually.`); continue; }
-    if (qty === null || qty < 0) { warn(`${tk}: no valid quantity; skipped.`); continue; }
-    const cost = num(p.total_cost), px = num(p.price);
+    let tk = clean(p.ticker, 16).toUpperCase().replace(/[^A-Z0-9.\-:]/g, "");
+    if (!tk) {
+      warn(`"${clean(p.name, 50) || "A holding"}" has no ticker symbol (quantity ${qty == null ? "?" : qty}${num(p.market_value) != null ? ", value " + num(p.market_value) : ""}); add it manually.`);
+      out.unresolved.push({ name: clean(p.name, 60), qty, mv: num(p.market_value), cur, evidence: clean(p.evidence, 100) });
+      continue;
+    }
+    const mv = num(p.market_value), avg = num(p.avg_cost), pl = num(p.unrealized_pl);
+    const pending = qty === null && mv != null && mv > 0; // value shown, share count not: filled in later from a live price
+    if ((qty === null && !pending) || (qty !== null && qty < 0)) { warn(`${tk}: no valid quantity; skipped.`); continue; }
+    if (pending) flags.push("no share count on this screen");
+    const px = num(p.price);
+    const r2 = (x) => Math.round(x * 100) / 100;
+    let cost = num(p.total_cost);
+    if (cost == null && avg != null && avg >= 0 && qty != null) cost = r2(qty * avg);
+    if (cost == null && mv != null && pl != null && mv - pl >= 0) cost = r2(mv - pl);
+    if (cur === "THB" && !tk.includes(".") && !/^[A-Z]+:/.test(tk)) { flags.push(`saved as ${tk}.BK (Thai exchange symbol)`); tk = tk + ".BK"; }
+    const evidence = clean(p.evidence, 100);
+    if (!evidence) flags.push("no source quote");
+    // the line's own arithmetic: quantity x price should equal the printed market value (catches misread digits)
+    if (qty != null && qty > 0 && px != null && px > 0 && mv != null && mv > 0 && Math.abs(qty * px - mv) > Math.max(mv * 0.005, 0.02)) flags.push(`${qty} x ${px} = ${Math.round(qty * px * 100) / 100}, but the line shows ${mv}`);
     const key = tk + "|" + cur;
     const prev = merged.get(key);
-    if (prev) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; warn(`${tk}: duplicate lines were combined.`); continue; }
-    merged.set(key, { tk, cur, qty, cost: cost != null && cost >= 0 ? cost : null, px: px != null && px > 0 ? px : null, name: clean(p.name, 60), evidence: clean(p.evidence, 100) });
+    if (prev && prev.qty != null && qty != null) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; if (mv != null) prev.mv = (prev.mv || 0) + mv; prev.flags.push("duplicate lines combined"); warn(`${tk}: duplicate lines were combined.`); continue; }
+    if (prev) { warn(`${tk} appears twice with a missing share count; kept the first.`); continue; }
+    merged.set(key, { tk, cur, qty, cost: cost != null && cost >= 0 ? cost : null, px: px != null && px > 0 ? px : null, mv: mv != null && mv >= 0 ? mv : null, name: clean(p.name, 60), evidence, flags });
   }
   out.positions = [...merged.values()];
   // cross-check against the statement's own total when the currencies line up
   const total = num(raw && raw.reported_total_value), tcur = clean(raw && raw.total_currency, 5).toUpperCase() || "USD";
   if (total && total > 0) {
     let sum = 0, complete = true;
-    for (const p of out.positions) { if (p.cur !== tcur) { complete = false; continue; } if (p.px == null) { complete = false; continue; } sum += p.qty * p.px; }
+    for (const p of out.positions) { if (p.cur !== tcur) { complete = false; continue; } const v = p.mv != null ? p.mv : p.px != null ? p.qty * p.px : null; if (v == null) { complete = false; continue; } sum += v; }
+    for (const u of out.unresolved) { if (u.mv != null && u.cur === tcur) sum += u.mv; else complete = false; }
     for (const c of out.cash) { if (c.cur === tcur) sum += c.qty; else complete = false; }
     if (complete && sum > 0 && Math.abs(sum - total) / total > 0.02) warn(`Extracted holdings add up to ${Math.round(sum).toLocaleString("en-US")} but the statement total is ${Math.round(total).toLocaleString("en-US")} ${tcur}: check for missing or wrong lines.`);
     else if (!complete) warn("The statement total could not be fully cross-checked (missing prices or mixed currencies).");
@@ -99,4 +137,101 @@ function normalizeResult(raw) {
 }
 
 
-module.exports = { MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };
+// Compare two independent readings of the same file. Anything one reader saw and the other did not is ADDED (never dropped)
+// and flagged; quantity/price disagreements are flagged on the row. `a` is mutated and returned.
+function crossCheck(a, b) {
+  const push = (w) => { if (a.warnings.length < 40) a.warnings.push(clean(w, 220)); };
+  const ib = new Map(b.positions.map((p) => [p.tk + "|" + p.cur, p])), seen = new Set();
+  let diffs = 0;
+  for (const p of a.positions) {
+    const k = p.tk + "|" + p.cur, q = ib.get(k); seen.add(k);
+    if (!q) { p.flags.push("second reader did not find this line"); diffs++; continue; }
+    if (p.qty == null || q.qty == null) {
+      if (p.mv != null && q.mv != null && Math.abs(p.mv - q.mv) / Math.max(p.mv, 1e-9) > 0.02) { p.flags.push(`readers disagree on value (${p.mv} vs ${q.mv})`); diffs++; }
+      continue;
+    }
+    if (Math.abs(p.qty - q.qty) > Math.max(1e-6, Math.abs(p.qty) * 0.001)) { p.flags.push(`readers disagree on quantity (${p.qty} vs ${q.qty})`); diffs++; }
+    if (p.px != null && q.px != null && Math.abs(p.px - q.px) / p.px > 0.01) { p.flags.push(`readers disagree on price (${p.px} vs ${q.px})`); diffs++; }
+  }
+  for (const [k, q] of ib) {
+    if (seen.has(k)) continue;
+    a.positions.push({ ...q, flags: [...(q.flags || []), "found by the second reader only"] }); diffs++;
+    push(`${q.tk} (${q.qty}) was found by only one of two readers; it is added for you to check.`);
+  }
+  const cash = (r) => r.cash.reduce((m, c) => (m[c.cur] = (m[c.cur] || 0) + c.qty, m), {});
+  const ca = cash(a), cb = cash(b);
+  for (const cur of new Set([...Object.keys(ca), ...Object.keys(cb)])) {
+    const x = ca[cur] || 0, y = cb[cur] || 0;
+    if (Math.abs(x - y) > Math.max(0.01, Math.abs(x) * 0.001)) { diffs++; push(`Cash in ${cur}: the two readers disagree (${x} vs ${y}). Check the cash line.`); }
+  }
+  if (diffs) push(`Two independent readers disagreed on ${diffs} item${diffs > 1 ? "s" : ""}; rows marked with a warning need a look.`);
+  a.crossChecked = true;
+  return a;
+}
+
+// Themes offered by the holdings editor (same list as the Theme select).
+const THEMES = ["Other", "Semiconductors", "Megacap tech", "Photonics", "Software", "Power & energy", "Healthcare", "Financials", "Index fund", "Gold"];
+
+// Characters a vision reader confuses with each other in a small ticker font (C/Q/O/G/0, I/L/1, ...).
+const CONFUSABLE = { C: "QOG", Q: "CO", O: "QC0D", G: "C6", D: "O0", I: "L1J", L: "I1", J: "I", S: "5", B: "8", Z: "2", U: "V", V: "UY", M: "N", N: "M", H: "N", E: "F", F: "E", P: "R", R: "P", A: "4", T: "I", Y: "V", W: "VV" };
+function lookalikes(tk) {
+  const out = new Set();
+  for (let i = 0; i < tk.length && out.size < 16; i++) for (const c of CONFUSABLE[tk[i]] || "") if (c.length === 1) out.add(tk.slice(0, i) + c + tk.slice(i + 1));
+  out.delete(tk);
+  return [...out];
+}
+
+// Rows that show a holding value but no share count (some apps): estimate shares = value / current price. This is approximate
+// (the screenshot's price may differ from now), so the row is flagged. `getQuotes(symbols)` -> {data:{SYM:{price,currency}}}.
+// Also: a missing price is filled from the live quote, and a ticker the reader probably misread (no quote exists for it, and the
+// share count is still unknown) is corrected to a look-alike symbol that does have a quote.
+async function fillQuantities(out, getQuotes) {
+  const need = out.positions.filter((p) => p.qty == null || p.px == null);
+  if (!need.length) return out;
+  const fetchQ = async (syms) => { try { return (await getQuotes(syms)).data || {}; } catch (e) { return {}; } };
+  const ok = (p, quote) => quote && Number(quote.price) > 0 && (!quote.currency || String(quote.currency).toUpperCase() === p.cur);
+  let q = await fetchQ([...new Set(need.map((p) => p.tk))]);
+  const dead = need.filter((p) => p.qty == null && p.mv > 0 && !ok(p, q[p.tk]));
+  if (dead.length) {
+    const variants = new Map(dead.map((p) => [p, lookalikes(p.tk.replace(/\.BK$/, "")).map((v) => (p.tk.endsWith(".BK") ? v + ".BK" : v))]));
+    const vq = await fetchQ([...new Set([...variants.values()].flat())]);
+    for (const [p, vs] of variants) {
+      const hit = vs.find((v) => ok(p, vq[v]));
+      if (!hit) continue;
+      p.flags.push(`ticker read as ${p.tk}; no such symbol, corrected to ${hit}`);
+      out.notes.push(`${p.tk} was corrected to ${hit}.`);
+      q[hit] = vq[hit]; p.tk = hit;
+    }
+  }
+  for (const p of need) {
+    const quote = q[p.tk], good = ok(p, quote), px = good ? Number(quote.price) : null;
+    if (p.qty != null) { if (p.px == null && good) p.px = px; continue; }
+    if (good && p.mv > 0) {
+      p.qty = Math.round((p.mv / px) * 1e5) / 1e5; p.px = px;
+      p.flags.push(`share count estimated: value ${p.mv} / current price ${px}; verify with your broker`);
+    } else {
+      p.flags.push("no share count and no live price: enter the quantity");
+      out.warnings.push(`${p.tk}: the screen shows only a value (${p.mv} ${p.cur}); enter the share count.`);
+    }
+  }
+  return out;
+}
+
+// Ask the model to file each holding under one of the editor's themes. `gen` is llm.generateJson. Never throws: on any failure
+// the rows keep the default theme.
+async function classifyThemes(out, gen) {
+  const rows = out.positions.filter((p) => p.tk);
+  if (!rows.length) return out;
+  const schema = { type: "OBJECT", properties: { themes: { type: "ARRAY", items: { type: "OBJECT", properties: { i: { type: "NUMBER" }, theme: { type: "STRING", enum: THEMES } }, required: ["i", "theme"] } } }, required: ["themes"] };
+  const list = rows.map((p, i) => `${i}. ${p.tk}${p.name ? " (" + p.name + ")" : ""}`).join("\n");
+  try {
+    const ai = await gen({ system: "You file stock and ETF tickers under exactly one theme from this list: " + THEMES.join(", ") + ". Use Index fund for broad market or international index ETFs, Semiconductors for chip makers and storage hardware, Megacap tech for the largest platform companies, Software for software, cybersecurity and data analytics, Power & energy for utilities, power producers and clean energy, Healthcare for pharma, biotech and medical, Financials for banks, insurers and brokers, Gold for gold and gold miners, Photonics for optical and laser firms. Use Other when nothing fits. Return one entry per input line, using its index.", user: list, schema, job: "import-theme", timeoutMs: 9000 });
+    for (const t of Array.isArray(ai && ai.themes) ? ai.themes : []) {
+      const p = rows[Number(t && t.i)];
+      if (p && THEMES.includes(t.theme)) p.theme = t.theme;
+    }
+  } catch (e) { /* keep defaults */ }
+  return out;
+}
+
+module.exports = { isSparse, fillQuantities, classifyThemes, lookalikes, THEMES, crossCheck, MAX_BYTES, MIME, SYSTEM_PROMPT, RESPONSE_SCHEMA, checkUpload, normalizeResult, maskDigits };

@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lekha Financials</title>
+<meta name="facebook-domain-verification" content="i1t0v5zdpgkc9wkg3i8abrin7cg1vo">
 <meta name="claude:viewport-fit-sides" content="cover">
 <script>/* embed mode (?embed=1): the whole classic terminal, minus its own header, inside the v2 / v3 shells */
 try{if(/[?&]embed=1/.test(location.search)){var R=document.documentElement;R.classList.add("embed");var V=JSON.parse(localStorage.getItem("ptpub.v1.v2.prefs")||"null")||{};if(V.theme==="light"||V.theme==="dark")R.setAttribute("data-theme",V.theme);if(V.size)R.style.setProperty("--zoom",{S:.92,M:1,L:1.12,XL:1.25}[V.size]||1)}}catch(e){}</script>
@@ -344,7 +345,7 @@ td{font-size:13.5px}
     </section>
 
     <section class="panel" id="proj-panel" aria-labelledby="h-proj" style="display:none">
-      <div class="ph"><h2 id="h-proj">1B Projection Lab</h2><span class="pill lk-tag">PREMIUM</span></div>
+      <div class="ph"><h2 id="h-proj">Illustrative Projection Lab</h2><span class="pill lk-tag">PREMIUM</span></div>
       <div id="proj-body"></div>
     </section>
 
@@ -531,7 +532,7 @@ td{font-size:13.5px}
      browser's localStorage and syncs to the account when signed in.
    - Entitlement checks are NOT done here: client-side checks are not security.
      They belong on the server that implements PT_DATA_SOURCE. */
-const PT_NS = window.PT_DEMO_MODE ? "ptpub.v1.demo." : "ptpub.v1.";
+const PT_NS = window.PT_STORAGE_NS;
 const PT_MARKET_DOCS = new Set(["meta/macro","meta/fredhist","meta/regime_val","meta/factor_val","meta/f13","meta/cftc","meta/tic","meta/vixeq_hist","meta/valin","meta/fgi"]);
 const PT_MARKET_COLS = new Set(["news","fund","rev","etf","ins"]);
 const PT_USER_DOCS = /^(val\/settings|valhist\/[\w-]+|quant\/[\w-]+|snapshots\/[\w-]+|holdings\/[\w-]+)$/;
@@ -2196,7 +2197,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   else if(c==="needs_reauth")msg="data source needs re-authentication";
   else if(c==="not_in_manifest"||c==="approval_required")msg="Google Drive not allowed for this page";
   else if(c==="server_unavailable")msg="Google Drive did not answer, retrying";
-  else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else if(c==="rate_limited")msg="too many requests to the "+what+" source; wait a few minutes and retry";else if(c==="no_data")msg="the price source returned nothing for your holdings";else if(/^source_http_/.test(c||""))msg=what+" source error (HTTP "+c.slice(12)+")";else msg="Live "+what+" unavailable";return msg}
+  else if(c==="plan_required")msg="included in the Paid and Premium plans";else if(c==="not_configured")msg="no market-data source connected";else if(c==="no_holdings")msg="add holdings to begin";else if(c==="rate_limited")msg="too many requests to the "+what+" source; wait a few minutes and retry";else if(c==="no_data")msg="the price source returned nothing for your holdings";else if(/^source_http_/.test(c||""))msg=what+" source error (HTTP "+c.slice(12)+")";else msg="Live "+what+" unavailable";return msg}
 (async()=>{
   mcp=await PT_ADAPTER.use("mcp");
   if(!mcp){if(S.source!=="snapshot")setPill("st-prices","Prices: live feed unavailable in this view","stale");return}
@@ -2361,30 +2362,11 @@ window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(
     }
   }
   paint();
-  function demoPrompt(){
-    try{
-      if(!window.PT_DEMO_MODE)return;
-      var s=null;try{s=window.PT_AUTH&&PT_AUTH.session()}catch(e){}
-      if(s&&s.access_token)return;
-      if(localStorage.getItem("ptpub.v1.demoPrompt"))return;
-      var real=null;try{real=localStorage.getItem("ptpub.v1.db.holdings/all")}catch(e){}
-      if(!real)return;
-      localStorage.setItem("ptpub.v1.demoPrompt","1");
-      var d=document.createElement("div");d.id="demo-prompt";
-      d.innerHTML="You have holdings saved in this browser. Create a free account to use them with real market data — or keep exploring the simulated demo.";
-      var b1=document.createElement("button");b1.className="btn";b1.textContent="Create free account";
-      b1.onclick=function(){d.remove();var t=document.getElementById("tb-set");if(t)t.click();};
-      var b2=document.createElement("button");b2.className="btn";b2.textContent="Keep exploring demo";
-      b2.onclick=function(){d.remove();};
-      d.appendChild(b1);d.appendChild(b2);document.body.appendChild(d);
-      setTimeout(function(){d.remove()},60000);
-    }catch(e){}
-  }
   document.addEventListener("pt:state-hydrated",paint);
   document.addEventListener("pt:state-synced",paint);
   document.addEventListener("visibilitychange",paint);
   setTimeout(paint,800);setTimeout(paint,2500);setTimeout(paint,5000);
-  setTimeout(demoPrompt,600);
+
 })();
 </script>
 <script>(function(){

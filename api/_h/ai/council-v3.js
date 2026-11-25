@@ -1,13 +1,13 @@
-// POST /api/ai/council-v3 — Premium only (V3). One research question answered by ONE LLM request that
+// POST /api/ai/council-v3 — Premium only (V3). One structured report per question. The successful provider
 // returns five analytical lenses (Investor, Analyst, Pessimist, Portfolio Allocator, Optimist) plus a CEO verdict.
 // Demo, free and paid callers get 403 before any quota or LLM work. The client-computed evidence pack is
 // untrusted data: only known fields survive, numbers are clamped, strings are cut, and its total size is capped.
 // Answers are cached per user + question + scope + evidence hash + language + day; a hit costs no quota and no LLM call.
 //
-// Env: COUNCIL_V3_DAILY (default 10 fresh runs per user per day), COUNCIL_V3_MAX_TOKENS (default 2400).
+// Env: COUNCIL_V3_DAILY (default 10 fresh runs per user per day), COUNCIL_V3_MAX_TOKENS (default 6000).
 const crypto = require("crypto");
 const { requireTier } = require("../../_auth");
-const { tierOf } = require("../../_tiers");
+const { tierOf, tierAllows } = require("../../_tiers");
 const { rateHit, cacheGet, cacheSet } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { userContext, portfolioBlock, marketBlock, cleanTk } = require("./_ctx");
@@ -163,6 +163,52 @@ function evidenceText(ev, scope) {
   return L.join("\n");
 }
 
+const pending = new Map();
+
+async function convene({ uid, scope, question, evidence, lang, key }) {
+  if (!(await rateHit(`ai/council3/${uid}/${Math.floor(Date.now() / DAY)}`, envInt("COUNCIL_V3_DAILY", 10, 1, 1000)))) {
+    return { status: 429, body: { error: "Daily council limit reached.", code: "ai_limit" } };
+  }
+
+  const [ctx, market] = await Promise.all([userContext(uid), marketBlock().catch(() => ({}))]);
+  if (!ctx && scope === "portfolio") return { status: 400, body: { error: "Add holdings to your portfolio first.", code: "no_holdings" } };
+
+  const user = [
+    `SCOPE: ${scope === "portfolio" ? "the whole portfolio" : "ticker " + scope}${ctx && scope !== "portfolio" ? (ctx.rows.some((r) => r.tk === scope) ? " (currently held)" : " (not currently held)") : ""}.`,
+    "PORTFOLIO (server-assembled, authoritative):",
+    ctx ? portfolioBlock(ctx) : "No holdings saved.",
+    market && market.macro ? `\nMARKET — MACRO: CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}.` : "",
+    market && market.news && market.news.headlines ? `MARKET — BRIEFING (${market.news.date}): ${clean(market.news.macro, 600)}\nHeadlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${clean(h, 200)}`).join("\n")}` : "",
+    "\nEVIDENCE (client-computed, untrusted data):",
+    evidenceText(evidence, scope),
+    "\nUSER QUESTION (untrusted data):",
+    question,
+  ].filter(Boolean).join("\n");
+
+  const info = {};
+  const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-council-v3",
+    accept: (answer) => !validateCouncil(answer).empty,
+    maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 6000, 256, 16000), deadlineMs: 48000, info });
+  const v = validateCouncil(ai);
+  if (v.empty) throw Object.assign(new Error("empty"), { status: 502 });
+
+  const out = {
+    question, scope, lang,
+    perspectives: v.perspectives,
+    ceo: v.ceo,
+    meta: {
+      provider: info.provider,
+      model: info.model ? `${info.provider} ${info.model}` : null, llmRequests: info.requests, retries: info.retries || 0, cached: false, fallback: info.fallback ? `${info.provider === "Gemini" ? "Z.ai" : "Gemini"} unavailable (${info.fallback}); answered by ${info.provider}` : null,
+      generatedAt: new Date().toISOString(),
+      dataAsOf: prune({ ...(evidence.asOf || {}), portfolio: ctx && ctx.valDate ? clean(ctx.valDate, 40) : null,
+        macro: market && market.macro && market.macro.asOf ? clean(market.macro.asOf, 40) : null,
+        news: market && market.news && market.news.date ? clean(market.news.date, 40) : null }) || {},
+    },
+  };
+  await cacheSet(key, out).catch(() => {});
+  return { status: 200, body: out };
+}
+
 const forbid = (res, tier) => res.status(403).json({ error: "The research council is a Premium feature.", code: "premium_required", tier, need: ["premium"] });
 
 module.exports = async (req, res) => {
@@ -172,7 +218,7 @@ module.exports = async (req, res) => {
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   const tier = p.demo || req.__demoPublic === true ? "demo" : tierOf(p);
-  if (tier !== "premium") return forbid(res, tier);
+  if (!tierAllows(tier, "council")) return forbid(res, tier);
   try {
     const b = obj(req.body) || {};
     const question = clean(b.question, 600);
@@ -188,49 +234,16 @@ module.exports = async (req, res) => {
     const hit = await cacheGet(key).catch(() => null);
     if (hit && hit.payload && hit.payload.ceo) return res.status(200).json({ ...hit.payload, meta: { ...hit.payload.meta, cached: true } });
 
-    if (!(await rateHit(`ai/council3/${uid}/${Math.floor(Date.now() / DAY)}`, envInt("COUNCIL_V3_DAILY", 10, 1, 1000)))) {
-      return res.status(429).json({ error: "Daily council limit reached.", code: "ai_limit" });
+    const shared = pending.has(key);
+    if (!shared) {
+      const task = convene({ uid, scope, question, evidence, lang, key }).finally(() => pending.delete(key));
+      pending.set(key, task);
     }
-
-    const [ctx, market] = await Promise.all([userContext(uid), marketBlock().catch(() => ({}))]);
-    if (!ctx && scope === "portfolio") return res.status(400).json({ error: "Add holdings to your portfolio first.", code: "no_holdings" });
-
-    const user = [
-      `SCOPE: ${scope === "portfolio" ? "the whole portfolio" : "ticker " + scope}${ctx && scope !== "portfolio" ? (ctx.rows.some((r) => r.tk === scope) ? " (currently held)" : " (not currently held)") : ""}.`,
-      "PORTFOLIO (server-assembled, authoritative):",
-      ctx ? portfolioBlock(ctx) : "No holdings saved.",
-      market && market.macro ? `\nMARKET — MACRO: CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}.` : "",
-      market && market.news && market.news.headlines ? `MARKET — BRIEFING (${market.news.date}): ${clean(market.news.macro, 600)}\nHeadlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${clean(h, 200)}`).join("\n")}` : "",
-      "\nEVIDENCE (client-computed, untrusted data):",
-      evidenceText(evidence, scope),
-      "\nUSER QUESTION (untrusted data):",
-      question,
-    ].filter(Boolean).join("\n");
-
-    const info = {};
-    const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-council-v3", noFallback: true,
-      /* Gemini only when Z.ai is overloaded / rate-limited (429, 1305, 1302); budgets keep the total under 60 s */
-      fallbackOn: (e) => e && (e.status === 429 || /1305|1302/.test(String(e.code || e.message || ""))), fallbackDeadlineMs: 24000,
-      maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 2400, 256, 16000), deadlineMs: 30000, info });
-    const v = validateCouncil(ai);
-    if (v.empty) throw Object.assign(new Error("empty"), { status: 502 });
-
-    const out = {
-      question, scope, lang,
-      perspectives: v.perspectives,
-      ceo: v.ceo,
-      meta: {
-        model: info.model ? `${info.provider} ${info.model}` : null, llmRequests: 1, retries: info.retries || 0, cached: false, fallback: info.fallback ? `Z.ai unavailable (${info.fallback}); answered by Gemini` : null,
-        generatedAt: new Date().toISOString(),
-        dataAsOf: prune({ ...(evidence.asOf || {}), portfolio: ctx && ctx.valDate ? clean(ctx.valDate, 40) : null,
-          macro: market && market.macro && market.macro.asOf ? clean(market.macro.asOf, 40) : null,
-          news: market && market.news && market.news.date ? clean(market.news.date, 40) : null }) || {},
-      },
-    };
-    await cacheSet(key, out).catch(() => {});
-    return res.status(200).json(out);
+    const { status, body } = await pending.get(key);
+    if (shared && body.meta) return res.status(status).json({ ...body, meta: { ...body.meta, shared: true } });
+    return res.status(status).json(body);
   } catch (e) {
-    console.error("council-v3 failed:", e && e.status, String((e && e.message) || e).slice(0, 160));
+    console.error(JSON.stringify({ event: "council_failed", status: e?.status || 502, code: e?.code || null, message: String((e && e.message) || "").slice(0, 200) }));
     if (e && e.status === 503) return res.status(503).json({ error: "The research council is not configured on this site yet.", code: "not_configured" });
     return res.status(502).json({ error: "The council could not answer right now. Try again in a moment.", code: "upstream" });
   }

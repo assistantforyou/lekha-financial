@@ -5,6 +5,7 @@ const calc = require("../../_fin/calc");
 const obs = require("../../_fin/obs");
 const agent = require("../../_fin/agent");
 const { clientId } = require("../../_history");
+const { asOfFor } = require("../../_fin/asof");
 
 const buckets = new Map();
 function limited(req, max) { const id = clientId(req), now = Date.now(); let b = buckets.get(id); if (!b || b.reset < now) { b = { n: 0, reset: now + 60000 }; buckets.set(id, b); if (buckets.size > 3000) buckets.clear(); } return ++b.n > max; }
@@ -21,13 +22,13 @@ function fail(res, e) {
 
 const GET = {
   search: (q) => svc.search(q.q || q.query || "", { limit: num(q.limit, 12) }),
-  quote: (q) => svc.getQuote(q.symbol), history: (q) => svc.getHistoricalPrices(q.symbol, { days: num(q.days, 365) }),
-  company: async (q) => ({ data: await svc.getCompanyBundle(q.symbol), meta: { source: "bundle" } }),
-  profile: (q) => svc.getCompanyProfile(q.symbol), statements: (q) => svc.getFinancialStatements(q.symbol, { type: q.type }), facts: (q) => svc.getCompanyFacts(q.symbol),
-  filings: (q) => svc.getSecFilings(q.symbol, { forms: list(q.forms), limit: num(q.limit, 40) }), news: (q) => svc.getNews({ symbol: q.symbol || null, category: q.category || null, query: q.q || null, limit: num(q.limit, 25) }),
-  earnings: (q) => svc.getEarnings(q.symbol), estimates: (q) => svc.getEstimates(q.symbol), peers: (q) => svc.getPeers(q.symbol), ratios: (q) => svc.getRatios(q.symbol),
-  valuation: (q) => svc.getValuation(q.symbol, { growth: q.growth != null ? num(q.growth) : undefined, discount: q.discount != null ? num(q.discount) : undefined, terminalGrowth: q.terminalGrowth != null ? num(q.terminalGrowth) : undefined, years: q.years ? Math.max(1, Math.min(40, Math.floor(num(q.years, 10)))) : undefined }),
-  macro: (q) => (q.id ? svc.getMacroSeries(q.id, { years: num(q.years, 10) }) : svc.getMacroDashboard()), fx: (q) => svc.getFX(q.base || "USD"),
+  quote: (q, asOf) => svc.getQuote(q.symbol, { asOf }), history: (q, asOf) => svc.getHistoricalPrices(q.symbol, { days: num(q.days, 365), asOf }), movers: (q, asOf) => svc.getMovers({ asOf, sector: q.sector || null }), intraday: (q, asOf) => svc.getIntradayPrices(q.symbol, { days: num(q.days, 1), asOf }),
+  company: async (q, asOf) => ({ data: await svc.getCompanyBundle(q.symbol, { asOf }), meta: { source: "bundle", asOf: asOf || null } }),
+  profile: (q) => svc.getCompanyProfile(q.symbol), statements: (q, asOf) => svc.getFinancialStatements(q.symbol, { type: q.type, asOf }), facts: (q, asOf) => svc.getCompanyFacts(q.symbol, { asOf }),
+  filings: (q, asOf) => svc.getSecFilings(q.symbol, { forms: list(q.forms), limit: num(q.limit, 40), asOf }), news: (q, asOf) => svc.getNews({ symbol: q.symbol || null, category: q.category || null, query: q.q || null, limit: num(q.limit, 25), asOf }),
+  earnings: (q, asOf) => svc.getEarnings(q.symbol, { asOf }), estimates: (q, asOf) => svc.getEstimates(q.symbol, { asOf }), peers: (q) => svc.getPeers(q.symbol), ratios: (q, asOf) => svc.getRatios(q.symbol, { asOf }),
+  valuation: (q, asOf) => svc.getValuation(q.symbol, { asOf, growth: q.growth != null ? num(q.growth) : undefined, discount: q.discount != null ? num(q.discount) : undefined, terminalGrowth: q.terminalGrowth != null ? num(q.terminalGrowth) : undefined, years: q.years ? Math.max(1, Math.min(40, Math.floor(num(q.years, 10)))) : undefined }),
+  macro: (q, asOf) => (q.id ? svc.getMacroSeries(q.id, { years: num(q.years, 10), asOf }) : svc.getMacroDashboard({ asOf })), fx: (q, asOf) => svc.getFX(q.base || "USD", { asOf }),
 };
 const NOSTORE = new Set(["quote"]);
 
@@ -35,13 +36,17 @@ function make(route) {
   if (GET[route]) return async (req, res) => {
     if (req.method !== "GET") return res.status(405).json({ error: "Use GET." });
     if (limited(req, 120)) return res.status(429).json({ error: "Too many requests. Slow down." });
-    try { return ok(res, await GET[route](req.query || {}), NOSTORE.has(route) ? "no-store" : undefined); } catch (e) { return fail(res, e); }
+    try {
+      const asOf = await asOfFor(req);   // demo visitors get the demo cut-off date; the response differs by caller, so shared caches must key on the token
+      res.setHeader("Vary", "Authorization");
+      return ok(res, await GET[route](req.query || {}, asOf), NOSTORE.has(route) ? "no-store" : asOf ? undefined : "private, max-age=30");
+    } catch (e) { return fail(res, e); }
   };
   if (route === "quotes") return async (req, res) => {
     if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
     if (limited(req, 60)) return res.status(429).json({ error: "Too many requests. Slow down." });
     const b = req.body && typeof req.body === "object" ? req.body : {};
-    try { return ok(res, await svc.getQuotes(Array.isArray(b.symbols) ? b.symbols.slice(0, 40) : []), "no-store"); } catch (e) { return fail(res, e); }
+    try { const asOf = await asOfFor(req); res.setHeader("Vary", "Authorization"); return ok(res, await svc.getQuotes(Array.isArray(b.symbols) ? b.symbols.slice(0, 40) : [], { asOf }), "no-store"); } catch (e) { return fail(res, e); }
   };
   if (route === "calc") return async (req, res) => {
     if (req.method !== "POST") return res.status(405).json({ error: "Use POST." });
@@ -55,7 +60,9 @@ function make(route) {
     try { const value = calc[fn](...args); res.setHeader("Cache-Control", "no-store"); return res.status(200).json({ fn, value, kind: "calculated", note: "Deterministic server-side calculation. Rates are fractions." }); } catch (e) { return res.status(400).json({ error: "Invalid inputs." }); }
   };
   if (route === "agent") return require("./agent-route");
+  if (route === "i18n") return require("./i18n");
   if (route === "diag") return require("./diag");
+  if (route === "audit") return require("./audit");
   return null;
 }
-module.exports = { make, routes: [...Object.keys(GET), "quotes", "calc", "agent", "diag"] };
+module.exports = { make, routes: [...Object.keys(GET), "quotes", "calc", "agent", "i18n", "diag", "audit"] };

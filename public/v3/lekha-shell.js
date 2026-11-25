@@ -7,7 +7,7 @@
   var KEY = "ptpub.v1.v3.route", START = "ptpub.v1.v3.start";
   var TABS = {
     portfolio: { name: "My Portfolio", subs: [["overview", "Overview"], ["holdings", "Holdings"], ["risk", "Risk"]] },
-    simulation: { name: "Intelligent Simulation", subs: [["main", "1 Billion Simulation Engine"]] },
+    simulation: { name: "Intelligent Simulation", subs: [["main", "Monte Carlo Engine"]] },
     macro: { name: "Macroeconomics & Indicators", subs: [["regime", "Macro Regime"], ["rotation", "Market Rotation"], ["intel", "Market Intelligence"], ["appetite", "Risk Appetite"]] },
     analysis: { name: "Deep Analysis & Intelligent Council", subs: [["value", "Intrinsic Value & Margin of Safety"], ["deep", "Holdings Deep Analysis"], ["council", "LLM Council"], ["reports", "AI Research Reports"]] },
     sector: { name: "Sector Rotation Intelligence", subs: [["now", "Right Now"], ["rrg", "Rotation Graph"], ["lead", "Leadership Quality"], ["breadth", "Sector Breadth"]] },

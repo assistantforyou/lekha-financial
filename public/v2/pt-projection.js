@@ -1,4 +1,4 @@
-/* LEKHA "1B Projection Lab": a SYNTHETIC, art-directed growth scenario shown below Portfolio performance.
+/* LEKHA "Illustrative Projection Lab": a SYNTHETIC, art-directed growth scenario shown below Portfolio performance.
    Every figure comes from public/pt-projection-data.json: hand-authored design data, not a Monte Carlo run,
    not a forecast, not your portfolio. The "1B" is an interface-scale label; no billion-path job was executed.
    Visibility: Demo + Premium see the panel, Free sees a locked teaser, Paid does not see it.
@@ -35,9 +35,9 @@
       '<div class="lk-lead"><div><div class="lk-eyebrow">PROBABILISTIC INVESTMENT INTELLIGENCE</div>' +
       '<h3 class="lk-h">The future is a distribution.</h3>' +
       '<p class="note">Five portfolio outlook windows. A growth-oriented scenario with illustrative catalysts, pullbacks and recoveries.</p></div>' +
-      '<div class="lk-scale"><small>SIMULATION-SCALE CONCEPT</small><strong>1B</strong><small>ONE BILLION</small></div></div>' +
+      '<div class="lk-scale"><small>SCENARIO WINDOWS</small><strong>5</strong><small>ILLUSTRATIVE</small></div></div>' +
       '<div class="lk-demo"><strong>PREMIUM SCENARIO LAB</strong><span>Illustrative bullish concept starting ' + esc(sfx(fmtDate(D.start_date))) +
-      ' · seven hypothetical catalyst reactions. The displayed 1B scale is a design label: no billion-path computation was run; the curves and scenario figures are art-directed, not measured forecasts. No actual holdings or real market data.</span></div>' +
+      ' · seven hypothetical catalyst reactions. The curves and scenario figures are prebuilt illustrations. No actual holdings or real market data.</span></div>' +
       '<div class="lk-metrics">' +
       '<div class="lk-m"><div class="lk-ml">Starting value</div><div class="lk-mv">' + money(D.starting_portfolio_usd) + '</div><div class="lk-ms">' + esc(sfx(fmtDate(D.start_date).toUpperCase())) + ' · USD</div></div>' +
       '<div class="lk-m"><div class="lk-ml">Base-case projected value</div><div class="lk-mv lk-blue" id="lk-median">—</div><div class="lk-ms" id="lk-median-sub">—</div></div>' +
@@ -62,7 +62,7 @@
       '<div class="tablebox"><table class="lk-table"><thead><tr><th>Horizon</th><th>' + esc(sfx("End date")) + '</th><th>Median</th><th>P05</th><th>P95</th><th>P(gain)</th><th>P(loss &gt;10%)</th><th>Band width*</th></tr></thead><tbody id="lk-body"></tbody></table></div>' +
       '<div class="note">*P10–P90 styling width as a percentage of starting value. All statistics here are illustrative, not calibrated probabilities.</div></div>' +
       '<details class="lk-details"><summary>Concept methodology, dates and limitations</summary>' +
-      '<p><b>1B means a one-billion-path interface concept only.</b> No billion-path job has been executed or benchmarked. The growth-oriented median line, stylized fan bands, summary probabilities, histogram silhouette and seven dated hypothetical catalysts were generated for an aesthetic demonstration. They are not the result of a newly executed Monte Carlo simulation or a validated return model.</p>' +
+      '<p><b>This panel illustrates a hypothetical scenario.</b> No billion-path job has been executed or benchmarked. The growth-oriented median line, stylized fan bands, summary probabilities, histogram silhouette and seven dated hypothetical catalysts were generated for an aesthetic demonstration. They are not the result of a newly executed Monte Carlo simulation or a validated return model.</p>' +
       '<p>Illustrative start: ' + esc(sfx("18 August 2026")) + '. The five calendar windows end 8 September 2026 (21 days), 18 September 2026 (one month), 18 November 2026 (three months), 18 February 2027 (six months) and 18 August 2027 (one year) ' + esc(SFX) + '. Weekdays approximate sessions without a holiday calendar. Event labels and impacts are hypothetical market-narrative examples, not verified central-bank meeting schedules, reported earnings or factual price reactions.</p>' +
       '<p>The 21-day view has the densest near-term visual scale, not empirically higher predictive accuracy. Percentile-style bands and displayed probabilities are design scaffolding, not observed frequencies, calibrated confidence bounds or investment forecasts. Not financial advice. Do not describe the 1B label as a completed computation.</p>' +
       '<div class="lk-btns"><button type="button" class="btn" id="lk-export-json">Export JSON data</button><button type="button" class="btn" id="lk-export-svg">Export chart SVG</button></div></details></div>';
@@ -275,15 +275,21 @@
       D = j; b.innerHTML = markup(); root = b.querySelector(".lk"); selected = "21D"; bind(); update();
     }).catch(function () { b.innerHTML = '<div class="empty">The projection demo could not be loaded.</div>'; });
   }
+  var LOCK_TIER = null;
   function mountLocked() {
     var b = body(); if (!b) return;
     b.innerHTML = '<div class="lk-locked"><svg class="lk-ghost" viewBox="0 0 600 220" aria-hidden="true" preserveAspectRatio="none"><path d="M0 190 C60 180 90 170 140 160 S230 150 280 120 S380 110 430 70 S540 40 600 20 L600 220 L0 220 Z" fill="var(--chart)" fill-opacity=".18"/><path d="M0 190 C60 180 90 170 140 160 S230 150 280 120 S380 110 430 70 S540 40 600 20" fill="none" stroke="var(--chart)" stroke-width="4"/></svg>' +
-      '<div class="lk-lock-c"><div class="lk-lock-t">1B Projection Lab · Premium</div><p class="note">An interactive growth-scenario lab with five horizons, scenario bands, dated catalysts and an outcome silhouette. Available on the Premium plan.</p>' +
-      '<button class="btn pri" type="button" id="lk-upgrade">Go Premium — ฿1,299/month</button><div class="set-msg" id="lk-lock-msg" role="status"></div></div></div>';
+      '<div class="lk-lock-c"><div class="lk-lock-t">Illustrative Projection Lab · Premium</div><p class="note">An interactive growth-scenario lab with five horizons, scenario bands, dated catalysts and an outcome silhouette. Available on the Premium plan.</p>' +
+      '<button class="btn pri" type="button" id="lk-upgrade">Go Premium — ฿599/month</button><div class="set-msg" id="lk-lock-msg" role="status"></div></div></div>';
     var up = document.getElementById("lk-upgrade");
     up.onclick = function () {
-      var msg = document.getElementById("lk-lock-msg"); msg.textContent = "Opening secure checkout…";
-      window.PT_AUTH.fetch("/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: "premium" }) })
+      var msg = document.getElementById("lk-lock-msg");
+      var s = window.PT_AUTH && PT_AUTH.session && PT_AUTH.session();
+      if (window.PT_DEMO_MODE || !(s && s.access_token)) { msg.textContent = "Create an account or sign in first, then choose Premium."; return; }
+      /* an existing Paid subscriber switches plans in the billing portal; Checkout refuses a second subscription */
+      var portal = LOCK_TIER === "paid";
+      msg.textContent = portal ? "Opening the billing portal…" : "Opening secure checkout…";
+      window.PT_AUTH.fetch(portal ? "/api/billing/portal" : "/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan: "premium" }) })
         .then(function (r) { return r.json(); }).then(function (j) { if (j && j.url) location.href = j.url; else msg.textContent = (j && j.error) || "Checkout is not available right now."; })
         .catch(function () { msg.textContent = "Checkout is not available right now."; });
     };
@@ -291,9 +297,10 @@
   function apply() {
     var sec = section(); if (!sec) return Promise.resolve();
     return tierNow().then(function (tier) {
-      if (tier === "demo" || tier === "premium") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; return mountFull(); }
-      if (tier === "free") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; mountLocked(); return; }
-      sec.remove(); /* Paid sees nothing; unknown tier (sign-in lookup failed) shows nothing rather than a wrong state */
+      /* Premium feature (simulation): demo, Free and Paid see the locked card; unknown tier (sign-in lookup failed) shows nothing */
+      if (tier === "premium" || tier === "demo") { sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; return mountFull(); }
+      if (tier === "free" || tier === "paid") { LOCK_TIER = tier; sec.style.display = ""; sec.querySelector(".lk-tag").textContent = "PREMIUM"; mountLocked(); return; }
+      sec.remove();
     });
   }
   window.PT_PROJ = { apply: apply };

@@ -1,4 +1,4 @@
-/* LEKHA V3 Intelligent Simulation ("LEKHA 1 BILLION SIMULATION ENGINE" is the product name).
+/* LEKHA V3 Intelligent Simulation ("LEKHA MONTE CARLO ENGINE" is the product name).
    Real Monte Carlo from core/engine.js via sim-runner.js. Each run is capped at 1,000,000 paths and the UI always shows the
    number of paths actually completed. Inputs come from the classic engine state (PT_APP.S): no second data fetch. */
 import { run, MAX_PATHS, MODEL_VERSION, DEFAULT_HORIZONS } from "./sim-runner.js";
@@ -35,16 +35,18 @@ function riskOf(sym, mkt, S) {
 }
 /* one-year beta / volatility / stock-specific volatility vs the S&P 500, from the page's price history */
 export function tickerRisk(sym) {
-  const S = window.PT_APP && PT_APP.S, spx = S && S.hist && S.hist[SPX] && S.hist[SPX].D; if (!spx) return null;
+  const S = window.PT_APP && PT_APP.S, spx = S && S.hist && S.hist[SPX] && S.hist[SPX].D; if (!spx?.length) return null;
   return riskOf(sym, rets(spx, spx[spx.length - 1][0] - 370 * DAY), S);
 }
 export function buildSimInput() {
   const A = window.PT_APP, S = A && A.S; if (!S || !A.lekha) return { err: "The portfolio engine is still loading." };
   const { list, total } = A.lekha.aggregate();
-  const inv = list.filter((a) => a.ticker !== "CASH" && a.value > 0).sort((a, b) => b.value - a.value).slice(0, 25);
+  const inv = list.filter((a) => a.ticker !== "CASH" && a.value > 0).sort((a, b) => b.value - a.value);
+  if (inv.length > 25) return { err: "This simulation supports up to 25 invested holdings.", retryable: false };
   if (!inv.length || !(total > 0)) return { err: "Add holdings in My Portfolio to run a projection." };
-  const spx = S.hist && S.hist[SPX] && S.hist[SPX].D; if (!spx) return { err: "Waiting for price history…" };
+  const spx = S.hist && S.hist[SPX] && S.hist[SPX].D; if (!spx?.length) return { err: "Waiting for price history…" };
   const mkt = rets(spx, spx[spx.length - 1][0] - 370 * DAY), mv = [...mkt.values()], mm = mv.reduce((s, v) => s + v, 0) / mv.length;
+  if (mv.length < 2) return { err: "Insufficient benchmark return history." };
   const mvol = Math.sqrt(mv.reduce((s, v) => s + (v - mm) ** 2, 0) / (mv.length - 1) * 252);
   const vres = S.vres && S.vres.res, missing = [];
   const assets = inv.map((a) => {
@@ -73,7 +75,7 @@ const demo = () => !!window.PT_DEMO_MODE;
 
 function shell() {
   host.innerHTML = `<section class="panel sim">
-  <div class="sim-head"><div><p class="sim-eyebrow">LEKHA 1 BILLION SIMULATION ENGINE</p><h2 class="sim-title">LEKHA INTELLIGENT SIMULATION</h2>
+  <div class="sim-head"><div><p class="sim-eyebrow">LEKHA MONTE CARLO ENGINE</p><h2 class="sim-title">LEKHA INTELLIGENT SIMULATION</h2>
   <p class="sim-sub">Probability-driven portfolio projections, scenario analysis, and forward-looking risk intelligence.</p></div>
   <div class="sim-tags" id="sim-tags"></div></div>
   <div class="sim-ctrls"><div class="seg" id="sim-hz" role="group" aria-label="Projection horizon">${HZ.map((h) => `<button data-h="${h}">${HZ_LABEL[h]}</button>`).join("")}</div>
@@ -112,7 +114,7 @@ function progress() {
 /* compact summary other modules (Council evidence) can use — always carries the true completed count */
 export function simSummary() {
   if (!st.res) return null; const h = st.res.summary.horizons["1Y"] || {};
-  return { engine: "LEKHA 1 Billion Simulation Engine", completedPaths: st.res.completedPaths, requestedPaths: st.res.requestedPaths, stopped: st.res.stopped, modelVersion: st.res.modelVersion, at: st.res.at,
+  return { engine: "LEKHA Monte Carlo Engine", completedPaths: st.res.completedPaths, requestedPaths: st.res.requestedPaths, stopped: st.res.stopped, modelVersion: st.res.modelVersion, at: st.res.at,
     horizon: "1Y", p5: h.p5, p50: h.p50, p95: h.p95, mean: h.mean, pGain: h.pGain, pLoss10: h.pLoss10, cvar5: h.cvar5, ddMedian: h.dd && h.dd.median, dd95: h.dd && h.dd.p95 };
 }
 
@@ -183,6 +185,10 @@ function paint() {
   seg(); const out = host.querySelector("#sim-out"); if (!out) return;
   if (st.err && !st.res) { out.innerHTML = `<div class="empty">${esc(st.err)}</div>`; return; }
   if (!st.res) { out.innerHTML = `<div class="empty">Choose a horizon and path count, then run. Everything is computed in your browser from your holdings, their price history and the live 10-year yield.</div>`; return; }
+  if (!st.res.completedPaths) {
+    out.innerHTML = '<div class="empty">Simulation stopped. 0 paths completed. Run again to calculate results.</div>';
+    return;
+  }
   const r = st.res, s = r.summary, o = s.horizons[st.hz], sv = st.meta.start, hIdx = DEFAULT_HORIZONS.findIndex(([c]) => c === st.hz);
   const kpi = (l, v, sub, cls = "") => `<div class="kpi"><span class="lbl">${l}</span><span class="val ${cls}">${v}</span><span class="sub">${sub}</span></div>`;
   const tone = (x) => (x > 0 ? "up" : x < 0 ? "down" : "");
@@ -216,11 +222,18 @@ function paint() {
 }
 function dl(name, type, text) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 
-export function mount(el) {
-  host = el; shell(); paint();
+export async function mount(el) {
+  host = el;
+  const account = await window.PT_TIER_READY();
+  /* Premium only (feature "simulation"); the demo runs it on the simulated sample portfolio */
+  if (!demo() && !(account && account.features && account.features.simulation === true)) {
+    host.innerHTML = '<section class="panel"><h2>Monte Carlo simulations</h2><p>Portfolio simulations are included in the Premium plan (฿599/month).</p><a href="/#/account/plans">Compare plans</a></section>';
+    return;
+  }
+  shell(); paint();
   /* first visit: one 100K run once the portfolio is priced (local computation only, no network) */
   const tryAuto = () => { if (st.auto || st.job || st.res) return; const r = window.LEKHA_SHELL && LEKHA_SHELL.route(); if (!r || r.t !== "simulation") return;
-    const b = buildSimInput(); if (b.err) { st.err = b.err; paint(); return setTimeout(tryAuto, 1500); } st.auto = true; start(); };
+    const b = buildSimInput(); if (b.err) { st.err = b.err; paint(); if (b.retryable !== false) setTimeout(tryAuto, 1500); return; } st.auto = true; start(); };
   if (window.LEKHA_SHELL) LEKHA_SHELL.onRoute((r) => { if (r.t === "simulation") tryAuto(); });
   tryAuto();
 }

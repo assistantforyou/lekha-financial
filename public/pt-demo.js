@@ -60,6 +60,11 @@
     { tk: "PTT.BK", acct: "Demo Bank", theme: "Energy", cur: "THB", qty: 200, avg: 32.10, px: 34.25, dr: 1.8e-4, vo: 0.009, be: 0.7 },
     { tk: "JNJ", acct: "Demo Retirement", theme: "Health Care", cur: "USD", qty: 25, avg: 162.3, px: 154.9, dr: -0.5e-4, vo: 0.008, be: 0.55 },
     { tk: "PEP", acct: "Demo Retirement", theme: "Consumer staples", cur: "USD", qty: 30, avg: 142.8, px: 158.2, dr: 3.0e-4, vo: 0.007, be: 0.5 },
+    /* Thai listings (SET), held in a baht account so the demo shows a second market and a second currency. */
+    { tk: "CPALL.BK", acct: "Demo Bangkok", theme: "Thai consumer", cur: "THB", qty: 400, avg: 58.50, px: 62.75, dr: 2.0e-4, vo: 0.010, be: 0.65 },
+    { tk: "SCB.BK", acct: "Demo Bangkok", theme: "Thai banks", cur: "THB", qty: 300, avg: 118.0, px: 127.5, dr: 2.6e-4, vo: 0.009, be: 0.95 },
+    { tk: "AOT.BK", acct: "Demo Bangkok", theme: "Thai transport", cur: "THB", qty: 500, avg: 62.00, px: 55.25, dr: -1.2e-4, vo: 0.012, be: 0.9 },
+    { tk: "DELTA.BK", acct: "Demo Bangkok", theme: "Thai electronics", cur: "THB", qty: 100, avg: 780.0, px: 942.0, dr: 5.8e-4, vo: 0.017, be: 1.3 },
     { tk: "CASH", acct: "Demo Brokerage", theme: "Cash", cur: "USD", qty: 12000, avg: 1, px: 1, dr: 0, vo: 0, be: 0 }
   ];
   var UNIVERSE = {
@@ -328,7 +333,14 @@
     JPM: { cls: "cyclical", sector: "Financials", eps: 18.7, pe: 13, sh: 2790, fc: { g: 0.06 } },
     XOM: { cls: "cyclical", sector: "Energy", eps: 8.1, pe: 14, sh: 4340, fc: { g: 0.03 } },
     JNJ: { cls: "quality", sector: "Health Care", eps: 9.96, pe: 15, sh: 2410, fc: { g: 0.045 } },
-    PEP: { cls: "quality", sector: "Consumer Staples", eps: 8.16, pe: 19, sh: 1370, fc: { g: 0.055 } }
+    PEP: { cls: "quality", sector: "Consumer Staples", eps: 8.16, pe: 19, sh: 1370, fc: { g: 0.055 } },
+    /* SET listings. Simulated fundamentals in baht, so the demo can value them the way the real terminal
+       values any listing it has statements for. ps is the simulated price-to-sales the history is scaled to. */
+    "PTT.BK": { cls: "cyclical", sector: "Energy", eps: 3.0, pe: 11, sh: 28563, ps: 4.0, cur: "THB", fc: { g: 0.02 } },
+    "CPALL.BK": { cls: "quality", sector: "Consumer Staples", eps: 2.4, pe: 26, sh: 8983, ps: 2.9, cur: "THB", fc: { g: 0.06 } },
+    "SCB.BK": { cls: "quality", sector: "Financials", eps: 12.6, pe: 10, sh: 3367, ps: 2.4, cur: "THB", fc: { g: 0.04 } },
+    "AOT.BK": { cls: "quality", sector: "Industrials", eps: 1.9, pe: 29, sh: 14286, ps: 2.1, cur: "THB", fc: { g: 0.09 } },
+    "DELTA.BK": { cls: "growth", sector: "Information Technology", eps: 20, pe: 47, sh: 1247, ps: 1.4, cur: "THB", fc: { g: 0.14 } }
   };
   function betaVsSpy(sym) {
     var wk = weeklyFrom(seriesOf(sym)).slice(-104), sp = weeklyFrom(seriesOf("SPY")).slice(-104);
@@ -346,14 +358,16 @@
     holdingSymbols().forEach(function (s) {
       var t = holdingMap()[s], px = closesOf(s)[closesOf(s).length - 1];
       var f = FUND_CFG[t];
-      if (t === "SMH") { lines.push("SMH," + px + "," + Math.round(px * 505e6 / 1e3) + ",505000000,1.25,,,USD,ETF"); return; }
-      if (/\.BK$|\.HK$/.test(s)) return;
+      if (t === "SMH") { lines.push("SMH," + px + "," + Math.round(px * 505e6) + ",505000000,1.25,,,USD,ETF"); return; }
+      // A listing is only skipped when the demo has no fundamentals for it. SET names in FUND_CFG carry
+      // simulated baht statements, so they are valued like any other holding.
+      if (!f && /\.BK$|\.HK$/.test(s)) return;
       if (!f) {
         var r = mulberry32(hash("val:" + t)), sh = Math.round((300 + r() * 8000)) * 1e6, pe = Math.round(8 + r() * 40);
-        lines.push([t, px.toFixed(2), Math.round(px * sh / 1e6), sh, (0.7 + r() * 1.3).toFixed(3), pe, (px / pe).toFixed(2), "USD", "Common Stock"].join(","));
+        lines.push([t, px.toFixed(2), Math.round(px * sh), sh, (0.7 + r() * 1.3).toFixed(3), pe, (px / pe).toFixed(2), "USD", "Common Stock"].join(","));
         return;
       }
-      lines.push([t, px.toFixed(2), Math.round(px * f.sh * 1e6 / 1e6), f.sh * 1e6, betaVsSpy(s).toFixed(3), f.pe, f.eps, "USD", "Common Stock"].join(","));
+      lines.push([t, px.toFixed(2), Math.round(px * f.sh * 1e6), f.sh * 1e6, betaVsSpy(s).toFixed(3), f.pe, f.eps, f.cur || "USD", "Common Stock"].join(","));
     });
     lines.push("UPDATED," + at);
     return lines.join("\n");
@@ -383,12 +397,17 @@
       da.push(Math.round(r * 0.035)); sbc.push(Math.round(r * (0.02 + rnd() * 0.05)));
       fcf.push(Math.round(r * (0.14 + rnd() * 0.14)));
     }
+    /* Scale the simulated history to the demo market cap (a 2025 price/sales around 2.6, which puts most of the demo values near its demo prices) so the
+       values in the demo are plausible next to the demo prices instead of a million times off. */
+    var pxc = closesOf(t), pxv = pxc && pxc.length ? pxc[pxc.length - 1] : 100;
+    var revNow = (cfg.sh * 1e6 * pxv) / (cfg.ps || 2.6) / 1e6, k = revNow / (rev[rev.length - 1] || 1);
+    for (var i = 0; i < rev.length; i++) { rev[i] = Math.round(rev[i] * k); ocf[i] = Math.round(ocf[i] * k); da[i] = Math.round(da[i] * k); sbc[i] = Math.round(sbc[i] * k); fcf[i] = Math.round(fcf[i] * k); }
     var rev3 = rev.slice(-3), g = +(Math.pow(rev3[2] / rev3[0], 1 / 2) - 1).toFixed(3);
     return {
       t: t, method: "dcf", cls: cfg.cls, clsAuto: true, sector: cfg.sector, ai: false,
-      cur: "USD", bsCur: "USD", basis: "fcf", shareMode: "mc", asOf: daysAgoIso(4),
+      cur: cfg.cur || "USD", bsCur: cfg.bsCur || cfg.cur || "USD", basis: "fcf", shareMode: "mc", asOf: daysAgoIso(4),
       cols: cols, ends: ends, rev: rev, fcf: fcf, ocf: ocf, da: da, sbc: sbc,
-      debt: Math.round(base * (0.2 + rnd() * 0.5)), netcash: Math.round(base * (rnd() * 0.8 - 0.2)),
+      debt: Math.round(rev[0] * (0.2 + rnd() * 0.5)), netcash: Math.round(rev[0] * (rnd() * 0.8 - 0.2)),
       rev_ttm: rev[6], fcf_ttm: fcf[6],
       fc: { fy: "FY2025", end: "2025-12-31", rev: rev3, g: g, glh: 1, eps: cfg.eps, pt: cfg.pe, basis: "trailing", note: "Simulated consensus for the demo — not a real estimate." },
       src: { cf: "Simulated XBRL extract (demo)", bs: "Simulated balance sheet (demo)" }
@@ -408,11 +427,12 @@
         });
         return;
       }
-      if (/\.BK$|\.HK$/.test(s)) {
-        out.push({ id: s, data: { t: t, missing: "Non-US listing: the demo cannot value " + t + " (the real terminal values US-listed holdings from SEC filings).", ai: false } });
+      var thaiCfg = FUND_CFG[t];
+      if (!thaiCfg && /\.BK$|\.HK$/.test(s)) {
+        out.push({ id: s, data: { t: t, missing: "Non-US listing: the demo has no simulated statements for " + t + ", so it quotes it and shows it in the portfolio, risk and sector screens, but does not publish an intrinsic value for it.", ai: false } });
         return;
       }
-      var cfg = FUND_CFG[t];
+      var cfg = thaiCfg;
       if (cfg) out.push({ id: s, data: fundDoc(t, cfg) });
       else {
         var r = mulberry32(hash("fund:gen:" + t));
@@ -453,7 +473,10 @@
       { h: "Rate-cut odds firm after soft simulated inflation print", imp: "bullish", tks: ["SPY", "XLK"], bull: "Softer simulated CPI lifts rate-sensitive names.", bear: "One simulated print is not a trend; the demo macro series is invented." },
       { h: "Electric-vehicle maker misses simulated delivery estimates", imp: "bearish", tks: ["TSLA"], bull: "Sentiment washout could mark a floor for the demo's worst performer.", bear: "The demo position sits 35% underwater and well below its high." },
       { h: "Defensive staples and healthcare lag as simulated risk appetite builds", imp: "mixed", tks: ["XLP", "XLV", "PEP", "JNJ"], bull: "Rotation into cyclicals usually leaves staples cheap.", bear: "The demo's defensive sleeve drags on relative performance today." },
-      { h: "Energy majors steady as simulated crude holds its range", imp: "mixed", tks: ["XOM", "PTT.BK", "XLE"], bull: "Income exposure holds its value.", bear: "Simulated crude offers no momentum either way." }
+      { h: "Energy majors steady as simulated crude holds its range", imp: "mixed", tks: ["XOM", "PTT.BK", "XLE"], bull: "Income exposure holds its value.", bear: "Simulated crude offers no momentum either way." },
+      { h: "Thai banks and retailers report simulated resilient domestic demand", imp: "bullish", tks: ["SCB.BK", "CPALL.BK"], bull: "Domestic consumption and net interest margin both hold in the simulated quarter.", bear: "Household debt and a slow simulated tourist recovery cap the upside." },
+      { h: "Simulated tourist arrivals lift Thai airport and travel names", imp: "bullish", tks: ["AOT.BK"], bull: "Passenger volumes recover in the simulated data set.", bear: "The demo's AOT position is still 11% below its simulated cost." },
+      { h: "Thai electronics maker gains on simulated data-centre power orders", imp: "bullish", tks: ["DELTA.BK"], bull: "Power and thermal orders extend the simulated order book.", bear: "One order cycle does not justify the demo's 21x simulated multiple." }
     ];
     [0, 1, 2, 3].forEach(function (back) {
       var date = daysAgoIso(back);
@@ -697,6 +720,7 @@
   }
 
   /* ---- the PT_DATA_SOURCE-compatible adapter ---- */
+  /* The demo is a full preview: every dataset below is simulated locally for the sample portfolio, nothing is locked. */
   function source() {
     currentHoldings();
     return {

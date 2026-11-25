@@ -4,11 +4,9 @@
    quant runs and snapshots follow the user across browsers and survive a cleared cache.
    localStorage stays the fast, synchronous read path; this file keeps it in step. */
 (function () {
-  var NS = "ptpub.v1.";
-  var STAMP = NS + "sync.map";     // {key: ISO time last seen/written}
-  var READY = NS + "sync.ready";   // session flag: hydrate already done this load
+  var NS = window.PT_STORAGE_NS;
   var AUTH = window.PT_AUTH || null;
-  var USER_KEY = /^(?:holdings|valhist|quant|snapshots)\/[A-Za-z0-9._:-]{1,80}$|^val\/settings$|^settings\/[a-z0-9._-]{1,40}$/;
+  var USER_KEY = /^(?:holdings|valhist|quant|snapshots|reports)\/[A-Za-z0-9._:-]{1,80}$|^val\/settings$|^settings\/[a-z0-9._-]{1,40}$/;
 
   function lsGet(k) { try { var v = localStorage.getItem(NS + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(NS + k, JSON.stringify(v)); return true; } catch (e) { return false; } }
@@ -77,8 +75,10 @@
     return inflight;
   }
 
-  function markReady(v) { try { if (v) sessionStorage.setItem(READY, "1"); else sessionStorage.removeItem(READY); } catch (e) {} }
-  function isReady() { try { return sessionStorage.getItem(READY) === "1"; } catch (e) { return false; } }
+  // Each page checks the account again. Stored server timestamps prevent a second reload.
+  var ready = false;
+  function markReady(value) { ready = value; }
+  function isReady() { return ready; }
 
   /* Pull the account's documents into localStorage, push anything local the account has never
      seen, and reload once if the server held something newer than this browser. */
@@ -96,7 +96,7 @@
         seen[d.key] = true;
         var st = m[d.key] || "";
         if (!st || Date.parse(d.updated_at) > Date.parse(st)) {
-          lsSet("db." + d.key, d.data);
+          if (!lsSet("db." + d.key, d.data)) throw new Error("Browser storage is full.");
           setStamp(d.key, d.updated_at);
           newer = true;
         }
@@ -106,7 +106,8 @@
       if (missing.length) {
         var docs = missing.map(function (k) { return { key: k, data: lsGet("db." + k) }; });
         var pr = await AUTH.fetch("/api/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ docs: docs }) });
-        if (pr.ok) { var now = new Date().toISOString(); missing.forEach(function (k) { setStamp(k, now); }); }
+        if (!pr.ok) throw new Error("HTTP " + pr.status);
+        var now = new Date().toISOString(); missing.forEach(function (k) { setStamp(k, now); });
       }
       markReady(true);
       var changed = newer || JSON.stringify([localKeys().sort(), stamps()]) !== before;
@@ -125,7 +126,7 @@
 
   window.PT_SYNC = {
     hydrate: hydrate, flush: flush, touch: touch, forget: forget, reset: reset,
-    keys: localKeys, stamps: stamps,
+    keys: localKeys, stamps: stamps, accepts: function (key) { return USER_KEY.test(key); },
     get status() { return { signedIn: signedIn(), ready: isReady(), pending: Object.keys(queue).length, error: lastError }; },
   };
 

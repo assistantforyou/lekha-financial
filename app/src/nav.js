@@ -15,7 +15,7 @@ export const TREE = [
     { id: "news", title: "News search", icon: Newspaper, page: "news", desc: "Company, market, earnings, M&A, regulatory and macro headlines from every source, de-duplicated." },
   ] },
   { id: "simulation", title: "Simulation", icon: Cpu, items: [
-    { id: "main", title: "1B simulation engine", icon: Cpu, panes: ["tab-sim"], desc: "Monte Carlo on your actual holdings: fan chart, return distribution, VaR, catalysts. Up to 1M paths on worker threads." },
+    { id: "main", title: "Monte Carlo simulation", icon: Cpu, panes: ["tab-sim"], desc: "Monte Carlo on your actual holdings: fan chart, return distribution, VaR, catalysts. Up to 1M paths on worker threads." },
     { id: "projection", title: "Projection lab", icon: FlaskConical, panes: ["tab-sim-proj"], desc: "The original V2 growth-scenario lab with five horizons and dated catalysts." },
   ] },
   { id: "macro", title: "Macro & markets", icon: Globe, items: [
@@ -28,8 +28,8 @@ export const TREE = [
   { id: "analysis", title: "Deep analysis & council", icon: Brain, items: [
     { id: "value", title: "Intrinsic value & MOS", icon: Scale, panes: ["tab-val"], desc: "DCF and residual-income models per holding, margin of safety, valuation dispersion and history." },
     { id: "deep", title: "Holdings deep analysis", icon: Stethoscope, panes: ["tab-an-deep"], desc: "One holding at a time: price, position, risk, valuation, analysts and headlines." },
-    { id: "council", title: "LLM council", icon: Users, panes: ["tab-an-council"], desc: "Five perspectives and a CEO synthesis, written as one report." },
-    { id: "reports", title: "AI research reports", icon: ScrollText, panes: ["lekha-reports"], desc: "Every saved council report, plus sample reports." },
+    { id: "council", title: "LLM council", icon: Users, page: "council", desc: "Five perspectives and a CEO synthesis, written as one report." },
+    { id: "reports", title: "AI research reports", icon: ScrollText, page: "reports", desc: "Every saved council report." },
     { id: "ask", title: "Ask the analyst", icon: Bot, panes: ["v3-ai-host"], analyst: "chat", desc: "Ask anything about your holdings and get an answer computed from your live portfolio: positions, weights, P&L, concentration, drawdown and what would change the view." },
     { id: "briefing", title: "Daily briefing", icon: BookOpen, panes: ["v3-ai-host"], analyst: "brief", desc: "What moved, what changed and what to watch in your portfolio today." },
     { id: "stress", title: "Stress test", icon: Swords, panes: ["v3-ai-host"], analyst: "sim", desc: "Monte Carlo plus rate-shock, tech-drawdown and recession scenarios on your holdings." },
@@ -42,10 +42,11 @@ export const TREE = [
   { id: "account", title: "Account & settings", icon: CircleUser, items: [
     { id: "profile", title: "Profile", icon: CircleUser, page: "profile", desc: "Who you are, your plan and your session." },
     { id: "preferences", title: "Preferences", icon: Settings2, page: "preferences", desc: "Language, theme (100), text size, density, currency and start screen." },
-    { id: "plans", title: "Plans & billing", icon: CreditCard, page: "plans", desc: "Compare Demo, Free, Paid and Premium; manage your subscription." },
+    { id: "plans", title: "Plans & billing", icon: CreditCard, page: "plans", desc: "Compare Free ฿0, Paid ฿399 and Premium ฿599; manage your subscription. The demo is a free preview." },
     { id: "layout", title: "Dashboard layout", icon: LayoutGrid, page: "layout", desc: "Show, hide and reorder panels on every screen." },
     { id: "data", title: "Data & import", icon: Upload, page: "data", desc: "Import statements, export your data and check sync status." },
     { id: "diagnostics", title: "Diagnostics (admin)", icon: Stethoscope, page: "diagnostics", admin: true, desc: "Provider health, latency, cache hit rate, tool failures, token use and running costs." },
+    { id: "audit", title: "Audit log (admin)", icon: ScrollText, page: "audit", admin: true, desc: "Traffic, failures, rate limits and the sign-up to AI funnel per route, from the audit table." },
   ] },
 ]
 export const FLAT = TREE.flatMap((g) => g.items.map((i) => ({ ...i, group: g.id, groupTitle: g.title, key: `${g.id}/${i.id}` })))
@@ -55,6 +56,7 @@ export const DEFAULT_ROUTE = "portfolio/overview"
 const ALIAS = { "sector/rrg": "sector/now", "account/security": "account/profile", "account/legal": "account/profile", "account/about": "account/profile" }
 export function parseHash(h) {
   const m = /^#\/?([^?]*)(?:\?(.*))?$/.exec(h || ""), parts = (m && m[1] ? m[1] : "").split("/").filter(Boolean), q = new URLSearchParams((m && m[2]) || "")
+  if (parts[0] === "research" && parts[1] === "company" && parts[2]) parts.splice(0, 2)   // research/company/AAPL is the same page as company/AAPL
   if (parts[0] === "company") return { key: "research/company", param: parts[1] ? decodeURIComponent(parts[1]) : null, query: q, t: "company", s: parts[1] || "" }
   const raw = parts.length >= 2 ? `${parts[0]}/${parts[1]}` : parts.length === 1 ? (FLAT.find((i) => i.group === parts[0]) || {}).key : null
   const key = ALIAS[raw] || raw

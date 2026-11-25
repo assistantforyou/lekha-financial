@@ -5,6 +5,8 @@ const ROUTES = {
   "simulate": () => require("./_h/ai/simulate"),
   "council": () => require("./_h/ai/council"),
   "council-v3": () => require("./_h/ai/council-v3"),
+  "chat": () => require("./_h/ai/chat"),
+  "threads": () => require("./_h/ai/threads"),
 };
 const h = require("./_router").group("ai", ROUTES);
 module.exports = h;

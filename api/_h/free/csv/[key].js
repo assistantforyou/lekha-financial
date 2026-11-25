@@ -1,7 +1,7 @@
 // Free tier price datasets: ROTATION / RISK (daily ETF series) and BREADTH (S&P 500 above-average flags).
 // Alpaca primary, Twelve Data fallback; results cached in Supabase so a page load is normally one read.
-// Real data needs a signed-in account: anonymous visitors get the DEMO simulation instead (never /api).
-const { requireTier } = require("../../../_auth");
+// Every dataset here needs a signed-in account; the market datasets need a Paid or Premium feature.
+const { requireTier, requireFeature, lockCache } = require("../../../_auth");
 const { limitsOf } = require("../../../_tiers");
 const { cacheGetMany, cacheSet } = require("../../../_lib");
 const { getSeries } = require("../../../_prices");
@@ -86,12 +86,21 @@ async function breadth(res) {
 module.exports = async (req, res) => {
   const key = String(req.query.key || "");
   // Per-user datasets take the caller's symbols in a POST body and need a signed-in account.
-  // The shared market datasets below are identical for every account: they stay public and
-  // CDN-cacheable (Vercel never caches authorized requests, and caching is what keeps the
-  // page fast on the Hobby plan) — same as the pre-tier design, deliberately accepted.
-  const PERSONAL = key === "HISTORY" || key === "FACTOR" || key === "VALIN";
+  // The market datasets are identical for every entitled account and are cached server-side
+  // (Supabase + memory), so gating them costs one function call per page load, not provider calls.
+  // Datasets that feed only Paid/Premium screens need the matching feature (api/_data/entitlements.json)
+  // and are never cached publicly. HISTORY feeds Free portfolio screens and keeps its Free entitlement.
+  const GATED = {
+    ROTATION: ["marketRotation", "sectorRotation"], RISK: ["riskAppetite"], VOLATILITY: ["riskAppetite"],
+    BREADTH: ["sectorRotation"], OBOS: ["sectorRotation"], FACTOR: ["sectorRotation"], PEER: ["valuation"], VALIN: ["valuation", "deepAnalysis"],
+  };
   let limits = null;
-  if (PERSONAL) {
+  if (GATED[key]) {
+    lockCache(res);
+    const p = await requireFeature(req, res, GATED[key]);
+    if (!p) return;
+    limits = limitsOf(p);
+  } else if (key === "HISTORY") {
     res.setHeader("Cache-Control", "no-store");
     const p = await requireTier(req, res, ["free", "paid", "premium"]);
     if (!p) return;

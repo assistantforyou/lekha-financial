@@ -1,9 +1,9 @@
-// POST /api/ai/simulate — Premium only. Deterministic Monte Carlo + stress tests on the user's
+// POST /api/ai/simulate — Premium only (feature "simulation"). Deterministic Monte Carlo + stress tests on the user's
 // REAL holdings: per-holding weekly returns and betas come from the same price series the app
 // serves (Alpaca/Twelve Data + intl sources, via _history.seriesFor), the RNG is seeded from
 // user + day + symbols so the same request always returns the same paths. Math is free; the
 // short narrative is one budgeted LLM call and is optional.
-const { requireTier } = require("../../_auth");
+const { requireFeature } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { langOf, withLang } = require("./_lang");
@@ -66,7 +66,7 @@ const STRESS = [
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only." });
-  const p = await requireTier(req, res, ["demo", "free", "paid", "premium"]);
+  const p = await requireFeature(req, res, "simulation");
   if (!p) return;
   res.setHeader("Cache-Control", "no-store");
   try {
@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
     const lang = langOf(body.lang);
 
     const uid = p.user_id;
-    const ok = await rateHit(`ai/sim/${uid}/${Math.floor(Date.now() / DAY)}`, p.demo ? 100 : 10);
+    const ok = await rateHit(`ai/sim/${uid}/${Math.floor(Date.now() / DAY)}`, 10);
     if (!ok) return res.status(429).json({ error: "Daily simulation limit reached (10/day on Premium).", code: "ai_limit" });
 
     const ctx = await userContext(uid);
@@ -96,7 +96,8 @@ module.exports = async (req, res) => {
       const row = ctx.rows.find((r) => r.tk === s);
       items.push({ tk: s, beta: Math.round(beta * 100) / 100, idio, weight: row ? row.valUsd : 0, theme: row ? row.theme : "" });
     }
-    const wSum = items.reduce((s, x) => s + x.weight, 0) || 1;
+    const wSum = items.reduce((s, x) => s + x.weight, 0);
+    if (!(wSum > 0)) return res.status(422).json({ error: "A priced holding with sufficient return history is required.", code: "insufficient_history" });
     for (const x of items) x.weightPct = Math.round((x.weight / wSum) * 1000) / 10;
 
     const weeks = Math.round(years * 52);
@@ -134,7 +135,7 @@ module.exports = async (req, res) => {
         schema: NARRATIVE_SCHEMA,
       });
       narrative = String(ai.narrative || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 700);
-    } catch (e) { /* math is the deliverable; narrative stays empty when the LLM is unavailable */ }
+    } catch { narrative = "AI commentary is currently unavailable. The simulation results are calculated independently."; }
 
     return res.status(200).json({
       seed: "deterministic (user+day+holdings)", years, paths: PATHS, weeks,
