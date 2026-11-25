@@ -75,9 +75,13 @@ const FLOW = {
   capex: [["us-gaap", "PaymentsToAcquirePropertyPlantAndEquipment"], ["us-gaap", "PaymentsToAcquireProductiveAssets"]],
   dividendsPaid: [["us-gaap", "PaymentsOfDividends"], ["us-gaap", "PaymentsOfDividendsCommonStock"]],
   buybacks: [["us-gaap", "PaymentsForRepurchaseOfCommonStock"]],
+  // valuation inputs (v4): stock compensation is an expense the cash-flow statement adds back, pre-tax income gives the effective tax rate, acquisitions are reinvestment
+  sbc: [["us-gaap", "ShareBasedCompensation"], ["us-gaap", "AllocatedShareBasedCompensationExpense"]],
+  pretaxIncome: [["us-gaap", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"], ["us-gaap", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"]],
+  acquisitions: [["us-gaap", "PaymentsToAcquireBusinessesNetOfCashAcquired"]],
 };
 const PERSHARE = { eps: [["us-gaap", "EarningsPerShareDiluted"], ["us-gaap", "EarningsPerShareBasicAndDiluted"], ["us-gaap", "EarningsPerShareBasic"]] };
-const SHARES = { dilutedShares: [["us-gaap", "WeightedAverageNumberOfDilutedSharesOutstanding"], ["us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"]] };
+const SHARES = { dilutedShares: [["us-gaap", "WeightedAverageNumberOfDilutedSharesOutstanding"], ["us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"]], basicShares: [["us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"]] };
 const INSTANT = {
   cash: [["us-gaap", "CashAndCashEquivalentsAtCarryingValue"], ["us-gaap", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"]],
   shortTermInvestments: [["us-gaap", "MarketableSecuritiesCurrent"], ["us-gaap", "ShortTermInvestments"], ["us-gaap", "AvailableForSaleSecuritiesDebtSecuritiesCurrent"]],
@@ -85,6 +89,12 @@ const INSTANT = {
   shareholdersEquity: [["us-gaap", "StockholdersEquity"], ["us-gaap", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]],
   inventory: [["us-gaap", "InventoryNet"]], receivables: [["us-gaap", "AccountsReceivableNetCurrent"]],
   debtLT: [["us-gaap", "LongTermDebtNoncurrent"], ["us-gaap", "LongTermDebt"]], debtCur: [["us-gaap", "LongTermDebtCurrent"], ["us-gaap", "ShortTermBorrowings"]],
+  // valuation inputs (v4): everything the equity bridge needs beyond debt and cash
+  longTermInvestments: [["us-gaap", "MarketableSecuritiesNoncurrent"], ["us-gaap", "LongTermInvestments"], ["us-gaap", "AvailableForSaleSecuritiesDebtSecuritiesNoncurrent"]],
+  leaseOp: [["us-gaap", "OperatingLeaseLiability"]], leaseOpCur: [["us-gaap", "OperatingLeaseLiabilityCurrent"]], leaseOpNon: [["us-gaap", "OperatingLeaseLiabilityNoncurrent"]],
+  leaseFin: [["us-gaap", "FinanceLeaseLiability"]], leaseFinCur: [["us-gaap", "FinanceLeaseLiabilityCurrent"]], leaseFinNon: [["us-gaap", "FinanceLeaseLiabilityNoncurrent"]],
+  minorityInterest: [["us-gaap", "MinorityInterest"]],
+  preferredEquity: [["us-gaap", "PreferredStockValue"]],
 };
 const DAY = 864e5, dur = (f) => (Date.parse(f.end) - Date.parse(f.start)) / DAY;
 
@@ -129,6 +139,11 @@ function buildStatements(facts, symbol, type, asOf) {
     for (const k of Object.keys(inst)) { const f = inst[k].get(end); if (f) row[k] = f.val; }
     row.totalDebt = (row.debtLT != null || row.debtCur != null) ? (row.debtLT || 0) + (row.debtCur || 0) : null;
     row.capex = row.capex != null ? Math.abs(row.capex) : null;
+    row.acquisitions = row.acquisitions != null ? Math.abs(row.acquisitions) : null;
+    // leases: the total concept when the filer reports one, otherwise current + noncurrent (many filers tag only the parts)
+    const part = (t, c, n) => (row[t] != null ? row[t] : row[c] != null || row[n] != null ? (row[c] || 0) + (row[n] || 0) : null);
+    const lop = part("leaseOp", "leaseOpCur", "leaseOpNon"), lfn = part("leaseFin", "leaseFinCur", "leaseFinNon");
+    row.leaseLiabilities = lop != null || lfn != null ? (lop || 0) + (lfn || 0) : null;
     if (row.da != null && row.operatingIncome != null) row.ebitda = row.operatingIncome + row.da;
     const st = S.statement(row); st.derived = []; if (row.da != null) st.derived.push("ebitda"); if (lb.fp) st.fiscalPeriod = lb.fp; out.push(st);
   }
@@ -136,7 +151,7 @@ function buildStatements(facts, symbol, type, asOf) {
 }
 
 // Bump when buildStatements output changes, so rows normalized by older code (up to 7 days in the shared cache) are ignored.
-const STATEMENT_SCHEMA = "v3-merged-concepts";
+const STATEMENT_SCHEMA = "v4-valuation-fields";
 // Statements are cached by the latest accession number, so they live until a new filing appears.
 async function statements(symbol, { type = "annual", asOf } = {}) {
   const cik = await cikFor(symbol); if (!cik) return [];

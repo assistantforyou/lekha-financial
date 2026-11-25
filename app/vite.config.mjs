@@ -28,6 +28,6 @@ export default defineConfig({
   base: "/",
   publicDir: false,
   plugins: [stage(), react(), tailwindcss(), stamp()],
-  resolve: { alias: { "@": path.resolve(dir, "src") } },
+  resolve: { alias: { "@": path.resolve(dir, "src"), "@fin": path.resolve(dir, "../api/_fin/valuation") } },
   build: { outDir: path.resolve(dir, "../public"), emptyOutDir: false, rollupOptions: { input: path.resolve(dir, "index.html") } },
 })

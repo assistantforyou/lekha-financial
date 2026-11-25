@@ -74,7 +74,7 @@ async function evidenceFor(scope) {
         price: d.price,
         iv: d.intrinsicPerShare,
         mos: d.marginOfSafety != null ? Math.round(d.marginOfSafety * 1000) / 10 : null,
-        method: "DCF on free cash flow",
+        method: d.v2 && d.v2.model === "ri" ? "Residual income (financial)" : "DCF: free cash flow to the firm",
         asOf: (r.meta && r.meta.asOf) || null,
       }]
       out.asOf.valuation = (r.meta && r.meta.asOf) || undefined
