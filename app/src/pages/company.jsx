@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import { Bars, DataState, EmptyBox, ErrorBox, FreshBadge, PageHeader, SourceTag, Spark, Stat } from "@/components/common"
 import AgentPanel from "@/components/AgentPanel"
+import DcfCard from "@/components/valuation/DcfCard"
 import PriceChart from "@/components/PriceChart"
 import { keyStats } from "@/lib/chartmath"
 import { recent, remember } from "@/components/CommandPalette"
@@ -100,18 +101,11 @@ function Financials({ b }) {
 }
 
 function Valuation({ symbol, b }) {
-  const r = unwrap(b.ratios), [a, setA] = useState({}), [run, setRun] = useState(0)
-  const v = useData("valuation", { symbol, growth: a.growth, discount: a.discount, terminalGrowth: a.terminalGrowth }, { enabled: true, refresh: 0 })
-  const d = v.status === "ok" ? v.data : null, as = d && d.assumptions
+  const r = unwrap(b.ratios)
   return (<div className="space-y-4">
     <Card><CardHeader><CardTitle>Multiples & quality</CardTitle><CardDescription>Every figure is calculated by the app from SEC filings and the live quote. Hover a row for the formula and inputs.</CardDescription></CardHeader><CardContent>
       {!r ? <ErrorBox message={b.ratios.error} attempts={b.ratios.attempts} /> : <Table><TableHeader><TableRow><TableHead>Metric</TableHead><TableHead className="text-right">Value</TableHead><TableHead>Formula</TableHead></TableRow></TableHeader><TableBody>{r.metrics.map((m) => <TableRow key={m.id}><TableCell className="font-medium">{m.label}</TableCell><TableCell className="num text-right">{metric(m)}</TableCell><TableCell className="text-xs text-muted-foreground" title={JSON.stringify(m.inputs)}>{m.formula}</TableCell></TableRow>)}</TableBody></Table>}</CardContent></Card>
-    <Card><CardHeader><CardTitle>Discounted cash flow</CardTitle><CardDescription>Two-stage DCF. Free cash flow is a 3-year average margin on current revenue; growth starts at median 5-year revenue growth, limited by what the company's returns can fund, and fades to the terminal rate. Override any assumption. This is a model, not a price target, and the Intrinsic value page uses its own scenario model, so the two can differ.</CardDescription></CardHeader><CardContent className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">{[["growth", "Starting growth (10y fade)", as && as.growth], ["discount", "Discount rate", as && as.discount], ["terminalGrowth", "Terminal growth", as && as.terminalGrowth]].map(([k, l, dv]) => <div key={k} className="space-y-1.5"><Label htmlFor={"dcf-" + k}>{l}</Label><div className="flex items-center gap-2"><Input id={"dcf-" + k} type="number" step="0.5" value={a[k] != null ? a[k] * 100 : ""} placeholder={dv != null ? (dv * 100).toFixed(1) : ""} onChange={(e) => setA({ ...a, [k]: e.target.value === "" ? undefined : parseFloat(e.target.value) / 100 })} /><span className="text-sm text-muted-foreground">%</span></div></div>)}</div>
-      <DataState s={v}>{d && (d.dcf ? <div className="space-y-3"><div className="grid grid-cols-2 gap-2 md:grid-cols-4"><Stat label="Intrinsic / share" value={price(d.intrinsicPerShare, d.currency)} sub="DCF (calculated)" /><Stat label="Price" value={price(d.price, d.quoteCurrency)} /><Stat label="Margin of safety" value={pct(d.marginOfSafety, 1, true)} tone={tone(d.marginOfSafety)} /><Stat label="Terminal value share" value={pct(d.dcf.terminalShare, 0)} hint="Share of enterprise value that comes from the terminal value: high means the result is sensitive to long-run assumptions." /></div>
-        {(d.impliedGrowth != null || d.impliedGrowthNote) && as && <p className="text-sm" data-testid="implied-growth">At the current price the market is assuming starting growth of <b className="num">{d.impliedGrowth != null ? pct(d.impliedGrowth, 1) : d.impliedGrowthNote}</b> a year on these assumptions, against <b className="num">{pct(as.growth, 1)}</b> in this model. The gap is what the price needs to be true.</p>}
-        <p className="text-xs text-muted-foreground">Assumptions: FCF {compact(as.freeCashFlow, false) + " " + (d.currency || "")} ({as.fcfBasis}), growth {pct(as.growth, 1)} ({as.growthBasis}), discount {pct(as.discount, 1)}, risk-free {pct(as.riskFree, 2)}, beta {as.beta != null ? as.beta.toFixed(2) : "n/a"}{as.betaAdjusted != null ? " (adjusted " + as.betaAdjusted.toFixed(2) + ")" : ""}, equity risk premium {pct(as.equityRiskPremium, 2)}, net debt {compact(as.netDebt)}, shares {compact(as.shares, false)}.</p></div> : <Alert variant="warn"><AlertTitle>DCF not applicable</AlertTitle><AlertDescription>Free cash flow is not positive or inputs are missing, so a discounted-cash-flow value would be meaningless. Use the multiples above.</AlertDescription></Alert>)}</DataState>
-    </CardContent></Card></div>)
+    <DcfCard symbol={symbol} /></div>)
 }
 
 function Growth({ b }) {
@@ -164,7 +158,8 @@ function Workspace({ symbol, route, navigate }) {
   const q = (live.status === "ok" && live.data) || (b && unwrap(b.quote)), prof = (b && unwrap(b.profile)) || null, watched = wl.some((w) => w.symbol === symbol)
   const pending = !b && s.status !== "error", failed = !b && s.status === "error"
   useEffect(() => { if (prof) remember({ symbol, name: prof.name }) }, [prof && prof.name])
-  useEffect(() => { if (s.status === "ok") { prefetch("valuation", { symbol }); prefetch("history", { symbol, days: 1900 }) } }, [symbol, s.status])   // warm the tabs people click next so they open instantly
+  useEffect(() => { prefetch("valuation", { symbol }) }, [symbol])   // the valuation input pack loads in parallel with the company bundle, so the Valuation tab is ready when it opens
+  useEffect(() => { if (s.status === "ok") prefetch("history", { symbol, days: 1900 }) }, [symbol, s.status])   // warm the tabs people click next so they open instantly
   const nothing = !!b && !q && !prof && !b.annual.ok
   // Instant header: the name comes from the built-in list and the last price seen for this symbol from this browser, so something real
   // is on screen at once; the live quote (about a second) replaces the remembered one, which is labelled while it stands in.
