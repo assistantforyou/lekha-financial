@@ -8,6 +8,7 @@ import { M, MOBILE_MAX, place, scrollDelta } from "./layout"
 import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, modeOf, resolve, setPlatform, visible } from "./steps"
 import { onStartTour, shouldAutoStart, writeStatus } from "./store"
 import { funnel } from "@/lib/pixel"
+import { DONE as LANG_DONE, pending as langPending } from "@/lib/langprompt"
 
 const WF_ICONS = [Search, Building2, Layers, LineChart]
 const reduced = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch (e) { return false } }
@@ -84,7 +85,15 @@ export default function Tour({ navigate }) {
     setSkipped([]); setCur(0); setAlt(false); setReady(false); setActive(true); goTo(0, 1)
   }, [goTo])
   useEffect(() => onStartTour(begin), [begin])
-  useEffect(() => { if (!shouldAutoStart()) return; const t = setTimeout(() => { if (shouldAutoStart()) begin() }, 1600); return () => clearTimeout(t) }, [begin])
+  /* The Quick Tour starts by itself, but not over the language prompt: when the prompt is up it waits for the answer (or 8 s), then starts. */
+  useEffect(() => {
+    if (!shouldAutoStart()) return
+    const go = () => { if (shouldAutoStart()) begin() }
+    if (!langPending()) { const t = setTimeout(go, 1600); return () => clearTimeout(t) }
+    let t2 = 0; const cap = setTimeout(go, 8000), done = () => { clearTimeout(cap); t2 = setTimeout(go, 600) }
+    window.addEventListener(LANG_DONE, done, { once: true })
+    return () => { clearTimeout(cap); clearTimeout(t2); window.removeEventListener(LANG_DONE, done) }
+  }, [begin])
 
   const move = useCallback((d) => {
     const { cur: c, busy: b, skipped: s } = live.current; if (b) return

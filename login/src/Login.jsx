@@ -1,4 +1,5 @@
 import { ReleasePolicies } from "../../app/src/components/ReleasePolicies"
+import LangPrompt from "../../app/src/components/LangPrompt"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -177,6 +178,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center px-6 py-16">
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50 }}><LangPrompt /></div>
       <img
         src="/login/lekha.png"
         alt="Lekha Financials"
