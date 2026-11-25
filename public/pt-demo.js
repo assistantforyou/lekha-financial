@@ -268,7 +268,9 @@
     labelled["INDEXNASDAQ:.IXIC"] = seriesOf("INDEXNASDAQ:.IXIC");
     return labelled;
   }
-  function buildHistory() { return historyCsv(histLabelled(), 4.42); }
+  /* the engine, the analyst and the data snapshot all ask for the same history; it only changes when the holdings do */
+  var HIST_MEMO = null;
+  function buildHistory() { var key = holdingSymbols().join(","); if (HIST_MEMO && HIST_MEMO.k === key) return HIST_MEMO.v; var v = historyCsv(histLabelled(), 4.42); HIST_MEMO = { k: key, v: v }; return v; }
   function buildRotation() {
     var by = {}; ROTATION.forEach(function (s) { by[s] = seriesOf(s); }); return rotationCsv(by);
   }

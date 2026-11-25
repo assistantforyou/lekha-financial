@@ -19,6 +19,8 @@
   function setRoute(r, panesShown) {
     var prev = cur; cur = r; var A = app(), mode = modeOf(r);
     if (A.setTab && A.S && (A.S.tab !== mode || !prev.t)) { routing = true; try { A.setTab(mode); } finally { routing = false; } }
+    /* the heavy market-data feeds start on the first route that is not the overview or the holdings table (the engine also starts them when idle) */
+    if (A.ensureData && r && !(r.t === "portfolio" && (r.s === "overview" || r.s === "holdings" || !r.s))) A.ensureData(0);
     if (panesShown) requestAnimationFrame(function () { redraw(r); });
     listeners.forEach(function (f) { try { f(r, prev); } catch (e) {} });
   }
@@ -31,6 +33,7 @@
     return true;
   }
   window.LEKHA_SHELL = {
+    lazy: true,
     engineTab: engineTab, go: go, route: function () { return cur; }, onRoute: function (f) { listeners.push(f); },
     _setRoute: setRoute, _redraw: function () { redraw(cur); }, _register: function (fn) { navigate = fn; }, openSettings: function () { go("account/preferences"); }, closeSettings: function () {},
   };

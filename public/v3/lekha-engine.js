@@ -1447,7 +1447,9 @@ function renderValAll(selOnly,keepSet){if(S.tab!=="val")return;if(!selOnly)compu
 function setTab(t){S.tab=t;if(window.LEKHA_SHELL&&LEKHA_SHELL.engineTab(t)===false)return;
   if(t==="val")renderValAll();else if(t==="set"){if(window.PT_UI)window.PT_UI.renderSettings()}else renderAll()}
 
-function buildPortfolioSeries(){
+let _pfm=null;
+function buildPortfolioSeries(){if(!S.hist||!S.rows.length)return null;const k=[S.hist,S.rows,S.usdthb,S.hkdusd,Math.floor(ptNow()/60000)];if(_pfm&&_pfm.k.every((x,i)=>x===k[i]))return _pfm.v;const v=buildPortfolioSeries0();_pfm={k,v};return v}
+function buildPortfolioSeries0(){
   if(!S.hist||!S.rows.length)return null;
   const rows=positions();let fixedUSD=0;const holdings=[];
   for(const r of rows){if(r.symbol&&r.shares&&S.hist[r.symbol]&&S.hist[r.symbol].D){holdings.push({sym:r.symbol,sh:r.shares,fx:r.fx||1})}else fixedUSD+=r.valueUSD||0}
@@ -1639,6 +1641,17 @@ Object.assign(S,{ldView:"sect",ldOpen:null,revs:[],factor:null,fred:null,peer:nu
 $("vx-box").addEventListener("click",e=>{const b=e.target.closest("#vx-range button");if(b){S.vxRange=b.dataset.r;renderVix()}});
 $("vx-box").addEventListener("change",e=>{if(e.target.id==="vx-hyp"){S.vxHypOn=e.target.checked;renderVix()}});
 $("ld-view").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S.ldView=b.dataset.v;renderLead()});
+const LZ={on:!(window.LEKHA_SHELL&&LEKHA_SHELL.lazy),q:[],warm:false};
+function lazyData(fn){if(LZ.on)fn();else LZ.q.push(fn)}
+function ensureData(gap){if(LZ.on)return;LZ.on=true;const q=LZ.q.splice(0);q.forEach((f,i)=>setTimeout(()=>{try{f()}catch(e){console.warn("[lekha] data",e)}},i*(gap||0)))}
+if(window.LEKHA_SHELL&&LEKHA_SHELL.lazy){
+  const hid=id=>{const e=document.getElementById(id);return !e||!!e.closest("[hidden]")};
+  const guard=(probe,fn)=>function(){if(!LZ.warm&&hid(probe))return;return fn.apply(this,arguments)};
+  renderRegime=guard("rg-box",renderRegime);renderLead=guard("ld-box",renderLead);renderVix=guard("vx-box",renderVix);renderFgi=guard("fg-box",renderFgi);
+  renderRotation=guard("rot-chart",renderRotation);renderRRG=guard("rrg-chart",renderRRG);renderBreadth=guard("br-table",renderBreadth);renderObos=guard("ob-table",renderObos);renderRiskApp=guard("ra-chart",renderRiskApp);
+  const idle=f=>window.requestIdleCallback?requestIdleCallback(f,{timeout:4000}):setTimeout(f,300);
+  setTimeout(()=>idle(()=>{LZ.warm=true;ensureData(150);[renderMacro,renderLead,renderVix,renderFgi,renderRotation,renderRRG,renderBreadth,renderObos,renderRiskApp].forEach((f,i)=>setTimeout(()=>{try{f()}catch(e){}},1500+i*150))}),3500);
+}
 setCur(S.cur);
 renderRotation();
 let rzT=null,lastW=window.innerWidth;window.addEventListener("resize",()=>{if(Math.abs(window.innerWidth-lastW)<40)return;lastW=window.innerWidth;clearTimeout(rzT);rzT=setTimeout(()=>{renderPortfolioChart();renderMacro();renderFgi();renderRotation();if(S.flowReady)renderFlow();renderRRG();renderRiskApp();if(S.obOpen)renderObos();if(S.open.size)renderTable();if(S.tab==="val")renderDisp();renderVix()},200)});
@@ -1681,6 +1694,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
 (async()=>{
   mcp=await PT_ADAPTER.use("mcp");
   if(!mcp){if(S.source!=="snapshot")setPill("st-prices","Prices: live feed unavailable in this view","stale");return}
+  const watchL=(...a)=>lazyData(()=>mcp.watchTool(...a));
   const watchEngine=()=>mcp.watchTool(DRIVE,TOOL,{fileId:ENGINE_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Broker,");const at=ev.result.cache?ev.result.cache.storedAt:ptNow();
       if(t&&applyEngine(t,"live",at)){setPill("st-prices","Prices: live · "+(window.PT_DEMO_MODE?ptSfx(fmtD(at)):new Date(at).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})),"live");renderAll()}
@@ -1700,7 +1714,7 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   const histSigOf=items=>(items||[]).filter(h=>h&&h.tk!=="CASH").map(h=>h.tk+"|"+h.cur).sort().join(",");
   let histSig=histSigOf((()=>{try{return JSON.parse(localStorage.getItem(PT_NS+"db.holdings/all")).items}catch(e){return[]}})());
   let valSig=null;window.PT_ONHOLD=()=>{const vs=phLoad().items.map(h=>h.tk).filter(t=>t&&t!=="CASH").sort().join(",");if(valSig!==null&&vs!==valSig&&window.PT_RELOAD_VAL)window.PT_RELOAD_VAL();valSig=vs;const sig=histSigOf(phLoad().items);if(sig!==histSig){histSig=sig;if(window.PT_DATA_SOURCE)loadHist(true)}};
-  mcp.watchTool(DRIVE,TOOL,{fileId:ROT_ID,exportMimeType:"text/csv"},ev=>{
+  watchL(DRIVE,TOOL,{fileId:ROT_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"D|SPY");if(!t){if(!S.rot){S.rotErr="Rotation data export could not be read.";renderRotation()}return}
       const R=parseRotation(t);if(!R.D.SPY||!R.D.SPY.length){if(!S.rot){S.rotErr="Rotation data is empty.";renderRotation()}return}
       S.rot=R;S.rotCache={};S.rrgCache={};S.rotErr=null;S.rotAt=ev.result.cache?ev.result.cache.storedAt:ptNow();renderRotation();renderRRG();renderBreadth()}
@@ -1708,12 +1722,12 @@ function handleErr(err,what){const c=err&&err.code;let msg;
       S.rotErr=handleErr(ev.error,"rotation data");if(!S.rot){renderRotation();renderRRG()}}
   },{cache:{staleTime:600000,gcTime:6*3600000},refetchInterval:900000});
   const authz=c=>["needs_reauth","server_not_connected","not_in_manifest","approval_required","blocked_by_policy"].includes(c);
-  mcp.watchTool(DRIVE,TOOL,{fileId:BREADTH_ID,exportMimeType:"text/csv"},ev=>{
+  watchL(DRIVE,TOOL,{fileId:BREADTH_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Sector");const B=t&&parseBreadth(t);
       if(B&&B.stocks.length>400){S.breadth=B;S.brErr=null;S.brAt=ev.result.cache?ev.result.cache.storedAt:ptNow()}else if(!S.breadth)S.brErr="Breadth data export could not be read.";renderBreadth()}
     else{if(authz(ev.error&&ev.error.code))S.breadth=null;S.brErr=handleErr(ev.error,"breadth data");if(!S.breadth)renderBreadth()}
   },{cache:{staleTime:900000,gcTime:12*3600000},refetchInterval:1800000});
-  mcp.watchTool(DRIVE,TOOL,{fileId:OBOS_ID,exportMimeType:"text/csv"},ev=>{
+  watchL(DRIVE,TOOL,{fileId:OBOS_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Group");const O=t&&parseObos(t);
       if(O&&O.stocks.length>400&&O.etf.SPY&&O.etf.SPY.pts.length>60){S.obos=O;S.obM=null;S.obErr=null;S.obAt=ev.result.cache?ev.result.cache.storedAt:ptNow()}else if(!S.obos)S.obErr="Overbought/oversold data export could not be read (the sheet may still be calculating).";renderObos()}
     else{if(authz(ev.error&&ev.error.code)){S.obos=null;S.obM=null}S.obErr=handleErr(ev.error,"overbought/oversold data");if(!S.obos)renderObos()}
@@ -1725,22 +1739,22 @@ function handleErr(err,what){const c=err&&err.code;let msg;
   },{cache:{staleTime:300000,gcTime:6*3600000},refetchInterval:900000});
   loadValin();
   window.PT_RELOAD_VAL=()=>{S.valinErr=null;S.fundErr=null;S.fundLoaded=false;S.valinSrc=null;S.valin=null;S.fund={};S.fundMissing={};renderValAll();ptEmit("fund/x");loadValin()};
-  mcp.watchTool(DRIVE,TOOL,{fileId:FACTOR_ID,exportMimeType:"text/csv"},ev=>{
+  watchL(DRIVE,TOOL,{fileId:FACTOR_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Kind");const F=t&&parseFactor(t);
       if(F&&F.px.SPY&&F.px.SPY.length>200){S.factor=F;S.factorErr=null;S.qfM=null;S.rgM=null;S.rvM=null}else if(!S.factor)S.factorErr="Factor data export could not be read (the sheet may still be calculating).";renderLead();renderRegime()}
     else{if(authz(ev.error&&ev.error.code)){S.factor=null;S.qfM=null}S.factorErr=handleErr(ev.error,"factor data");if(!S.factor)renderLead()}
   },{cache:{staleTime:6*3600000,gcTime:24*3600000},refetchInterval:6*3600000});
-  mcp.watchTool(DRIVE,TOOL,{fileId:VOL_ID,exportMimeType:"text/csv"},ev=>{
+  watchL(DRIVE,TOOL,{fileId:VOL_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Segment");const X=t&&parseVol(t);
       if(X&&X.VIX.size>500&&X.VIXEQ.size>100){S.vol=X;S.volErr=null;S.vxM=null}else if(!S.vol)S.volErr="Volatility data export could not be read (the sheet may still be calculating).";renderVix()}
     else{if(authz(ev.error&&ev.error.code)){S.vol=null;S.vxM=null}S.volErr=handleErr(ev.error,"volatility data");if(!S.vol)renderVix()}
   },{cache:{staleTime:1800000,gcTime:12*3600000},refetchInterval:3600000});
-  mcp.watchTool(DRIVE,TOOL,{fileId:PEER_ID,exportMimeType:"text/csv"},ev=>{
+  watchL(DRIVE,TOOL,{fileId:PEER_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"Ticker,Sector,Member");const P=t&&parsePeer(t);
       if(P&&Object.keys(P.rows).length>400){S.peer=P;S.peerErr=null;S.pvM=null;S.rvM=null}else if(!S.peer)S.peerErr="Peer valuation export could not be read (the sheet may still be calculating).";renderLead();if(S.tab==="val"){renderDisp();renderValC()}}
     else{if(authz(ev.error&&ev.error.code)){S.peer=null;S.pvM=null}S.peerErr=handleErr(ev.error,"peer valuation data");if(!S.peer&&S.tab==="val")renderDisp()}
   },{cache:{staleTime:3600000,gcTime:12*3600000},refetchInterval:3600000});
-  mcp.watchTool(DRIVE,TOOL,{fileId:RISK_ID,exportMimeType:"text/csv"},ev=>{
+  watchL(DRIVE,TOOL,{fileId:RISK_ID,exportMimeType:"text/csv"},ev=>{
     if(ev.type==="data"){const t=extractText(ev.result,"D|XLY");const R=t&&parseRotation(t);
       if(R&&R.D.XLY&&R.D.XLY.length&&R.D.XLP&&R.D.XLP.length){S.risk=R;S.raCache=null;S.raErr=null;S.raAt=ev.result.cache?ev.result.cache.storedAt:ptNow()}else if(!S.risk)S.raErr="XLY/XLP data export could not be read.";renderRiskApp()}
     else{if(authz(ev.error&&ev.error.code)){S.risk=null;S.raCache=null}S.raErr=handleErr(ev.error,"XLY/XLP data");if(!S.risk)renderRiskApp()}
@@ -1796,6 +1810,6 @@ window.ptHoldingsCsv=ptHoldingsCsv;
 window.PT_HOLD={load:phLoad,save:phSave,apply:phApply};
 /* bridge for pt-ui.js (Settings, layout, extra charts) */
 window.PT_APP={S,setTab,renderAll:()=>renderAll(),renderValAll:()=>renderValAll(),
-  lekha:{lineChart,multiChart,fx,esc,money,pct,positions,aggregate,computeVal,drawTicker,ldDetail,renderRRG,renderSummary},
+  ensureData:g=>ensureData(g),lekha:{lineChart,multiChart,fx,esc,money,pct,positions,aggregate,computeVal,drawTicker,ldDetail,renderRRG,renderSummary},
   redrawOverview:()=>{for(const f of [renderPortfolioChart,renderMacro,renderFgi,renderRotation,renderRRG,renderRiskApp,renderBreadth,renderObos,renderLead,renderVix,renderNews])try{f()}catch(e){}if(S.flowReady)try{renderFlow()}catch(e){}}};
 })();
