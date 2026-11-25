@@ -170,7 +170,7 @@ You can still explore and change the UI with no secrets at all:
 These need keys and will show errors or empty panels until the file is filled in:
 
 - Accounts / sign in (Supabase)
-- Statement import and AI news (Z.ai / Gemini)
+- Statement import and AI news (DeepSeek)
 - Brokerage holdings (Alpaca)
 - Analyst data, price history, all-time highs (Alpha Vantage, Twelve Data)
 - Billing (Stripe)
@@ -232,7 +232,7 @@ Then open a pull request on GitHub. **Do not push directly to `main`** unless Ja
 | `EADDRINUSE` / port already in use | Something else is on 3456. Run `node scripts/dev-server.mjs 3457` and open that port. |
 | Panels are empty / 500 errors | The secrets file isn't loaded. Re-run the `source` command in §7 in the same terminal. |
 | Sign-in fails | Supabase keys are missing or wrong. Check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. |
-| AI import fails | Check `ZAI_API_KEY` first, then `GEMINI_API_KEY`. |
+| AI import fails | Check `DEEPSEEK_API_KEY`. Z.ai/GLM was removed on 2026-11-25 and a stale `ZAI_API_KEY` is ignored. |
 | `git push` rejected | You're on `main`. Create a branch (§9). |
 | Claude Code asks for an API key | Choose the account login option; unset `ANTHROPIC_API_KEY` and retry (§3). |
 
@@ -242,5 +242,5 @@ Then open a pull request on GitHub. **Do not push directly to `main`** unless Ja
 
 - Never commit a file containing a key. `.env*` is ignored, and `keys.env` lives outside the repo, so this should be automatic — don't fight it.
 - Never share your Claude login. If James needs to see something, share the screen, not the credentials.
-- Ask before adding a new paid service. The project deliberately uses free tiers (Z.ai, Alpha Vantage free, SEC EDGAR, ECB).
+- Ask before adding a new paid service. The project deliberately uses low-cost/free tiers (DeepSeek, Alpha Vantage free, SEC EDGAR, ECB).
 - When in doubt, ask Claude Code: *"what does this file do?"* before letting it change anything.

@@ -16,13 +16,13 @@ Scope: every part of the app that touches financial data, before the unified dat
 | News | Public RSS (CNBC, MarketWatch, Fed, BBC, Nasdaq, Seeking Alpha) + Yahoo per-ticker RSS, AI only labels/summarises, never invents links. |
 | Macro | FRED keyless CSV (CPI, Fed funds, 10Y, ...) feeding the Macro Regime panel. |
 | Flows | CFTC Socrata, Treasury TIC, SSGA/iShares ETF shares, SEC insiders/13F. All keyless. |
-| AI / LLM | `_llm.js`: Z.ai GLM primary, Gemini fallback, usage logged to `pt_costs`. `ai/ask` answers only from server-built portfolio context. Council-v3 is one call with a demo fallback. |
+| AI / LLM | `_llm.js`: DeepSeek only (Z.ai/GLM removed 2026-11-25; Gemini is only used for embeddings), usage and a daily spend cap in `pt_costs`/`_ai/ds.js`. `ai/ask` answers only from server-built portfolio context. Council-v3 is one call with a demo fallback. |
 | Caching | `_lib.cached()` Supabase-backed (stale-while-error, 30 min failure backoff), per-instance memory caches in a few handlers, and a client-side `core/cache.js`. No shared TTL policy; no hit-rate accounting. |
 | Search | None beyond local ticker fields. No company page, no filings browser, no watchlist. |
 | Calculations | Scattered: valuation (DCF/RIM) inside the classic engine, risk/vol in `_vol.js`/engine. No reusable, tested calculation module. |
 | Charts | Hand-rolled SVG in the classic engine and the sim/council modules. |
 | MCP | Dev-time only (GitHub, Supabase, Vercel, Alpha Vantage URL in `keys.env`). The product does not depend on any MCP. |
-| Env vars in use | `SUPABASE_*`, `ALPACA_*`, `TWELVEDATA_API_KEY`, `AV_API_KEY`, `ZAI_API_KEY`, `GEMINI_*`, `NEWS_MODEL`, `FMP_API_KEY`, `FINNHUB_API_KEY`, `SEC_USER_AGENT`, `STRIPE_*`, `ADMIN_EMAILS`, `CRON_SECRET`, `PT_IMPORT_PASSCODE`. |
+| Env vars in use | `SUPABASE_*`, `ALPACA_*`, `TWELVEDATA_API_KEY`, `AV_API_KEY`, `DEEPSEEK_API_KEY`, `DEEPSEEK_DAILY_USD`, `LLM_TEXT_MODEL`, `LLM_VISION_MODEL`, `NEWS_MODEL`, `GEMINI_API_KEY` (embeddings only), `FMP_API_KEY`, `FINNHUB_API_KEY`, `SEC_USER_AGENT`, `STRIPE_*`, `ADMIN_EMAILS`, `CRON_SECRET`, `IMPORT_DAILY_LIMIT`, `IMPORT_IP_DAILY_LIMIT`. |
 
 ## 2. Redundancy and risk found
 

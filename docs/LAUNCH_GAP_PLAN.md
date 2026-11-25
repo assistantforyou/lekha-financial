@@ -1,3 +1,5 @@
+> **AI provider note (2026-11-25):** Z.ai/GLM has been removed. DeepSeek is the only conversational AI provider; Gemini is used only for document embeddings. Any Z.ai/GLM or Gemini-chat references below are historical test records, not current setup.
+
 # Launch gap plan · 22 November 2026
 
 Concrete settings and steps for the gaps left after staging acceptance. Evidence is in `STAGING_AUDIT_LOG.md`. Nothing here asserts a licence; where rights are unproven the source is treated as unavailable for sale.

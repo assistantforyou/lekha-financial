@@ -1,7 +1,11 @@
 // Statement import: pure helpers (prompt, schema, validation). No network, no secrets, nothing is stored.
+const { cleanText } = require("./_ai_safe");
+const { IMAGE_MIMES, TEXT_MIMES, DOC_MIMES } = require("./_media");
 const MAX_BYTES = 3 * 1024 * 1024; // base64 inflates by a third and Vercel request bodies top out near 4.5 MB
-const MIME = new Set(["application/pdf", "image/png", "image/jpeg", "image/webp", "text/csv", "text/plain", "text/tab-separated-values"]);
+const MIME = new Set([...DOC_MIMES, ...IMAGE_MIMES, ...TEXT_MIMES]);
 const CURRENCIES = new Set(["USD", "THB", "HKD"]);
+const MAX_QTY = 1e12;
+const MAX_MONEY = 1e15;
 
 // The statement is untrusted data: the model is told to extract only, and the output is re-validated below.
 const SYSTEM_PROMPT = [
@@ -38,20 +42,21 @@ const RESPONSE_SCHEMA = {
     total_currency: { type: "STRING", nullable: true },
     positions: {
       type: "ARRAY",
+      maxItems: 300,
       items: {
         type: "OBJECT",
         properties: {
           kind: { type: "STRING", enum: ["security", "cash"] },
-          ticker: { type: "STRING", nullable: true },
-          name: { type: "STRING", nullable: true },
+          ticker: { type: "STRING", nullable: true, maxLength: 20 },
+          name: { type: "STRING", nullable: true, maxLength: 80 },
           quantity: NUM, total_cost: NUM, price: NUM, market_value: NUM, avg_cost: NUM, unrealized_pl: NUM,
-          currency: { type: "STRING", nullable: true },
-          evidence: { type: "STRING", nullable: true },
+          currency: { type: "STRING", nullable: true, maxLength: 5 },
+          evidence: { type: "STRING", nullable: true, maxLength: 120 },
         },
         required: ["kind", "ticker", "name", "quantity", "market_value", "price", "total_cost", "avg_cost", "unrealized_pl", "currency", "evidence"],
       },
     },
-    warnings: { type: "ARRAY", items: { type: "STRING" } },
+    warnings: { type: "ARRAY", maxItems: 30, items: { type: "STRING", maxLength: 240 } },
   },
   required: ["positions"],
 };
@@ -65,7 +70,7 @@ function isSparse(raw) {
 }
 
 function checkUpload({ mime, size }) {
-  if (!MIME.has(String(mime || "").toLowerCase())) return "Unsupported file type. Use PDF, PNG, JPG, WEBP, CSV or text.";
+  if (!MIME.has(String(mime || "").toLowerCase())) return "Unsupported file type. Use PDF, an image, CSV/TSV/text, OFX/QFX, JSON, DOCX or XLSX.";
   if (!(size > 0)) return "The file is empty.";
   if (size > MAX_BYTES) return "The file is larger than 3 MB. Export fewer pages or a CSV.";
   return null;
@@ -74,7 +79,7 @@ function checkUpload({ mime, size }) {
 // Mask long digit runs (account numbers): applied to text uploads and to the returned account label.
 const maskDigits = (t) => String(t).replace(/\b\d{8,}\b/g, (m) => "*".repeat(m.length - 4) + m.slice(-4));
 const num = (v) => { const n = typeof v === "number" ? v : parseFloat(v); return Number.isFinite(n) ? n : null; };
-const clean = (s, n) => String(s == null ? "" : s).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
+const clean = (s, n) => cleanText(s, n);
 
 // Re-validate whatever the model returned into holdings items {tk, cur, qty, cost, px, name, evidence}.
 function normalizeResult(raw) {
@@ -90,7 +95,7 @@ function normalizeResult(raw) {
     const flags = [];
     if (!CURRENCIES.has(cur)) { if (cur) { warn(`Currency ${cur} is not supported by the page; set to USD, check the amounts.`); flags.push(`printed currency ${cur}, saved as USD`); } cur = "USD"; }
     if (p.kind === "cash") {
-      if (qty === null || qty < 0) { warn("A cash line had no valid amount and was skipped."); continue; }
+      if (qty === null || qty < 0 || qty > MAX_MONEY) { warn("A cash line had no valid amount and was skipped."); continue; }
       out.cash.push({ tk: "CASH", cur, qty, name: clean(p.name, 60), evidence: clean(p.evidence, 100) });
       continue;
     }
@@ -101,6 +106,7 @@ function normalizeResult(raw) {
       continue;
     }
     const mv = num(p.market_value), avg = num(p.avg_cost), pl = num(p.unrealized_pl);
+    if (qty != null && qty > MAX_QTY) { warn(`${tk}: quantity is outside the supported range; skipped.`); continue; }
     const pending = qty === null && mv != null && mv > 0; // value shown, share count not: filled in later from a live price
     if ((qty === null && !pending) || (qty !== null && qty < 0)) { warn(`${tk}: no valid quantity; skipped.`); continue; }
     if (pending) flags.push("no share count on this screen");
@@ -118,12 +124,12 @@ function normalizeResult(raw) {
     const prev = merged.get(key);
     if (prev && prev.qty != null && qty != null) { prev.qty += qty; if (cost != null) prev.cost = (prev.cost || 0) + cost; if (px != null) prev.px = px; if (mv != null) prev.mv = (prev.mv || 0) + mv; prev.flags.push("duplicate lines combined"); warn(`${tk}: duplicate lines were combined.`); continue; }
     if (prev) { warn(`${tk} appears twice with a missing share count; kept the first.`); continue; }
-    merged.set(key, { tk, cur, qty, cost: cost != null && cost >= 0 ? cost : null, px: px != null && px > 0 ? px : null, mv: mv != null && mv >= 0 ? mv : null, name: clean(p.name, 60), evidence, flags });
+    merged.set(key, { tk, cur, qty, cost: cost != null && cost >= 0 && cost <= MAX_MONEY ? cost : null, px: px != null && px > 0 && px <= MAX_MONEY ? px : null, mv: mv != null && mv >= 0 && mv <= MAX_MONEY ? mv : null, name: clean(p.name, 60), evidence, flags });
   }
   out.positions = [...merged.values()];
   // cross-check against the statement's own total when the currencies line up
   const total = num(raw && raw.reported_total_value), tcur = clean(raw && raw.total_currency, 5).toUpperCase() || "USD";
-  if (total && total > 0) {
+  if (total && total > 0 && total <= MAX_MONEY) {
     let sum = 0, complete = true;
     for (const p of out.positions) { if (p.cur !== tcur) { complete = false; continue; } const v = p.mv != null ? p.mv : p.px != null ? p.qty * p.px : null; if (v == null) { complete = false; continue; } sum += v; }
     for (const u of out.unresolved) { if (u.mv != null && u.cur === tcur) sum += u.mv; else complete = false; }

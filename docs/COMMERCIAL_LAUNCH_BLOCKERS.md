@@ -1,3 +1,5 @@
+> **AI provider note (2026-11-25):** Z.ai/GLM has been removed. DeepSeek is the only conversational AI provider; Gemini is used only for document embeddings. Any Z.ai/GLM or Gemini-chat references below are historical test records, not current setup.
+
 # Commercial launch blockers
 
 **NO-GO.** P0 holds acceptance of any paying customer. P1 holds unrestricted commercial launch. A successful build, a completed test checkout, or a change in configuration does not close an acceptance criterion. Each item below requires its own evidence. [Acceptance matrix](FINAL_RELEASE_ACCEPTANCE.md)

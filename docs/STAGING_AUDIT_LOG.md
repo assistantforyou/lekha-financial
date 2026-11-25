@@ -1,3 +1,5 @@
+> **AI provider note (2026-11-25):** Z.ai/GLM has been removed. DeepSeek is the only conversational AI provider; Gemini is used only for document embeddings. Any Z.ai/GLM or Gemini-chat references below are historical test records, not current setup.
+
 # Staging audit log (append-only)
 
 Times are UTC, 2026-11-22. Scope: Preview `audit/full-system-repair` only. No secret values are recorded here.
