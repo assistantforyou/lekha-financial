@@ -1,9 +1,8 @@
 // Chat turn, streamed over SSE. One endpoint for every AI surface: the mode decides depth,
 // the router decides tools. Threads are stored per user in pt_user_state.
 const { requireTier } = require("../../_auth");
-const crypto = require("crypto");
 const { tierOf } = require("../../_tiers");
-const { rateHit, cacheGet, cacheSet } = require("../../_lib");
+const { rateHit } = require("../../_lib");
 const { clientId } = require("../../_history");
 const { listState, putState } = require("../../_state");
 const { langOf, withLang } = require("../ai/_lang");
@@ -12,12 +11,6 @@ const ds = require("../../_ai/ds");
 
 const DAY = 86400000;
 const MAX_MESSAGES = 40;
-
-// How long a repeated question may be answered from cache. A price answer is only good for minutes,
-// a general explanation stays right for a week. DeepSeek's own prefix cache is separate: it is
-// automatic, lasts a few hours on their side and cannot be extended from here.
-const ANSWER_TTL = { company: 30 * 60000, portfolio: 15 * 60000, macro: 2 * 3600000, general: 7 * DAY };
-const answerTtl = (kind) => ANSWER_TTL[kind] || 30 * 60000;
 
 const LIMITS = {
   // One question before an account is the hook: an anonymous visitor gets to see the analyst answer from real
@@ -104,31 +97,10 @@ module.exports = async function handler(req, res) {
   const existing = persisted ? await loadThread(p.user_id, id) : null;
   const history = existing ? existing.messages.slice(-6) : [];
 
-  // An identical first-turn question within ten minutes is served from cache: no model call, same answer.
-  // Follow-ups and attachments always run fresh because their meaning depends on the conversation.
-  const simple = !attachments.length && !history.length;
-  const ck = simple
-    ? "ai/ans/" + crypto.createHash("sha1").update([who, mode, lang, String(b.symbol || ""), message.toLowerCase()].join("|")).digest("hex")
-    : null;
-  let hit = null;
-  if (ck) {
-    try {
-      const c = await cacheGet(ck);
-      if (c && c.text && Date.now() - Number(c.at || 0) < answerTtl(c.kind)) hit = c;
-    } catch (e) { hit = null; }
-  }
-
+  // Answers are never served from cache: every question retrieves live data first, so a repeated question
+  // gets a fresh answer built on current prices and headlines.
   sse(res);
   send(res, { type: "start", threadId: id, mode, tier });
-
-  if (hit) {
-    if (hit.evidence) send(res, hit.evidence);
-    for (let i = 0; i < hit.text.length; i += 240) send(res, { type: "text", text: hit.text.slice(i, i + 240) });
-    send(res, { type: "finish", answeredBy: "cache", ms: 0 });
-    send(res, { type: "done", threadId: id });
-    try { res.end(); } catch (e) { /* already closed */ }
-    return;
-  }
 
   let aborted = false;
   const ctl = new AbortController();
@@ -136,8 +108,6 @@ module.exports = async function handler(req, res) {
   req.on("close", onClose);
 
   let answer = "";
-  let evidencePart = null;
-  let planKind = null;
   try {
     for await (const part of loop.run({
       question: message,
@@ -152,8 +122,6 @@ module.exports = async function handler(req, res) {
       budgetMs: mode === "deep" ? 150000 : 60000,
     })) {
       if (part.type === "text") answer += part.text;
-      if (part.type === "evidence") evidencePart = part;
-      if (part.type === "plan") planKind = part.kind;
       send(res, part);
     }
   } catch (e) {
@@ -163,10 +131,6 @@ module.exports = async function handler(req, res) {
       code: String(e.code || "error"),
       message: budget ? "The AI daily budget has been reached. It resets at midnight UTC." : "The answer stopped early.",
     });
-  }
-
-  if (ck && answer) {
-    try { await cacheSet(ck, { at: Date.now(), text: answer, evidence: evidencePart, kind: planKind }); } catch (e) { /* cache is optional */ }
   }
 
   if (persisted && !aborted) {

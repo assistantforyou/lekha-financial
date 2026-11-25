@@ -27,7 +27,7 @@ For the Todoist task "Sex Projext" and "Idea Dumps". The full tier spec and desi
 - **Premium AI analyst — `api/ai.js` group:** ask-your-analyst chat (server-assembled
   portfolio context, prompt-injection-safe), daily briefing (cached per day), and
   deterministic Monte Carlo + 4 stress scenarios (seeded, no token cost) with an AI
-  narrative. Uses the existing Z.ai/Gemini `_llm` layer; all cost-logged.
+  narrative. Uses the existing DeepSeek `_llm` layer; all cost-logged.
 - **Demo simulation — `public/pt-demo.js`:** deterministic, seeded, internally
   consistent (NVDA winner, TSLA drawdown, semis concentration) and byte-compatible with
   every parser the terminal already has. Anonymous users get it automatically; existing

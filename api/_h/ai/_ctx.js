@@ -73,7 +73,7 @@ async function userContext(userId) {
   const cash = rows.filter((r) => r.tk === "CASH").reduce((s, r) => s + r.valUsd, 0);
   const total = invested + cash;
   for (const r of rows) r.weightPct = total > 0 ? Math.round((r.valUsd / total) * 1000) / 10 : 0;
-  return { rows, invested, cash, total, fx, valDate: vh ? vh.date : null, dispersion: vh && vh.disp || null };
+  return { rows, invested, cash, total, fx, valDate: vh ? vh.date : null, dispersion: vh && vh.disp || null, fetchedAt: new Date().toISOString(), liveCount: rows.filter((r) => r.priceSource && r.priceSource !== "valuation snapshot").length };
 }
 
 // Compact, LLM-friendly text block of the snapshot (the model never sees raw user ids).
@@ -94,9 +94,10 @@ function portfolioBlock(ctx) {
   return [
     `${partial ? "Priced subtotal" : "Total portfolio value"}: ~$${Math.round(ctx.total).toLocaleString("en-US")} (invested $${Math.round(ctx.invested).toLocaleString("en-US")}, cash $${Math.round(ctx.cash).toLocaleString("en-US")}).`,
     ctx.demo ? "Simulated sample prices and FX. These figures illustrate the demo portfolio." : partial ? "Some positions lack a price or currency conversion: their value is unknown and they are left out of the total and the weights." : "All positions are priced from live quotes (or the saved valuation snapshot where noted).",
+    ctx.fetchedAt ? `Live quotes requested at ${ctx.fetchedAt}: ${ctx.liveCount != null ? ctx.liveCount : 0} of ${ctx.rows.filter((r) => r.tk !== "CASH").length} positions priced live; the others use the saved snapshot or have no price.` : "",
     ctx.valDate ? `Valuation snapshot date: ${ctx.valDate}.` : "No valuation snapshot saved yet.",
     lines.join("\n"),
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 // Latest shared market docs (already cached by the free endpoints; read-only here).

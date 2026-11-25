@@ -481,7 +481,7 @@
       var usd = function (v) { return "$" + (v < 0.01 && v > 0 ? v.toFixed(4) : v.toFixed(2)); };
       var days = [], services = {};
       for (var i = 29; i >= 0; i--) { var d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10); var parts = (j.byDay && j.byDay[d]) || {}; Object.keys(parts).forEach(function (k) { services[k] = 1; }); days.push({ d: d, parts: parts }); }
-      var ser = Object.keys(services); if (!ser.length) ser = ["Z.ai"];
+      var ser = Object.keys(services); if (!ser.length) ser = ["DeepSeek"];
       var rev = j.revenue;
       body.innerHTML =
         "<div class='kpis set-k'><div class='kpi'><span class='lbl'>AI spend this month</span><span class='val'>" + usd(j.mtd) + "</span><span class='sub'>" + j.calls + " calls</span></div>" +

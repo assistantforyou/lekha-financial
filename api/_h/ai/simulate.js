@@ -6,6 +6,7 @@
 const { requireFeature } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
+const { fence, guard } = require("../../_ai_safe");
 const { langOf, withLang } = require("./_lang");
 const { seriesFor, cleanSymbols } = require("../../_history");
 const { userContext } = require("./_ctx");
@@ -129,9 +130,10 @@ module.exports = async (req, res) => {
 
     let narrative = "";
     try {
+      const ff = fence(`Portfolio (real holdings, weights of invested part): ${items.map((x) => `${x.tk} ${x.weightPct}% beta ${x.beta}`).join("; ")}\nHorizon: ${years}y, ${PATHS} seeded paths.\nOutcome multipliers: p5 ${percentiles.p5}, p25 ${percentiles.p25}, median ${percentiles.p50}, p75 ${percentiles.p75}, p95 ${percentiles.p95}. Probability of a loss: ${probLoss}%.\nStress impacts: ${stress.map((s) => `${s.name} ${s.impactPct}%`).join("; ")}.`, "simulation", 8000);
       const ai = await generateJson({
-        system: withLang(NARRATIVE_SYSTEM, lang), job: "ai-sim", timeoutMs: 30000,
-        user: `Portfolio (real holdings, weights of invested part): ${items.map((x) => `${x.tk} ${x.weightPct}% beta ${x.beta}`).join("; ")}\nHorizon: ${years}y, ${PATHS} seeded paths.\nOutcome multipliers: p5 ${percentiles.p5}, p25 ${percentiles.p25}, median ${percentiles.p50}, p75 ${percentiles.p75}, p95 ${percentiles.p95}. Probability of a loss: ${probLoss}%.\nStress impacts: ${stress.map((s) => `${s.name} ${s.impactPct}%`).join("; ")}.\nWrite the narrative.`,
+        system: withLang(NARRATIVE_SYSTEM + "\n\n" + guard([ff.tag]), lang), job: "ai-sim", timeoutMs: 30000,
+        user: ff.wrapped + "\nWrite the narrative.",
         schema: NARRATIVE_SCHEMA,
       });
       narrative = String(ai.narrative || "").replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 700);

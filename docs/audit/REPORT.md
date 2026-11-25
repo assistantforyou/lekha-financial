@@ -1,3 +1,5 @@
+> **AI provider note (2026-11-25):** Z.ai/GLM has been removed. DeepSeek is the only conversational AI provider; Gemini is used only for document embeddings. Any Z.ai/GLM or Gemini-chat references below are historical test records, not current setup.
+
 # LEKHA Financials engineering audit
 
 **Production assessment: not ready for production sign-off.** The integrated branch builds and the tested local journeys pass. Two account-level failures were reproducible on the original source, and historical filings, model failover and AI evidence needed corrections. Live identity, billing, provider entitlements, deployed access policies and financial-model calibration still require independent evidence. The browser inventory covers a subset of possible states.

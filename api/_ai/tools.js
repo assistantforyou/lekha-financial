@@ -43,6 +43,27 @@ const EXTRA = {
   },
 };
 
+const PULSE = [["SPY", "S&P 500 (SPY)"], ["QQQ", "Nasdaq 100 (QQQ)"], ["DIA", "Dow Jones (DIA)"], ["IWM", "Russell 2000 (IWM)"]];
+const pctText = (x) => (Number.isFinite(x) ? `${x >= 0 ? "+" : ""}${(Math.round(x * 10000) / 100).toFixed(2)}%` : "n/a");
+EXTRA.get_market_pulse = {
+  desc: "Live broad-market snapshot: S&P 500, Nasdaq 100, Dow and Russell 2000 ETFs with today's move. Fetched on every call, never from memory.",
+  args: {},
+  run: async () => {
+    const { data: qs } = await svc.getQuotes(PULSE.map((p) => p[0]));
+    const rows = PULSE.filter(([s]) => qs[s] && qs[s].price > 0);
+    if (!rows.length) throw new Error("no_market_quotes");
+    const stamp = rows.map(([s]) => qs[s].timestamp).filter(Boolean).sort().pop() || null;
+    return {
+      label: "Live market snapshot",
+      source: qs[rows[0][0]].source || "market data",
+      asOf: stamp,
+      kind: "fact",
+      lines: rows.map(([s, name]) => `${name}: ${Number(qs[s].price).toFixed(2)} USD, ${pctText(qs[s].changePercent)} vs previous close${qs[s].meta && qs[s].meta.freshness ? ` (${qs[s].meta.freshness})` : ""}`),
+      data: rows.map(([s, name]) => ({ symbol: s, name, price: qs[s].price, changePercent: qs[s].changePercent })),
+    };
+  },
+};
+
 function catalog() {
   const out = {};
   for (const [name, t] of Object.entries(agent.TOOLS)) out[name] = { desc: t.desc, args: t.args };
@@ -141,8 +162,44 @@ async function chartFor(symbol, { days = 180 } = {}) {
       .slice(-120)
       .map((b) => [String(b[0]).slice(0, 10), Number(b[4].toFixed(4))]);
     if (pts.length < 5) return null;
-    return { type: "chart", symbol: String(symbol).toUpperCase(), currency: currencyOf(String(symbol).toUpperCase()), points: pts, asOf: pts[pts.length - 1][0], source: "market data" };
+    return { type: "chart", kind: "price", symbol: String(symbol).toUpperCase(), currency: currencyOf(String(symbol).toUpperCase()), points: pts, asOf: pts[pts.length - 1][0], source: "market data" };
   } catch (e) { return null; }
 }
 
-module.exports = { schemas, names, catalog, run, parseArgs, evidenceOf, evidenceBlock, chartFor };
+/* Several symbols on one axis, each rebased to 100 at the first common session, so relative performance reads at a glance. */
+async function compareChartFor(symbols, { days = 180 } = {}) {
+  try {
+    const list = [...new Set((symbols || []).map((x) => String(x).toUpperCase()))].slice(0, 4);
+    if (list.length < 2) return null;
+    const got = await Promise.all(list.map(async (s) => {
+      try { const { data } = await svc.getHistoricalPrices(s, { days }); return [s, (data || []).filter((b) => Number.isFinite(b[4]) && b[4] > 0).map((b) => [String(b[0]).slice(0, 10), b[4]])]; } catch (e) { return [s, []]; }
+    }));
+    const ok = got.filter(([, p]) => p.length >= 5);
+    if (ok.length < 2) return null;
+    const common = ok.map(([, p]) => new Set(p.map((x) => x[0]))).reduce((a, b) => new Set([...a].filter((d) => b.has(d))));
+    const dates = [...common].sort().slice(-120);
+    if (dates.length < 5) return null;
+    const series = ok.map(([s, p]) => { const m = new Map(p), base = m.get(dates[0]); return { label: s, points: dates.map((d) => [d, Math.round((m.get(d) / base) * 10000) / 100]) }; });
+    return { type: "chart", kind: "lines", title: "Relative performance, rebased to 100", unit: "index", series, asOf: dates[dates.length - 1], source: "market data" };
+  } catch (e) { return null; }
+}
+
+/* Portfolio charts come straight from the priced holdings the model was shown, so the picture and the text cannot disagree. */
+function portfolioCharts(ctx) {
+  if (!ctx || !Array.isArray(ctx.rows)) return [];
+  const priced = ctx.rows.filter((r) => r.priced !== false && r.valUsd > 0);
+  const total = priced.reduce((a, r) => a + r.valUsd, 0);
+  if (!priced.length || !(total > 0)) return [];
+  const out = [];
+  const sorted = [...priced].sort((a, b) => b.valUsd - a.valUsd);
+  const top = sorted.slice(0, 10), rest = sorted.slice(10).reduce((a, r) => a + r.valUsd, 0);
+  const items = top.map((r) => ({ label: r.tk, value: Math.round(r.valUsd * 100) / 100, pct: Math.round((r.valUsd / total) * 1000) / 10 }));
+  if (rest > 0) items.push({ label: "Other", value: Math.round(rest * 100) / 100, pct: Math.round((rest / total) * 1000) / 10 });
+  const unpriced = ctx.rows.filter((r) => r.priced === false).length;
+  out.push({ type: "chart", kind: "donut", title: "Allocation by priced holding", unit: "USD", items, asOf: ctx.fetchedAt ? String(ctx.fetchedAt).slice(0, 16).replace("T", " ") + " UTC" : null, source: "live quotes" + (unpriced ? `; ${unpriced} unpriced position${unpriced > 1 ? "s" : ""} excluded` : "") });
+  const pl = priced.filter((r) => r.tk !== "CASH" && r.costUsd > 0).map((r) => ({ label: r.tk, value: Math.round(((r.valUsd - r.costUsd) / r.costUsd) * 10000) / 100 })).sort((a, b) => b.value - a.value);
+  if (pl.length >= 2) out.push({ type: "chart", kind: "bar", title: "Unrealized return on cost", unit: "%", items: pl.slice(0, 14), asOf: ctx.fetchedAt ? String(ctx.fetchedAt).slice(0, 16).replace("T", " ") + " UTC" : null, source: "live quotes against recorded cost basis" });
+  return out;
+}
+
+module.exports = { schemas, names, catalog, run, parseArgs, evidenceOf, evidenceBlock, chartFor, compareChartFor, portfolioCharts };

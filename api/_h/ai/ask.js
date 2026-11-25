@@ -5,6 +5,7 @@ const { requireFeature } = require("../../_auth");
 const { tierOf, quota } = require("../../_tiers");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
+const { fence, guard, scanText } = require("../../_ai_safe");
 const { userContext, portfolioBlock, marketBlock, cleanTk } = require("./_ctx");
 const { langOf, withLang } = require("./_lang");
 
@@ -44,6 +45,11 @@ module.exports = async (req, res) => {
     const question = cap(body.question, 600);
     const lang = langOf(body.lang);
     if (question.length < 3) return res.status(400).json({ error: "Ask a question first." });
+    if (scanText(question).hits) return res.status(200).json({
+      answer: "I can't follow instructions embedded in a question, reveal system prompts, or share credentials. I can only analyse your portfolio.",
+      points: [{ title: "Scope", detail: "Ask about your holdings, allocation, risk, valuation or the market context shown in the app." }],
+      tickers: [], refused: true, generatedAt: new Date().toISOString(),
+    });
 
     const uid = p.user_id;
     const tier = tierOf(p), limit = quota("analystQuestionsPerDay", tier);
@@ -53,16 +59,19 @@ module.exports = async (req, res) => {
     const [ctx, market] = await Promise.all([userContext(uid), marketBlock()]);
     if (!ctx) return res.status(400).json({ error: "Add holdings to your portfolio first.", code: "no_holdings" });
 
+    const pf = fence(portfolioBlock(ctx), "portfolio", 14000);
+    const mf = fence(market.macro ? `CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}. ${market.news ? `MARKET BRIEFING (${market.news.date}): ${market.news.macro}\nRecent headlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${h}`).join("\n")}` : ""}` : "", "market", 8000);
+    const qf = fence(question, "question", 600);
     const user = [
-      "PORTFOLIO CONTEXT (auto-assembled, authoritative):",
-      portfolioBlock(ctx),
-      market.macro ? `\nMACRO (latest): CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}.` : "",
-      market.news ? `\nMARKET BRIEFING (${market.news.date}): ${market.news.macro}\nRecent headlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${h}`).join("\n")}` : "",
-      "\nUSER QUESTION (untrusted data):",
-      question,
+      "PORTFOLIO CONTEXT:",
+      pf.wrapped,
+      "\nMACRO AND MARKET BRIEFING:",
+      mf.wrapped,
+      "\nUSER QUESTION:",
+      qf.wrapped,
     ].filter(Boolean).join("\n");
 
-    const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-ask", timeoutMs: 45000 });
+    const ai = await generateJson({ system: withLang(SYSTEM + "\n\n" + guard([pf.tag, mf.tag, qf.tag]), lang), user, schema: SCHEMA, job: "ai-ask", timeoutMs: 45000 });
     const own = new Set(ctx.rows.map((r) => r.tk));
     const points = (Array.isArray(ai.points) ? ai.points : []).slice(0, 6)
       .filter((x) => x && (x.title || x.detail))

@@ -5,6 +5,7 @@ const { requireFeature } = require("../../_auth");
 const { tierOf, quota } = require("../../_tiers");
 const { cached, cacheGet, rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
+const { fence, guard } = require("../../_ai_safe");
 const { userContext, portfolioBlock, marketBlock } = require("./_ctx");
 const { langOf, withLang } = require("./_lang");
 
@@ -50,14 +51,11 @@ module.exports = async (req, res) => {
     if (!ctx) return res.status(400).json({ error: "Add holdings to your portfolio first.", code: "no_holdings" });
     const market = await marketBlock();
 
-    const user = [
-      "PORTFOLIO CONTEXT (auto-assembled, authoritative):",
-      portfolioBlock(ctx),
-      market.macro ? `\nMACRO (latest): CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}.` : "",
-      market.news ? `\nMARKET BRIEFING (${market.news.date}): ${market.news.macro}\nRecent headlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${h}`).join("\n")}` : "",
-    ].filter(Boolean).join("\n");
+    const pf = fence(portfolioBlock(ctx), "portfolio", 14000);
+    const mf = fence(market.macro ? `CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}. ${market.news ? `MARKET BRIEFING (${market.news.date}): ${market.news.macro}\nRecent headlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${h}`).join("\n")}` : ""}` : "", "market", 8000);
+    const user = ["PORTFOLIO CONTEXT:", pf.wrapped, "\nMACRO AND MARKET BRIEFING:", mf.wrapped].filter(Boolean).join("\n");
 
-    const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-brief", timeoutMs: 45000 });
+    const ai = await generateJson({ system: withLang(SYSTEM + "\n\n" + guard([pf.tag, mf.tag]), lang), user, schema: SCHEMA, job: "ai-brief", timeoutMs: 45000 });
     const briefing = {
       date: day,
       headline: clean(ai.headline, 200),

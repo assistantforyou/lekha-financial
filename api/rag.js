@@ -11,6 +11,7 @@ const { clientId } = require("./_history");
 const { rateHit } = require("./_lib");
 const { sb } = require("./_lib");
 const rag = require("./_fin/rag");
+const { cleanText, neutralise, scanText } = require("./_ai_safe");
 
 const MAX_TEXT = 20000;
 
@@ -61,8 +62,11 @@ module.exports = async (req, res) => {
   }
 
   if (action === "ingest") {
-    const text = String(b.text || "").slice(0, MAX_TEXT);
-    if (text.length < 80) return res.status(400).json({ error: "That document is too short to index." });
+    const raw = cleanText(b.text, MAX_TEXT);
+    if (raw.length < 80) return res.status(400).json({ error: "That document is too short to index." });
+    const hits = scanText(raw).hits;
+    if (hits) console.error("rag ingest: instruction-like text neutralised", hits);
+    const text = neutralise(raw, MAX_TEXT).text;
     if (!(await rateHit(`rag/ingest/${quotaOwner}/${Math.floor(Date.now() / 36e5)}`, 30).catch(() => true))) return res.status(429).json({ error: "Too many documents this hour." });
     const kind = ["report", "statement", "note"].includes(b.kind) ? b.kind : "note";
     // saved Council reports are Premium material: only an account entitled to them may index one
@@ -70,7 +74,7 @@ module.exports = async (req, res) => {
     const ref = `${kind}:${String(b.ref || Date.now()).slice(0, 80)}`;
     try {
       const chunks = rag.chunkText(text);
-      const r = await rag.upsert(owner, chunks.map((c, i) => ({ kind, ref: `${ref}#${i}`, title: String(b.title || ref).slice(0, 160), content: c, ticker: b.ticker ? String(b.ticker).toUpperCase() : null, doc_type: kind, as_of: b.asOf || null, source_url: b.url || null })));
+      const r = await rag.upsert(owner, chunks.map((c, i) => ({ kind, ref: `${ref}#${i}`, title: cleanText(b.title || ref, 160), content: c, ticker: b.ticker ? cleanText(b.ticker, 20).toUpperCase() : null, doc_type: kind, as_of: b.asOf || null, source_url: b.url || null })));
       return res.status(200).json(r);
     } catch (e) { return res.status(502).json({ error: "That document could not be indexed: " + (e.code || e.status || e.message) }); }
   }
