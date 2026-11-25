@@ -1,3 +1,5 @@
+> **AI provider note (2026-11-25):** Z.ai/GLM has been removed. DeepSeek is the only conversational AI provider; Gemini is used only for document embeddings. Any Z.ai/GLM or Gemini-chat references below are historical test records, not current setup.
+
 # LEKHA Financials full-system audit — state of the work, 22 November 2026
 
 Written for handover. It records what was verified, what is still open, and — in the

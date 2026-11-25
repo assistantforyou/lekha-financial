@@ -64,4 +64,4 @@ open http://localhost:3456/v3?demo=1#/portfolio/overview
 After any V2 change: `node scripts/build-v3.mjs`.
 
 ## 6. Production readiness
-Ready to review on a Vercel preview deployment of this branch (`/v3` rewrite already exists in `vercel.json`). Needs approval before production: (1) a live Premium Council test and env review (`COUNCIL_V3_DAILY`, `COUNCIL_V3_MAX_TOKENS`, `ZAI_API_KEY`); (2) decision on server-side Premium enforcement for the older `/api/ai/{ask,briefing,simulate,council}` endpoints, which currently accept free/paid; (3) translations for new V3 strings; (4) merge to `main`.
+Ready to review on a Vercel preview deployment of this branch (`/v3` rewrite already exists in `vercel.json`). Needs approval before production: (1) a live Premium Council test and env review (`COUNCIL_V3_DAILY`, `COUNCIL_V3_MAX_TOKENS`, `DEEPSEEK_API_KEY`); (2) decision on server-side Premium enforcement for the older `/api/ai/{ask,briefing,simulate,council}` endpoints, which currently accept free/paid; (3) translations for new V3 strings; (4) merge to `main`.

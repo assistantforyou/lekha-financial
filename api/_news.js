@@ -3,6 +3,7 @@
 // the model refers to items by number, so it cannot invent a story or a URL.
 const { cached, cacheGet } = require("./_lib");
 const { generateJson } = require("./_llm");
+const { fence, guard } = require("./_ai_safe");
 const SP500 = require("./_data/sp500.json").stocks;
 
 const FEEDS = [
@@ -97,7 +98,8 @@ async function buildNews() {
   const items = await collectItems();
   if (items.length < 5) throw new Error("few_items");
   const list = items.map((it, i) => `${i}. [${it.source}] ${it.headline}${it.desc ? " — " + it.desc : ""}`).join("\n");
-  const ai = await generateJson({ system: SYSTEM, user: `Return between 6 and 10 distinct items (as many relevant ones as the list supports, never fewer than 6 when the list has 6 or more).\n\nNews items:\n${list}`, schema: SCHEMA, timeoutMs: 45000 });
+  const f = fence(list, "news", 30000);
+  const ai = await generateJson({ system: SYSTEM + "\n\n" + guard([f.tag]), user: `Return between 6 and 10 distinct items (as many relevant ones as the list supports, never fewer than 6 when the list has 6 or more).\n\nNews items:\n${f.wrapped}`, schema: SCHEMA, timeoutMs: 45000 });
   const date = new Date().toISOString().slice(0, 10);
   const today = briefingDoc(items, ai, date);
   if (!today) throw new Error("empty_briefing");
@@ -145,7 +147,8 @@ async function translateDocs(docs, lang) {
   const idx = list.map((x, i) => [i, x]).filter(([, x]) => x && String(x).trim()), tr = new Array(list.length).fill("");
   const batches = []; for (let k = 0; k < idx.length; k += 20) batches.push(idx.slice(k, k + 20));
   await Promise.all(batches.map(async (b) => {
-    const ai = await generateJson({ system: sys, user: b.map(([i, x]) => `${i}. ${x}`).join("\n"), schema: TR_SCHEMA, timeoutMs: 40000, job: "news-translate" });
+    const f = fence(b.map(([i, x]) => `${i}. ${x}`).join("\n"), "strings", 20000);
+    const ai = await generateJson({ system: sys + "\n\n" + guard([f.tag]), user: f.wrapped, schema: TR_SCHEMA, timeoutMs: 40000, job: "news-translate" });
     for (const r of Array.isArray(ai && ai.t) ? ai.t : []) { const i = Number(r && r.i); if (Number.isInteger(i) && i >= 0 && i < list.length && typeof r.s === "string") tr[i] = r.s; }
   }));
   if (tr.filter(Boolean).length < idx.length * 0.6) throw new Error("translate_incomplete");
