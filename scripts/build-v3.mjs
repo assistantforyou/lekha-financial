@@ -74,6 +74,42 @@ main = patch(main, '<span>Equity risk premium <span class="muted">(Damodaran imp
 main = patch(main, '<label class="chk"><input type="checkbox" id="vs-sbc" ${S.vset.sbc?"checked":""}> Treat stock-based pay as a cost</label>', '<label class="chk"><input type="checkbox" id="vs-sbc" ${S.vset.sbc?"checked":""}> Treat stock-based pay as a cost${vsI("sbc")}</label>', "mos info on sbc");
 main = patch(main, `el.querySelectorAll("input").forEach(i=>i.addEventListener("change",apply));`, `el.querySelectorAll("input").forEach(i=>i.addEventListener("change",apply));el.querySelectorAll(".vs-i").forEach(i=>{i.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();const o=i.classList.contains("open");el.querySelectorAll(".vs-i.open").forEach(x=>x.classList.remove("open"));if(!o)i.classList.add("open")});i.addEventListener("keydown",e=>{if(e.key==="Escape")i.classList.remove("open")})});`, "mos info tap toggle");
 
+
+/* ---------- speed (unified app only: LEKHA_SHELL.lazy) ----------
+   1. the portfolio series is memoised (it was rebuilt by every redraw);
+   2. the seven heavy market-data feeds (rotation, breadth, overbought/oversold, factors, volatility, peers, risk) start when a route that needs them opens,
+      or after the page has been idle, instead of at boot;
+   3. render functions of panels that are not on screen return at once until the idle warm-up (they were drawing hidden panels at boot).
+   /v2 and /v3 never set LEKHA_SHELL.lazy, so they behave exactly as before. */
+main = patch(main, `function buildPortfolioSeries(){\n  if(!S.hist||!S.rows.length)return null;`,
+  `let _pfm=null;
+function buildPortfolioSeries(){if(!S.hist||!S.rows.length)return null;const k=[S.hist,S.rows,S.usdthb,S.hkdusd,Math.floor(ptNow()/60000)];if(_pfm&&_pfm.k.every((x,i)=>x===k[i]))return _pfm.v;const v=buildPortfolioSeries0();_pfm={k,v};return v}
+function buildPortfolioSeries0(){
+  if(!S.hist||!S.rows.length)return null;`, "memo portfolio series");
+
+main = patch(main, `mcp.watchTool(DRIVE,TOOL,{fileId:ROT_ID,`, `watchL(DRIVE,TOOL,{fileId:ROT_ID,`, "lazy ROT_ID");
+main = patch(main, `mcp.watchTool(DRIVE,TOOL,{fileId:BREADTH_ID,`, `watchL(DRIVE,TOOL,{fileId:BREADTH_ID,`, "lazy BREADTH_ID");
+main = patch(main, `mcp.watchTool(DRIVE,TOOL,{fileId:OBOS_ID,`, `watchL(DRIVE,TOOL,{fileId:OBOS_ID,`, "lazy OBOS_ID");
+main = patch(main, `mcp.watchTool(DRIVE,TOOL,{fileId:FACTOR_ID,`, `watchL(DRIVE,TOOL,{fileId:FACTOR_ID,`, "lazy FACTOR_ID");
+main = patch(main, `mcp.watchTool(DRIVE,TOOL,{fileId:VOL_ID,`, `watchL(DRIVE,TOOL,{fileId:VOL_ID,`, "lazy VOL_ID");
+main = patch(main, `mcp.watchTool(DRIVE,TOOL,{fileId:PEER_ID,`, `watchL(DRIVE,TOOL,{fileId:PEER_ID,`, "lazy PEER_ID");
+main = patch(main, `mcp.watchTool(DRIVE,TOOL,{fileId:RISK_ID,`, `watchL(DRIVE,TOOL,{fileId:RISK_ID,`, "lazy RISK_ID");
+main = patch(main, `  const watchEngine=()=>mcp.watchTool(`, `  const watchL=(...a)=>lazyData(()=>mcp.watchTool(...a));\n  const watchEngine=()=>mcp.watchTool(`, "lazy watch helper");
+main = patch(main, `lekha:{lineChart,multiChart,fx,esc,money,pct,positions,aggregate,computeVal,drawTicker,ldDetail,renderRRG,renderSummary},`,
+  `ensureData:g=>ensureData(g),lekha:{lineChart,multiChart,fx,esc,money,pct,positions,aggregate,computeVal,drawTicker,ldDetail,renderRRG,renderSummary},`, "expose ensureData");
+main = patch(main, `setCur(S.cur);\nrenderRotation();`, `const LZ={on:!(window.LEKHA_SHELL&&LEKHA_SHELL.lazy),q:[],warm:false};
+function lazyData(fn){if(LZ.on)fn();else LZ.q.push(fn)}
+function ensureData(gap){if(LZ.on)return;LZ.on=true;const q=LZ.q.splice(0);q.forEach((f,i)=>setTimeout(()=>{try{f()}catch(e){console.warn("[lekha] data",e)}},i*(gap||0)))}
+if(window.LEKHA_SHELL&&LEKHA_SHELL.lazy){
+  const hid=id=>{const e=document.getElementById(id);return !e||!!e.closest("[hidden]")};
+  const guard=(probe,fn)=>function(){if(!LZ.warm&&hid(probe))return;return fn.apply(this,arguments)};
+  renderRegime=guard("rg-box",renderRegime);renderLead=guard("ld-box",renderLead);renderVix=guard("vx-box",renderVix);renderFgi=guard("fg-box",renderFgi);
+  renderRotation=guard("rot-chart",renderRotation);renderRRG=guard("rrg-chart",renderRRG);renderBreadth=guard("br-table",renderBreadth);renderObos=guard("ob-table",renderObos);renderRiskApp=guard("ra-chart",renderRiskApp);
+  const idle=f=>window.requestIdleCallback?requestIdleCallback(f,{timeout:4000}):setTimeout(f,300);
+  setTimeout(()=>idle(()=>{LZ.warm=true;ensureData(150);[renderMacro,renderLead,renderVix,renderFgi,renderRotation,renderRRG,renderBreadth,renderObos,renderRiskApp].forEach((f,i)=>setTimeout(()=>{try{f()}catch(e){}},1500+i*150))}),3500);
+}
+setCur(S.cur);\nrenderRotation();`, "render guards + warm-up");
+
 writeFileSync(P("v3", "lekha-engine.js"), HDR("public/v2/index.html (adapter + main script)") + adapter + "\n" + main);
 
 /* ---------- account / banner painter ---------- */

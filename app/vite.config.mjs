@@ -2,7 +2,8 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import path from "node:path"
-import { readFileSync } from "node:fs"
+import { readFileSync, existsSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { fileURLToPath } from "node:url"
 
 const dir = path.dirname(fileURLToPath(import.meta.url))
@@ -13,11 +14,20 @@ const stage = () => ({
   transformIndexHtml: { order: "pre", handler: (html) => html.replace("<!--@stage-->", readFileSync(path.join(dir, "stage.html"), "utf8")) },
 })
 
+/* Classic scripts and styles have fixed names, so they could never be cached for long without serving a stale engine after a deploy.
+   This stamps each local one with a content hash (?v=...): a changed file gets a new URL, an unchanged one is cached for a year (vercel.json). */
+const stamp = () => ({
+  name: "lekha-stamp",
+  transformIndexHtml: { order: "post", handler: (html) => html.replace(/((?:src|href)=")(\/[^"?#]+\.(?:js|css))(")/g, (m, a, f, z) => {
+    const file = path.resolve(dir, "../public" + f); if (f.startsWith("/assets/") || !existsSync(file)) return m
+    return a + f + "?v=" + createHash("sha1").update(readFileSync(file)).digest("hex").slice(0, 10) + z }) },
+})
+
 export default defineConfig({
   root: dir,
   base: "/",
   publicDir: false,
-  plugins: [stage(), react(), tailwindcss()],
-  resolve: { alias: { "@": path.resolve(dir, "src") } },
+  plugins: [stage(), react(), tailwindcss(), stamp()],
+  resolve: { alias: { "@": path.resolve(dir, "src"), "@fin": path.resolve(dir, "../api/_fin/valuation") } },
   build: { outDir: path.resolve(dir, "../public"), emptyOutDir: false, rollupOptions: { input: path.resolve(dir, "index.html") } },
 })

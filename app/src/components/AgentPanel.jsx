@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react"
-import { Bot, ChevronRight, Loader2, Paperclip, Plus, Send, Square, Trash2, Wrench } from "lucide-react"
+import { Bot, ChevronRight, Loader2, Lock, Paperclip, Plus, Send, Square, Trash2, Wrench } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { LineChart } from "@/components/common"
+import Markdown from "@/components/Markdown"
+import { ChartCard } from "@/components/Charts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
-import { trackCustom } from "@/lib/pixel"
+import { isDemo, useSession } from "@/lib/engine"
+import { Tooltip } from "@/components/ui/tooltip"
+import { trackCustom, funnel } from "@/lib/pixel"
 import { capture } from "@/lib/analytics"
 import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
 import { cn } from "@/lib/utils"
@@ -77,40 +80,36 @@ function Answer({ m, live }) {
   const tools = (m.parts || []).filter((p) => p.type === "tool")
   const evidence = (m.parts || []).filter((p) => p.type === "evidence").flatMap((p) => p.items || [])
   const error = (m.parts || []).find((p) => p.type === "error")
-  // Charts arrive as their own parts, drawn server-side from the same feed the evidence quotes.
-  const charts = (m.parts || []).filter((p) => p.type === "chart" && Array.isArray(p.points) && p.points.length > 1)
+  // Charts arrive as their own parts, drawn server-side from the same live feed the evidence quotes.
+  const charts = (m.parts || []).filter((p) => p.type === "chart")
+  const notices = (m.parts || []).filter((p) => p.type === "notice")
+  const step = [...(m.parts || [])].reverse().find((p) => p.type === "step")
   return (
     <div className="space-y-2">
       <Reasoning text={reasoning} live={live && !m.content} />
       {tools.map((p, i) => <ToolCard key={p.id || i} p={p} />)}
       {m.content ? (
-        <div className="space-y-2 text-sm leading-relaxed">
-          {String(m.content).split(/\n{2,}/).map((para, i) => <p key={i} className="whitespace-pre-wrap">{para}</p>)}
-        </div>
+        <Markdown text={m.content} />
       ) : live ? (
-        <div className="flex items-center gap-2 text-sm text-[var(--muted)]"><Loader2 className="size-4 animate-spin" /> Working</div>
+        <div className="flex items-center gap-2 text-sm text-[var(--muted)]"><Loader2 className="size-4 animate-spin" /> {step ? step.label : "Working"}</div>
       ) : null}
-      {charts.map((c, i) => (
-        <figure key={`${c.symbol}-${i}`} className="rounded-lg border border-border bg-[var(--panel)] p-2.5">
-          <figcaption className="mb-1 flex items-baseline justify-between gap-2 text-[11.5px]">
-            <span className="font-medium">{c.symbol} · last {c.points.length} sessions</span>
-            <span className="text-muted-foreground">{c.asOf}</span>
-          </figcaption>
-          <LineChart points={c.points} height={148} format={(v) => `${c.currency === "THB" ? "฿" : c.currency === "HKD" ? "HK$" : c.currency === "USD" ? "$" : ""}${Number(v).toFixed(2)}`} xLabel={(d) => String(d).slice(0, 7)} />
-        </figure>
-      ))}
+      {charts.map((c, i) => <ChartCard key={`${c.kind || "c"}-${c.symbol || c.title || ""}-${i}`} chart={c} />)}
+      {notices.map((n, i) => <Alert key={i} variant="warn"><AlertDescription>{n.message}</AlertDescription></Alert>)}
       <Evidence items={evidence} />
       {error && <Alert variant="warn"><AlertDescription>{error.message}</AlertDescription></Alert>}
     </div>
   )
 }
 
+/* The Quick Tour listens for a question being sent and answered (it steps aside while the visitor asks, then returns beside the answer). */
+const tourSignal = (phase) => { try { window.dispatchEvent(new CustomEvent("lekha:ask", { detail: { phase } })) } catch (e) {} }
 export default function AgentPanel({ symbol, initial }) {
   const [threads, setThreads] = useState([])
   const [threadId, setThreadId] = useState(null)
   const [msgs, setMsgs] = useState([])
   const [input, setInput] = useState("")
-  const [mode, setMode] = useState("fast")
+  const [mode, setMode] = useState("fast"), [lockNote, setLockNote] = useState(false)
+  const sess = useSession(), demo = isDemo() && !(sess && sess.access_token)   // the demo is Fast only; Deep is shown locked
   const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState("")
@@ -161,12 +160,13 @@ export default function AgentPanel({ symbol, initial }) {
       { role: "user", content: q, at: Date.now(), attachments: attached.map((a) => a.name) },
       { role: "assistant", content: "", parts: [], at: Date.now() }])
     setBusy(true)
+    tourSignal("start")
     const ctl = new AbortController()
     abort.current = ctl
-    let reply = ""
+    let reply = "", answered = false
     try {
       const out = await streamChat({
-        message: q, threadId, mode, symbol, signal: ctl.signal,
+        message: q, threadId, mode: demo ? "fast" : mode, symbol, signal: ctl.signal,
         attachments: attached,
         lang: window.PT_I18N ? window.PT_I18N.lang : "en",
         onPart: (p) => {
@@ -185,6 +185,7 @@ export default function AgentPanel({ symbol, initial }) {
           else patch(base + 1, (m) => ({ ...m, parts: [...m.parts, p] }))
         },
       })
+      funnel("AnswerSeen"); answered = true
       const id = out.threadId || threadId
       if (id) {
         // Keep a copy in this browser as well, so a conversation survives a reload even without an account.
@@ -213,7 +214,7 @@ export default function AgentPanel({ symbol, initial }) {
         try { localStorage.setItem("ptpub.v1.pendingAsk", q) } catch (x) {}
         patch(base + 1, (m) => ({ ...m, content: "", parts: [] }))
         setMsgs((ms) => ms.slice(0, base + 1))
-        setWall(true)
+        setWall(true); funnel("WallShown")
       }
       else {
         capture("agent_question_failed", { mode, reason: e.code || (e.status ? "http_" + e.status : "error") })
@@ -225,7 +226,7 @@ export default function AgentPanel({ symbol, initial }) {
           : e.message || "That request failed."
         setErr(msg)
       }
-    } finally { setBusy(false); abort.current = null }
+    } finally { setBusy(false); abort.current = null; tourSignal(answered ? "done" : "fail") }
   }
 
   async function openThread(id) {
@@ -292,10 +293,11 @@ export default function AgentPanel({ symbol, initial }) {
         </div>
       </aside>
 
-      <div className="order-1 space-y-3 lg:order-2">
+      <div className="relative isolate order-1 space-y-3 lg:order-2">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ background: "var(--fg)", opacity: 0.06, WebkitMaskImage: "url(/v3/brand/lekha-logo-white.png)", maskImage: "url(/v3/brand/lekha-logo-white.png)", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center 40%", maskPosition: "center 40%", WebkitMaskSize: "min(78%, 420px) auto", maskSize: "min(78%, 420px) auto" }} />
         <div className="min-h-[240px] space-y-4">
           {!msgs.length && (
-            <Card><CardContent className="flex items-start gap-3 py-6">
+            <Card className="bg-transparent"><CardContent className="flex items-start gap-3 py-6">
               <Bot className="mt-0.5 size-5 text-[var(--accent)]" />
               <div className="text-sm">
                 <p className="font-medium">Ask about a company, your portfolio, or the market.</p>
@@ -342,8 +344,8 @@ export default function AgentPanel({ symbol, initial }) {
                   Create a free account to keep asking, and the analyst answers about your own holdings instead of the sample portfolio.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <Button size="sm" asChild><a href={`/login.html?mode=signup&next=${wallNext}`}>Create a free account</a></Button>
-                  <Button size="sm" variant="outline" asChild><a href={`/login.html?next=${wallNext}`}>I already have one</a></Button>
+                  <Button size="sm" asChild><a href={`/login.html?mode=signup&next=${wallNext}`} onClick={() => funnel("WallClick", { action: "signup" })}>Create a free account</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/login.html?next=${wallNext}`} onClick={() => funnel("WallClick", { action: "login" })}>I already have one</a></Button>
                 </div>
                 <p className="mt-2 text-[11px] text-[var(--muted)]">Free plan, no card. Your question is saved and waiting for you.</p>
               </div>
@@ -351,7 +353,7 @@ export default function AgentPanel({ symbol, initial }) {
           </div>
         )}
 
-        <div className="rounded-lg border border-[var(--line)] p-2">
+        <div className="rounded-lg border border-[var(--line)] p-2" data-tour="ask-box">
           <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask(input) }}
             placeholder={symbol ? `Ask about ${symbol}…` : "Ask a question…"} rows={2} className="resize-none border-0 shadow-none focus-visible:ring-0" disabled={busy} />
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -360,12 +362,16 @@ export default function AgentPanel({ symbol, initial }) {
               <input type="file" className="hidden" multiple accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,.csv,.tsv,.txt,.md,.json" onChange={(e) => { attach(e.target.files); e.target.value = "" }} disabled={busy} />
             </label>
             <div className="flex overflow-hidden rounded-md border border-[var(--line)] text-xs">
-              {["fast", "deep"].map((m) => (
+              {["fast", "deep"].map((m) => m === "deep" && demo ? (
+                <Tooltip key={m} content="Deep mode is not available in demo mode. Create a free account to unlock the account plans.">
+                  <button type="button" aria-disabled="true" onClick={() => setLockNote(true)} className="inline-flex cursor-not-allowed items-center gap-1 px-2.5 py-1 capitalize text-[var(--muted)] opacity-60"><Lock className="size-3" aria-hidden="true" />{m}</button>
+                </Tooltip>
+              ) : (
                 <button key={m} type="button" onClick={() => { capture("agent_mode_changed", { mode: m }); setMode(m) }} disabled={busy}
-                  className={cn("px-2.5 py-1 capitalize", mode === m ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]")}>{m}</button>
+                  className={cn("px-2.5 py-1 capitalize", (demo ? "fast" : mode) === m ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]")}>{m}</button>
               ))}
             </div>
-            <span className="text-[11px] text-[var(--muted)]">{mode === "deep" ? "Tools and thinking, slower" : "Direct answer"}</span>
+            <span className="text-[11px] text-[var(--muted)]">{demo && lockNote ? "Deep mode is not available in demo mode." : mode === "deep" && !demo ? "Tools and thinking, slower" : "Direct answer"}</span>
             <div className="ml-auto flex gap-1.5">
               {busy ? (
                 <Button size="sm" variant="outline" onClick={() => abort.current && abort.current.abort()}><Square className="size-3.5" /> Stop</Button>

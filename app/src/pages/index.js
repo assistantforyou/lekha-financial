@@ -1,10 +1,11 @@
-import { Profile, Preferences, Plans, Layout, DataPage } from "./account"
-import { Audit, Diagnostics } from "./system"
-import CompanyPage from "./company"
-import AgentPage from "./agent"
-import NewsPage from "./news"
-import MacroPage from "./macro"
-import Watchlist from "./watchlist"
-import CouncilPage from "./council"
-import ReportsPage from "./reports"
-export default { company: CompanyPage, agent: AgentPage, news: NewsPage, macro: MacroPage, watchlist: Watchlist, council: CouncilPage, reports: ReportsPage, profile: Profile, preferences: Preferences, plans: Plans, layout: Layout, data: DataPage, diagnostics: Diagnostics, audit: Audit }
+import { lazy } from "react"
+/* Every React page is its own chunk: a visitor on the portfolio overview (the default route) downloads none of them until they open one.
+   The named exports of account.jsx and system.jsx are picked out of their module. */
+const page = (load, name) => lazy(() => load().then((m) => ({ default: name ? m[name] : m.default })))
+const account = () => import("./account"), system = () => import("./system")
+export default {
+  company: page(() => import("./company")), agent: page(() => import("./agent")), news: page(() => import("./news")), macro: page(() => import("./macro")),
+  watchlist: page(() => import("./watchlist")), council: page(() => import("./council")), reports: page(() => import("./reports")),
+  profile: page(account, "Profile"), preferences: page(account, "Preferences"), plans: page(account, "Plans"), layout: page(account, "Layout"), data: page(account, "DataPage"),
+  diagnostics: page(system, "Diagnostics"), audit: page(system, "Audit"),
+}

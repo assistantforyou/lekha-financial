@@ -10,13 +10,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import { Bars, DataState, EmptyBox, ErrorBox, FreshBadge, PageHeader, SourceTag, Spark, Stat } from "@/components/common"
 import AgentPanel from "@/components/AgentPanel"
+import DcfCard from "@/components/valuation/DcfCard"
 import PriceChart from "@/components/PriceChart"
 import { keyStats } from "@/lib/chartmath"
 import { recent, remember } from "@/components/CommandPalette"
 import { usePortfolioFacts } from "@/lib/suggest"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/watchlist"
-import { api, data as fetchData, prefetch, useData } from "@/lib/api"
+import { api, data as fetchData, lastQuote, prefetch, useData } from "@/lib/api"
+import { lookupLocal } from "@/lib/symbols"
 import { compact, date, dateTime, metric, mult, num, pct, price, tone } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
 import { capture } from "@/lib/analytics"
@@ -100,17 +102,11 @@ function Financials({ b }) {
 }
 
 function Valuation({ symbol, b }) {
-  const r = unwrap(b.ratios), [a, setA] = useState({}), [run, setRun] = useState(0)
-  const v = useData("valuation", { symbol, growth: a.growth, discount: a.discount, terminalGrowth: a.terminalGrowth }, { enabled: true, refresh: 0 })
-  const d = v.status === "ok" ? v.data : null, as = d && d.assumptions
+  const r = unwrap(b.ratios)
   return (<div className="space-y-4">
     <Card><CardHeader><CardTitle>Multiples & quality</CardTitle><CardDescription>Every figure is calculated by the app from SEC filings and the live quote. Hover a row for the formula and inputs.</CardDescription></CardHeader><CardContent>
       {!r ? <ErrorBox message={b.ratios.error} attempts={b.ratios.attempts} /> : <Table><TableHeader><TableRow><TableHead>Metric</TableHead><TableHead className="text-right">Value</TableHead><TableHead>Formula</TableHead></TableRow></TableHeader><TableBody>{r.metrics.map((m) => <TableRow key={m.id}><TableCell className="font-medium">{m.label}</TableCell><TableCell className="num text-right">{metric(m)}</TableCell><TableCell className="text-xs text-muted-foreground" title={JSON.stringify(m.inputs)}>{m.formula}</TableCell></TableRow>)}</TableBody></Table>}</CardContent></Card>
-    <Card><CardHeader><CardTitle>Discounted cash flow</CardTitle><CardDescription>Two-stage DCF. Defaults come from reported free cash flow and market data; override any assumption. This is a model, not a price target.</CardDescription></CardHeader><CardContent className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">{[["growth", "FCF growth (10y fade)", as && as.growth], ["discount", "Discount rate", as && as.discount], ["terminalGrowth", "Terminal growth", as && as.terminalGrowth]].map(([k, l, dv]) => <div key={k} className="space-y-1.5"><Label htmlFor={"dcf-" + k}>{l}</Label><div className="flex items-center gap-2"><Input id={"dcf-" + k} type="number" step="0.5" value={a[k] != null ? a[k] * 100 : ""} placeholder={dv != null ? (dv * 100).toFixed(1) : ""} onChange={(e) => setA({ ...a, [k]: e.target.value === "" ? undefined : parseFloat(e.target.value) / 100 })} /><span className="text-sm text-muted-foreground">%</span></div></div>)}</div>
-      <DataState s={v}>{d && (d.dcf ? <div className="space-y-3"><div className="grid grid-cols-2 gap-2 md:grid-cols-4"><Stat label="Intrinsic / share" value={price(d.intrinsicPerShare, d.currency)} sub="DCF (calculated)" /><Stat label="Price" value={price(d.price, d.quoteCurrency)} /><Stat label="Margin of safety" value={pct(d.marginOfSafety, 1, true)} tone={tone(d.marginOfSafety)} /><Stat label="Terminal value share" value={pct(d.dcf.terminalShare, 0)} hint="Share of enterprise value that comes from the terminal value: high means the result is sensitive to long-run assumptions." /></div>
-        <p className="text-xs text-muted-foreground">Assumptions: FCF {compact(as.freeCashFlow, false) + " " + (d.currency || "")}, growth {pct(as.growth, 1)} ({as.growthBasis}), discount {pct(as.discount, 1)}, risk-free {pct(as.riskFree, 2)}, beta {as.beta != null ? as.beta.toFixed(2) : "n/a"}, net debt {compact(as.netDebt)}, shares {compact(as.shares, false)}.</p></div> : <Alert variant="warn"><AlertTitle>DCF not applicable</AlertTitle><AlertDescription>Free cash flow is not positive or inputs are missing, so a discounted-cash-flow value would be meaningless. Use the multiples above.</AlertDescription></Alert>)}</DataState>
-    </CardContent></Card></div>)
+    <DcfCard symbol={symbol} /></div>)
 }
 
 function Growth({ b }) {
@@ -149,7 +145,7 @@ function Peers({ b, navigate }) {
     return () => { ctrl.abort(); clearInterval(t) }
   }, [peers.join()])
   if (!b.peers.ok) return <ErrorBox message={b.peers.error} attempts={b.peers.attempts} />
-  return <Card><CardHeader><CardTitle>Comparable companies</CardTitle><CardDescription><SourceTag meta={b.peers.meta} /> · peers come from the provider, or the same S&P 500 sector when no provider is configured</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Symbol</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Today</TableHead><TableHead /></TableRow></TableHeader><TableBody>{peers.slice(0, 10).map((p) => { const x = q[p]; return <TableRow key={p} className="cursor-pointer" onClick={() => navigate("company/" + p)}><TableCell className="font-mono font-semibold">{p}</TableCell><TableCell className="num text-right">{x ? price(x.price, x.currency) : (loading ? "…" : "–")}</TableCell><TableCell className={cn("num text-right", x && tone(x.changePercent))}>{x ? pct(x.changePercent, 2, true) : ""}</TableCell><TableCell className="text-right text-primary">Open →</TableCell></TableRow> })}</TableBody></Table>{loading && <p className="mt-2 text-xs text-muted-foreground">Loading peer quotes…</p>}</CardContent></Card>
+  return <Card><CardHeader><CardTitle>Comparable companies</CardTitle><CardDescription><SourceTag meta={b.peers.meta} /> · peers come from the provider, or the same S&P 500 sector when no provider is configured</CardDescription></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Symbol</TableHead><TableHead className="text-right">Price</TableHead><TableHead className="text-right">Today</TableHead><TableHead /></TableRow></TableHeader><TableBody>{peers.slice(0, 10).map((p) => { const x = q[p]; return <TableRow key={p} className="cursor-pointer" onMouseEnter={() => { prefetch("quote", { symbol: p }); prefetch("company", { symbol: p }) }} onClick={() => navigate("company/" + p)}><TableCell className="font-mono font-semibold">{p}</TableCell><TableCell className="num text-right">{x ? price(x.price, x.currency) : (loading ? "…" : "–")}</TableCell><TableCell className={cn("num text-right", x && tone(x.changePercent))}>{x ? pct(x.changePercent, 2, true) : ""}</TableCell><TableCell className="text-right text-primary">Open →</TableCell></TableRow> })}</TableBody></Table>{loading && <p className="mt-2 text-xs text-muted-foreground">Loading peer quotes…</p>}</CardContent></Card>
 }
 
 const TABS = [["overview", "Overview"], ["financials", "Financials"], ["valuation", "Valuation"], ["growth", "Growth"], ["news", "News"], ["filings", "Filings"], ["earnings", "Earnings"], ["peers", "Peers"], ["ai", "AI analyst"]]
@@ -163,19 +159,24 @@ function Workspace({ symbol, route, navigate }) {
   const q = (live.status === "ok" && live.data) || (b && unwrap(b.quote)), prof = (b && unwrap(b.profile)) || null, watched = wl.some((w) => w.symbol === symbol)
   const pending = !b && s.status !== "error", failed = !b && s.status === "error"
   useEffect(() => { if (prof) remember({ symbol, name: prof.name }) }, [prof && prof.name])
-  useEffect(() => { if (s.status === "ok") { prefetch("valuation", { symbol }); prefetch("history", { symbol, days: 1900 }) } }, [symbol, s.status])   // warm the tabs people click next so they open instantly
+  useEffect(() => { prefetch("valuation", { symbol }) }, [symbol])   // the valuation input pack loads in parallel with the company bundle, so the Valuation tab is ready when it opens
+  useEffect(() => { if (s.status === "ok") prefetch("history", { symbol, days: 1900 }) }, [symbol, s.status])   // warm the tabs people click next so they open instantly
   const nothing = !!b && !q && !prof && !b.annual.ok
+  // Instant header: the name comes from the built-in list and the last price seen for this symbol from this browser, so something real
+  // is on screen at once; the live quote (about a second) replaces the remembered one, which is labelled while it stands in.
+  const known = useMemo(() => lookupLocal(symbol), [symbol]), seen = useMemo(() => lastQuote(symbol), [symbol])
   // A quarter of daily closes in the header, so the price has shape before any tab is opened. The bars are the ones
   // the overview chart already fetched, so this adds no request.
   const sparkBars = b && b.history && b.history.ok ? unwrap(b.history) : null
   const sp = Array.isArray(sparkBars) ? sparkBars.slice(-65).map((x, i) => [i, x[4]]) : []
   return (<div className="space-y-4">
     <div data-tour="company-head" className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{(prof && prof.name) || (q && q.name) || symbol}</h1><Badge variant="secondary" className="font-mono">{symbol}</Badge>{prof && prof.exchange && <Badge variant="outline">{prof.exchange}</Badge>}{prof && prof.sector && <Badge variant="outline">{prof.sector}</Badge>}</div>
+      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold tracking-tight">{(prof && prof.name) || (q && q.name) || (known && known.name) || (seen && seen.name) || symbol}</h1><Badge variant="secondary" className="font-mono">{symbol}</Badge>{prof && prof.exchange && <Badge variant="outline">{prof.exchange}</Badge>}{prof && prof.sector && <Badge variant="outline">{prof.sector}</Badge>}</div>
         {q ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold">{price(q.price, q.currency)}</span><span className={cn("num text-base", tone(q.change))}>{q.change != null ? (q.change > 0 ? "+" : "") + num(q.change) : ""} ({pct(q.changePercent, 2, true)})</span>{sp.length > 1 && <Spark points={sp} up={!!(q.change >= 0)} w={116} h={32} />}<FreshBadge meta={q.meta} /><SourceTag source={q.source} asOf={q.timestamp} />{live.status === "ok" && <span className="text-[11px] text-muted-foreground" title="Price refreshes every 15 s while this tab is visible">● auto-refresh 15s</span>}</div>
+          : seen && !failed ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold opacity-70">{price(seen.price, seen.currency)}</span><span className={cn("num text-base opacity-70", tone(seen.change))}>{seen.change != null ? (seen.change > 0 ? "+" : "") + num(seen.change) : ""} ({pct(seen.changePercent, 2, true)})</span><span className="text-[11px] text-muted-foreground">last seen {dateTime(seen.t)} · updating</span></div>
           : pending ? <div className="mt-2 flex items-center gap-2"><Skeleton className="h-7 w-28" /><Skeleton className="h-4 w-20" /></div>
             : <p className="mt-1 text-sm text-muted-foreground">No live quote available from any provider.</p>}</div>
-      <div className="flex gap-2"><Button variant="outline" onClick={() => { capture("watchlist_changed", { action: watched ? "remove" : "add", source: "company" }); watched ? removeFromWatchlist(symbol) : addToWatchlist(symbol, prof && prof.name) }}>{watched ? <><StarOff />Unwatch</> : <><Star />Watch</>}</Button><Button onClick={() => setTab("ai")}><Bot />Ask AI</Button></div></div>
+      <div className="flex gap-2"><Button variant="outline" onClick={() => { capture("watchlist_changed", { action: watched ? "remove" : "add", source: "company" }); watched ? removeFromWatchlist(symbol) : addToWatchlist(symbol, prof && prof.name) }}>{watched ? <><StarOff />Unwatch</> : <><Star />Watch</>}</Button><Button data-tour="ask-ai" onClick={() => setTab("ai")}><Bot />Ask AI</Button></div></div>
     {failed && <ErrorBox message={s.error} attempts={s.attempts} onRetry={s.reload} />}
     {nothing && <Alert variant="warn"><AlertTitle>No data found for {symbol}</AlertTitle><AlertDescription>Check the ticker. US companies resolve through SEC EDGAR; ETFs, indices and crypto use market data providers (examples: SPY, ^GSPC, BTC-USD, 0700.HK).</AlertDescription></Alert>}
     <Tabs value={tab} onValueChange={setTab}><TabsList data-tour="company-tabs" className="h-auto flex-wrap">{TABS.map(([k, l]) => <TabsTrigger key={k} value={k} className="h-8">{l}</TabsTrigger>)}</TabsList>

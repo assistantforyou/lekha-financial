@@ -29,7 +29,8 @@ function quote(o) {
 // One reporting period. Money fields are in plain currency units.
 const STMT_FIELDS = ["revenue", "costOfRevenue", "grossProfit", "operatingIncome", "ebitda", "netIncome", "eps", "dilutedShares", "interestExpense", "incomeTax", "rAndD", "sgAndA",
   "cash", "shortTermInvestments", "totalCurrentAssets", "totalAssets", "totalCurrentLiabilities", "totalLiabilities", "totalDebt", "shareholdersEquity", "inventory", "receivables",
-  "operatingCashFlow", "capex", "freeCashFlow", "dividendsPaid", "buybacks"];
+  "operatingCashFlow", "capex", "freeCashFlow", "dividendsPaid", "buybacks",
+  "da", "sbc", "pretaxIncome", "acquisitions", "basicShares", "longTermInvestments", "leaseLiabilities", "minorityInterest", "preferredEquity"];
 function statement(o) {
   const out = { company: { symbol: String(o.symbol || "").toUpperCase(), name: o.name || null, cik: o.cik || null }, period: o.period, periodType: o.periodType || "annual",
     fiscalPeriod: o.fiscalPeriod || null, fiscalYear: o.fiscalYear || null, periodStart: o.periodStart || null, periodEnd: o.periodEnd || o.period, filingDate: o.filingDate || null,

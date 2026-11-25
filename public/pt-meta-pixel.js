@@ -39,4 +39,6 @@ fbq('track', 'PageView');
   window.ptPlanValue = function (plan) {
     return PLAN_THB[plan] ? { value: PLAN_THB[plan], currency: "THB", content_name: plan === "premium" ? "Premium" : "Paid", content_category: "subscription", content_type: "product", content_ids: [plan] } : null;
   };
+  /* the page queues events until this script has loaded (see the head of app/index.html); replay them now */
+  var q = window.__ptq; if (q && q.length) { window.__ptq = null; q.forEach(function (a) { fire(a[0], a[1], a[2], a[3]); }); }
 })();

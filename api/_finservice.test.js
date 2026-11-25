@@ -71,3 +71,31 @@ assert.equal(sec.buildStatements(f, "T", "annual", "2025-01-01").length, 0);
 assert.equal(S.quote({price:20,currency:"THB"}).meta.unit, "THB/share");
 assert.equal(S.statement({currency:"HKD"}).meta.unit, "HKD");
 assert.equal(S.quote({timestamp:null}).timestamp, null);
+
+// valuation fields (schema v4): D&A, stock compensation, pre-tax income, basic shares, long-term investments, leases (total concept, or current + noncurrent parts),
+// minority interest, preferred equity, acquisitions
+{
+  const fy = (v, extra = {}) => [{ start: "2025-01-01", end: "2025-12-31", val: v, form: "10-K", filed: "2026-02-01", fy: 2025, fp: "FY", accn: "k1", ...extra }];
+  const at = (v) => [{ end: "2025-12-31", val: v, form: "10-K", filed: "2026-02-01", fy: 2025, fp: "FY", accn: "k1" }];
+  const v = { entityName: "V", cik: 9, facts: { "us-gaap": {
+    Revenues: { units: { USD: fy(1000) } }, OperatingIncomeLoss: { units: { USD: fy(300) } },
+    DepreciationDepletionAndAmortization: { units: { USD: fy(40) } }, ShareBasedCompensation: { units: { USD: fy(25) } },
+    IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest: { units: { USD: fy(280) } }, IncomeTaxExpenseBenefit: { units: { USD: fy(56) } },
+    PaymentsToAcquireBusinessesNetOfCashAcquired: { units: { USD: fy(-12) } },
+    WeightedAverageNumberOfSharesOutstandingBasic: { units: { shares: fy(100) } }, WeightedAverageNumberOfDilutedSharesOutstanding: { units: { shares: fy(104) } },
+    MarketableSecuritiesNoncurrent: { units: { USD: at(90) } },
+    OperatingLeaseLiabilityCurrent: { units: { USD: at(5) } }, OperatingLeaseLiabilityNoncurrent: { units: { USD: at(20) } }, FinanceLeaseLiability: { units: { USD: at(3) } },
+    MinorityInterest: { units: { USD: at(7) } }, PreferredStockValue: { units: { USD: at(11) } },
+  } } };
+  const r = sec.buildStatements(v, "V", "annual")[0];
+  assert.strictEqual(r.da, 40, "D&A is kept on the row"); assert.strictEqual(r.ebitda, 340); assert.strictEqual(r.sbc, 25); assert.strictEqual(r.pretaxIncome, 280); assert.strictEqual(r.incomeTax, 56);
+  assert.strictEqual(r.acquisitions, 12, "acquisitions are positive outflows"); assert.strictEqual(r.basicShares, 100); assert.strictEqual(r.dilutedShares, 104);
+  assert.strictEqual(r.longTermInvestments, 90); assert.strictEqual(r.leaseLiabilities, 28, "operating parts 5 + 20 plus finance lease 3");
+  assert.strictEqual(r.minorityInterest, 7); assert.strictEqual(r.preferredEquity, 11);
+  // total lease concept wins over the parts; no lease concepts at all gives null, not 0
+  const t = JSON.parse(JSON.stringify(v)); t.facts["us-gaap"].OperatingLeaseLiability = { units: { USD: at(40) } };
+  assert.strictEqual(sec.buildStatements(t, "V", "annual")[0].leaseLiabilities, 43, "total operating 40 plus finance 3");
+  const n = JSON.parse(JSON.stringify(v)); for (const k of ["OperatingLeaseLiabilityCurrent", "OperatingLeaseLiabilityNoncurrent", "FinanceLeaseLiability"]) delete n.facts["us-gaap"][k];
+  assert.strictEqual(sec.buildStatements(n, "V", "annual")[0].leaseLiabilities, null);
+  assert.strictEqual(sec.STATEMENT_SCHEMA, "v4-valuation-fields", "schema bumped so rows without the new fields are not served from cache");
+}

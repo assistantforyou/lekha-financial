@@ -106,8 +106,45 @@ function ttm(rows, field) {
   return q.reduce((total, r) => total + r[field], 0);
 }
 
+// ---------- growth defaults for the DCF (all pure; rows/series are newest first) ----------
+const median = (a) => { const s = a.filter(fin).sort((x, y) => x - y); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+/* Median year-over-year growth over the last `n` fiscal years. Needs at least 3 usable observations so one odd year cannot decide it. */
+function medianGrowth(values, n = 5) {
+  const g = []; for (let i = 0; i < Math.min(n, values.length - 1); i++) { const v = growth(values[i], values[i + 1]); if (v != null) g.push(v); }
+  return g.length >= 3 ? safe(median(g)) : null;
+}
+/* Free-cash-flow base smoothed over `years` fiscal years: the mean FCF margin times the latest revenue. Capex cycles make a single year a poor base
+   (AMZN). null when fewer than `years` complete years exist, or the average margin is not positive. */
+function normalizedFcf(revenue, fcf, years = 3) {
+  const m = []; for (let i = 0; i < years; i++) { const x = margin(fcf[i], revenue[i]); if (x == null) return null; m.push(x); }
+  const avg = mean(m); return avg > 0 && fin(revenue[0]) && revenue[0] > 0 ? safe(avg * revenue[0]) : null;
+}
+/* What the company's own returns can fund: ROIC x net reinvestment rate. Net reinvestment = (|capex| - D&A + R&D) / NOPAT, averaged over up to 3 years and
+   bounded 0 to 1. R&D is counted as investment so intangible-heavy companies are not read as non-investing. */
+function fundableGrowth(rows, roicNow, taxRate = 0.21) {
+  const r = []; for (let i = 0; i < Math.min(3, rows.length); i++) {
+    const x = rows[i], nopat = ok(x.operatingIncome) ? x.operatingIncome * (1 - taxRate) : null;
+    if (!(nopat > 0) || !fin(x.capex)) continue;
+    const da = fin(x.da) ? x.da : ok(x.ebitda, x.operatingIncome) ? Math.max(0, x.ebitda - x.operatingIncome) : 0;   // statement rows carry EBITDA, not D&A
+    r.push(Math.min(1, Math.max(0, (Math.abs(x.capex) - da + (fin(x.rAndD) ? x.rAndD : 0)) / nopat)));
+  }
+  return ok(roicNow) && roicNow > 0 && r.length ? safe(roicNow * mean(r)) : null;
+}
+/* Reverse DCF: the starting growth that makes the model's value per share equal the market price (bisection on dcf(); value rises with growth).
+   null when the price cannot be matched inside [-10%, 40%]. */
+function impliedGrowth({ price, fcf, years = 10, terminalGrowth = 0.025, discount, netDebt = 0, shares }) {
+  if (!ok(price, fcf, discount, shares) || price <= 0 || fcf <= 0 || shares <= 0) return null;
+  const at = (g) => { const o = dcf({ fcf, growth: g, years, terminalGrowth, discount, netDebt, shares }); return o ? o.perShare : null; };
+  let lo = -0.1, hi = 0.4, vLo = at(lo), vHi = at(hi);
+  if (!ok(vLo, vHi) || price < vLo || price > vHi) return null;
+  for (let i = 0; i < 60; i++) { const mid = (lo + hi) / 2, v = at(mid); if (!ok(v)) return null; if (v < price) lo = mid; else hi = mid; }
+  return safe((lo + hi) / 2);
+}
+const ERP_DEFAULT = 0.0441;                                   // Damodaran implied ERP, the same figure the classic Intrinsic value page uses
+const blumeBeta = (raw) => (ok(raw) ? 0.67 * raw + 0.33 : null);   // shrinks a raw regression beta toward 1
+
 // A calculation packaged with what an evidence trail needs: the value, its unit, the formula and the exact inputs.
 const result = (name, value, unit, formula, inputs) => ({ name, value: safe(value), unit, kind: "calculated", formula, inputs });
 
 module.exports = { cagr, growth, yoy, qoq, margin, roe, roic, investedCapital, debtToEquity, currentRatio, interestCoverage, enterpriseValue, pe, earningsYield, fcfYield, evToEbitda, priceToSales, priceToBook, peg,
-  costOfEquity, wacc, dcf, returnsFrom, volatility, beta, betaFromBars, sharpe, drawdown, maxDrawdown, totalReturn, portfolioAllocation, portfolioReturn, ttm, mean, stdev, result };
+  costOfEquity, wacc, dcf, medianGrowth, normalizedFcf, fundableGrowth, impliedGrowth, blumeBeta, ERP_DEFAULT, returnsFrom, volatility, beta, betaFromBars, sharpe, drawdown, maxDrawdown, totalReturn, portfolioAllocation, portfolioReturn, ttm, mean, stdev, result };

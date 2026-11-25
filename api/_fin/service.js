@@ -304,25 +304,42 @@ async function getRatios(symbol, { asOf } = {}) {
   const pegV = C.peg(C.pe(comparablePrice, epsTtm), C.yoy(a0.eps, a1.eps)); metrics.push(m("peg", "PEG", pegV, "x", "P/E ÷ (EPS growth % )", { pe: C.pe(comparablePrice, epsTtm), epsGrowth: C.yoy(a0.eps, a1.eps) }));
   return { data: { symbol: s, price, asOf: quote ? quote.timestamp : null, metrics, growth: [...growth, ...qgrowth], sources: { quote: qt && qt.meta.source, statements: ann && ann.meta.source }, units: "money in the indicated currency; ratios in x; rates as fractions" }, meta: { source: "calculated", attempts: [] } };
 }
+/* The valuation engine is a pure ES module shared with the browser (api/_fin/valuation/); this CommonJS service loads it once, lazily. */
+let _engine; const engines = () => (_engine ||= Promise.all([import("./valuation/engine.mjs"), import("./valuation/pack.mjs")]).then(([engine, pack]) => ({ engine, pack })));
+
+/* getValuation: the input pack for the browser (which recomputes instantly as assumptions change) and the base-case result in the shape the agent, council and
+   older callers read. Industrial companies get a free-cash-flow-to-the-firm DCF; balance-sheet financials get residual income (see engine.mjs for the method).
+   overrides: growth (starting growth, or starting ROE for financials), discount (WACC, or cost of equity), terminalGrowth, years, erp. */
 async function getValuation(symbol, overrides = {}) {
-  const s = sym(symbol), asOf = overrides.asOf || undefined;
-  const [ann, qt, rf, hist, mkt] = await Promise.all([getFinancialStatements(s, { asOf }).catch(() => null), getQuote(s, { asOf }).catch(() => null), getMacroSeries("DGS10", { years: 1, asOf }).catch(() => null), getHistoricalPrices(s, { days: 380, asOf }).catch(() => null), getHistoricalPrices("SPY", { days: 380, asOf }).catch(() => null)]);
-  const A = (ann && ann.data) || [], a0 = A[0] || {}, facts = await getCompanyFacts(s, { asOf }).then((r) => r.data).catch(() => null);
-  const shares = (facts && facts.sharesOutstanding && facts.sharesOutstanding.value) || a0.dilutedShares, price = qt && qt.data.price;
-  const currency = a0.currency, quoteCurrency = qt?.data?.currency;
-  const comparable = !!currency && currency === quoteCurrency;
-  const rfRate = rf && rf.data.latest ? rf.data.latest.value / 100 : 0.04;
-  const b = hist && mkt ? C.betaFromBars(hist.data, mkt.data) : null;
-  const fcf = overrides.fcf != null ? overrides.fcf : a0.freeCashFlow;
-  const hg = A.length >= 4 ? C.cagr(A[Math.min(4, A.length - 1)].freeCashFlow, a0.freeCashFlow, Math.min(4, A.length - 1)) : null;
-  const g = overrides.growth != null ? overrides.growth : Math.max(0, Math.min(0.15, hg != null ? hg : 0.05));
-  const ke = C.costOfEquity(rfRate, b != null ? Math.max(0.6, Math.min(2, b)) : 1, overrides.erp != null ? overrides.erp : 0.05), debt = a0.totalDebt || 0, mc = comparable && price && shares ? price * shares : null;
-  const kd = a0.interestExpense && debt ? Math.min(0.12, Math.abs(a0.interestExpense) / debt) : 0.05;
-  const w = overrides.discount != null ? overrides.discount : (mc && ke != null ? C.wacc({ equity: mc, debt, costEquity: ke, costDebt: kd }) : ke);
-  const netDebt = (a0.totalDebt || 0) - (a0.cash || 0) - (a0.shortTermInvestments || 0);
-  const out = w != null ? C.dcf({ fcf, growth: g, years: overrides.years || 10, terminalGrowth: overrides.terminalGrowth != null ? overrides.terminalGrowth : 0.025, discount: w, netDebt, shares }) : null;
-  const assumptions = { freeCashFlow: fcf, growth: g, growthBasis: overrides.growth != null ? "user override" : hg != null ? "historical FCF CAGR, capped 0–15%" : "default 5% (history unavailable)", terminalGrowth: overrides.terminalGrowth != null ? overrides.terminalGrowth : 0.025, discount: w, riskFree: rfRate, beta: b, costOfEquity: ke, costOfDebt: kd, netDebt, shares, years: overrides.years || 10 };
-  return { data: { symbol: s, price, currency, quoteCurrency, intrinsicPerShare: out && out.perShare, marginOfSafety: comparable && out && out.perShare > 0 && price ? 1 - price / out.perShare : null, dcf: out, assumptions, kind: "calculated", note: "Model output, not a price target. Every assumption is listed and editable; free cash flow and shares come from SEC filings.", meta: S.meta({ source: "calculated from SEC EDGAR + market data", kind: "calculated", freshness: "delayed" }) }, meta: { source: "calculated", attempts: [] } };
+  const s = sym(symbol), asOf = overrides.asOf || undefined, { engine, pack: packMod } = await engines();
+  const [ann, qt, rfs, hist, mkt, facts, prof] = await Promise.all([
+    getFinancialStatements(s, { asOf }).catch(() => null), getQuote(s, { asOf }).catch(() => null), getMacroSeries("DGS10", { years: 1, asOf }).catch(() => null),
+    getHistoricalPrices(s, { days: 1900, asOf }).catch(() => null), getHistoricalPrices("SPY", { days: 1900, asOf }).catch(() => null),
+    getCompanyFacts(s, { asOf }).then((r) => r.data).catch(() => null), getCompanyProfile(s).then((r) => r.data).catch(() => null)]);
+  const A = (ann && ann.data) || [];
+  const pack = packMod.makePack({ symbol: s, name: (prof && prof.name) || (A[0] && A[0].company && A[0].company.name) || null, statements: A, quote: qt && qt.data, rf: rfs && rfs.data.latest ? rfs.data.latest.value / 100 : null,
+    stockBars: hist && hist.data, marketBars: mkt && mkt.data, basicShares: facts && facts.sharesOutstanding && facts.sharesOutstanding.value, sharesAsOf: facts && facts.sharesOutstanding && facts.sharesOutstanding.asOf, sector: (prof && prof.sector) || SP[s] || null, industry: prof && prof.industry,
+    today: asOf || new Date().toISOString().slice(0, 10), asOf: asOf || null, erp: overrides.erp });
+  const d = engine.defaults(pack), A0 = d.scenarios && d.scenarios.base;
+  // overrides land on the base case: growth is starting growth (starting ROE for financials), discount replaces WACC (cost of equity for financials)
+  const ri = d.applicable === "ri", base = A0 ? { ...A0, ...(overrides.growth != null ? (ri ? { roe0: overrides.growth, roeT: null } : { g1: overrides.growth }) : {}), ...(overrides.discount != null ? (ri ? { ke: overrides.discount, wacc: overrides.discount } : { wacc: overrides.discount }) : {}),
+    ...(overrides.terminalGrowth != null ? { gT: overrides.terminalGrowth } : {}), ...(overrides.years ? { years: overrides.years } : {}) } : null;
+  const r = base ? engine.value(pack, base) : null, ok = !!(r && r.ok), price = pack.price;
+  const scen = {}; if (d.scenarios) for (const k of ["bear", "base", "bull"]) { const v = engine.value(pack, k === "base" ? base : d.scenarios[k]); scen[k] = v.ok ? v.perShare : null; }
+  const rev = base && ok ? { growth: engine.reverseGrowth(pack, base, pack.comparable ? price : null), margin: engine.reverseMargin(pack, base, pack.comparable ? price : null) } : null;
+  const br = pack.bridge, z = (x) => (Number.isFinite(x) ? x : 0), netDebt = z(br.debt) + z(br.leases) + z(br.minority) + z(br.preferred) - z(br.cash) - z(br.sti) - z(br.lti), cc = d.cost;
+  const assumptions = base ? { freeCashFlow: ok && !ri ? r.rows[0].fcff : null, growth: ri ? null : base.g1, startingRoe: ri ? base.roe0 : null, growthBasis: ri ? d.provenance.roe0 : d.provenance.g1 || null,
+    fcfBasis: ri ? d.provenance.model : "year-1 free cash flow to the firm from the projection: after-tax operating profit (after stock compensation and R&D) less reinvestment tied to growth",
+    terminalGrowth: base.gT, discount: ri ? base.ke : base.wacc, riskFree: cc.rf, beta: pack.beta ? pack.beta.raw : null, betaAdjusted: cc.beta, equityRiskPremium: cc.erp, costOfEquity: base.ke, costOfDebt: ri ? null : cc.kd,
+    netDebt, shares: ok ? r.bridge.shares : null, years: base.years, marginTarget: ri ? null : base.marginTarget, salesToCapital: ri ? null : base.s2c } : null;
+  const impliedNote = rev && rev.growth ? (rev.growth.value == null ? (rev.growth.note === "above range" ? "above 40%" : rev.growth.note === "below range" ? "below -10%" : null) : null) : null;
+  return { data: { symbol: s, price, currency: pack.currency, quoteCurrency: pack.quoteCurrency, intrinsicPerShare: ok ? r.perShare : null, impliedGrowth: rev && rev.growth ? rev.growth.value : null, impliedGrowthNote: impliedNote,
+    marginOfSafety: pack.comparable && ok && r.perShare > 0 && price ? 1 - price / r.perShare : null,
+    dcf: ok ? { enterpriseValue: r.ev, equityValue: r.equity, perShare: r.perShare, pvOfCashFlows: r.pvExplicit, pvOfTerminal: r.pvTerminal, terminalShare: r.tvShare, model: r.model } : null,
+    assumptions, scenarios: scen,
+    v2: { applicable: d.applicable, reason: d.reason, needsTargetMargin: !!d.needsTargetMargin, model: ri ? "ri" : d.applicable === "fcff" ? "fcff" : null, pack, defaults: { scenarios: d.scenarios, skeleton: d.skeleton || null, provenance: d.provenance, warnings: d.warnings, cost: d.cost, analysis: { growths: d.analysis.growths, marginBase: d.analysis.marginBase, roicNow: d.analysis.roicNow, s2c: d.analysis.s2c, tax0: d.analysis.tax0, coverage: d.analysis.coverage, roe3: d.analysis.roe3 } }, baseOverridden: !!(overrides.growth != null || overrides.discount != null || overrides.terminalGrowth != null || overrides.years) },
+    kind: "calculated", note: "Model output, not a price target. Every assumption is listed and editable. Operating profit is after stock compensation; growth is paid for with reinvestment; value is a bear/base/bull range; the market-implied growth shows what the current price assumes.",
+    meta: S.meta({ source: "calculated from SEC EDGAR + market data", kind: "calculated", freshness: "delayed" }) }, meta: { source: "calculated", attempts: [] } };
 }
 
 // ---------------- the whole company workspace in one round trip ----------------

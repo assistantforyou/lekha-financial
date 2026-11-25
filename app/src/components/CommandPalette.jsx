@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Building2, Compass, FileText, Hash, Newspaper, Bot, Clock, CircleHelp } from "lucide-react"
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Badge } from "@/components/ui/badge"
-import { data } from "@/lib/api"
+import { data, prefetch } from "@/lib/api"
 import { searchLocal } from "@/lib/symbols"
 import { FLAT } from "@/nav"
 import { ui } from "@/tour/copy"
@@ -37,6 +37,10 @@ export default function CommandPalette({ open, onOpenChange, navigate }) {
     const direct = t.toUpperCase().replace(/\s+/g, ""); if (/^[A-Z0-9^][A-Z0-9.\-^=]{0,14}$/.test(direct) && !out.some((r) => r.symbol === direct)) out.push({ symbol: direct, name: "Open as ticker", type: "ticker" })
     return out
   }, [q, res])
+  // Warm the company page while the visitor is still choosing: the quote for the top matches, the full bundle for the best one.
+  // By the time they press Enter the header data is already in the cache.
+  const warm = useMemo(() => merged.filter((r) => r.type !== "ticker").slice(0, 3).map((r) => r.symbol).join(","), [merged])
+  useEffect(() => { if (!open || !warm) return; const t = setTimeout(() => { const s = warm.split(","); s.forEach((x) => prefetch("quote", { symbol: x })); prefetch("company", { symbol: s[0] }) }, 120); return () => clearTimeout(t) }, [open, warm])
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
       <CommandInput value={q} onValueChange={setQ} placeholder="Search companies, tickers, ETFs, crypto, filings, news, pages…" />

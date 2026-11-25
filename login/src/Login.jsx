@@ -1,4 +1,5 @@
 import { ReleasePolicies } from "../../app/src/components/ReleasePolicies"
+import LangPrompt from "../../app/src/components/LangPrompt"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -139,7 +140,13 @@ export default function Login() {
         setMsg({ text: r.j?.error || "Could not create the account.", kind: "err" })
         return
       }
-      try { window.ptTrack && window.ptTrack("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB" }, "reg") } catch {}
+      try {
+        // the signup is tied to the ad it came from (first-touch tags kept by the app) and to the tour button when that is where it started
+        let extra = {}
+        try { const a = JSON.parse(localStorage.getItem("ptpub.v1.attr") || "null") || {}; for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]) if (a[k]) extra[k] = a[k] } catch {}
+        if (new URLSearchParams(location.search).get("from") === "tour") extra.signup_from = "tour"
+        window.ptTrack && window.ptTrack("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB", ...extra }, "reg")
+      } catch {}
       if (r.j.session) {
         save(r.j.session)
         location.replace(nextUrl())
@@ -177,6 +184,7 @@ export default function Login() {
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center px-6 py-16">
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50 }}><LangPrompt /></div>
       <img
         src="/login/lekha.png"
         alt="Lekha Financials"
