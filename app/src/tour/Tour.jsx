@@ -7,6 +7,7 @@ import { COPY, LANG_LABEL, LANG_NATIVE, setTourLang, stepCopy, tourLang, ui } fr
 import { M, MOBILE_MAX, place, scrollDelta } from "./layout"
 import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, modeOf, resolve, setPlatform, visible } from "./steps"
 import { onStartTour, shouldAutoStart, writeStatus } from "./store"
+import { funnel } from "@/lib/pixel"
 
 const WF_ICONS = [Search, Building2, Layers, LineChart]
 const reduced = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch (e) { return false } }
@@ -23,6 +24,7 @@ const revealInNav = (a) => {
   const s = sc.getBoundingClientRect(), r = a.getBoundingClientRect(); if (r.top >= s.top + 4 && r.bottom <= s.bottom - 4) return
   sc.scrollTop += (r.top - s.top) - (s.height - r.height) / 2
 }
+const platformNow = () => { try { return matchMedia("(max-width: 640px)").matches ? "mobile" : "desktop" } catch (e) { return "desktop" } }
 const WAIT = { company: 14000, tabs: 14000 }
 const sameGeo = (a, b) => !!a && !!b && a.hidden === b.hidden && a.side === b.side && a.mobile === b.mobile && a.card.x === b.card.x && a.card.y === b.card.y && a.card.w === b.card.w && JSON.stringify(a.spot) === JSON.stringify(b.spot) && JSON.stringify(a.spot2) === JSON.stringify(b.spot2)
 const pinned = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const p = getComputedStyle(e).position; if (p === "sticky" || p === "fixed") return true } return false }
@@ -43,7 +45,7 @@ export default function Tour({ navigate }) {
   const [host] = useState(() => { const d = document.createElement("div"); d.id = "lekha-tour"; d.setAttribute("translate", "no"); d.className = "notranslate"; return d })
   live.current = { cur, busy, skipped, size, active, alt, askPhase }
 
-  const finish = useCallback((status) => { R.current.token++; writeStatus(status); setActive(false); setReady(false) }, [])
+  const finish = useCallback((status) => { R.current.token++; funnel(status === "completed" ? "TourComplete" : "TourSkip", { step: STEPS[live.current.cur] ? STEPS[live.current.cur].id : undefined, platform: platformNow() }); writeStatus(status); setActive(false); setReady(false) }, [])
 
   /* ---- go to a step: navigate if needed, wait for its target, scroll it into the free band, then show it ---- */
   const goTo = useCallback((i, dir = 1) => {
@@ -78,7 +80,7 @@ export default function Tour({ navigate }) {
 
   const begin = useCallback(() => {
     if (live.current.active) return
-    R.current.prevFocus = document.activeElement; writeStatus("in_progress"); setPlatform()
+    R.current.prevFocus = document.activeElement; writeStatus("in_progress"); setPlatform(); funnel("TourStart", { platform: platformNow() })
     setSkipped([]); setCur(0); setAlt(false); setReady(false); setActive(true); goTo(0, 1)
   }, [goTo])
   useEffect(() => onStartTour(begin), [begin])
@@ -198,6 +200,7 @@ export default function Tour({ navigate }) {
     const c = cardRef.current, ro = new ResizeObserver(() => { const w = c.offsetWidth, h = c.offsetHeight; setSize((p) => (p.w === w && p.h === h ? p : { w, h })) })
     ro.observe(c); return () => ro.disconnect()
   }, [ready, !!geo])
+  useEffect(() => { if (active && ready && !busy && STEPS[cur]) funnel("TourStep", { step: STEPS[cur].id, platform: platformNow() }) }, [active, ready, busy, cur])
   useEffect(() => { if (ready) schedule(false) }, [size, ready, schedule])
   useEffect(() => { if (ready && !busy && geo && modeOf(STEPS[cur], alt) === "card" && primaryRef.current && !cardRef.current.contains(document.activeElement)) primaryRef.current.focus({ preventScroll: true }) }, [ready, busy, cur, !!geo])   // hands-on steps leave focus with the app
 

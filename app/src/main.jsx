@@ -18,6 +18,8 @@ import React from "react"
 import { createRoot } from "react-dom/client"
 import "./index.css"
 import App from "./App"
+import { captureAttribution, watchTools } from "./lib/pixel"
+captureAttribution(); watchTools()
 createRoot(document.getElementById("root")).render(<App />)
 
 /* the V3 feature modules (simulation, council, deep analysis) mount into hosts that live in #stage; loaded at runtime, not bundled */

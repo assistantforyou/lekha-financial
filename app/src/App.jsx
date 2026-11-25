@@ -1,4 +1,4 @@
-import { track, planParams } from "@/lib/pixel"
+import { track, funnel, planParams } from "@/lib/pixel"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronRight, FlaskConical, PanelLeftOpen } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -54,6 +54,7 @@ export default function App() {
     try { if (route.t !== "company") localStorage.setItem("ptpub.v1.app.route", JSON.stringify(route.key)) } catch (e) {}
     window.scrollTo(0, 0); setMenu(false)
     track("ViewContent", { content_name: item.title, content_category: item.groupTitle || route.t || "app", content_type: "product" })
+    if (route.key === "account/plans") funnel("PlansViewed", {}, { session: true })
     if (!isPane && window.LEKHA_SHELL) window.LEKHA_SHELL._setRoute({ t: route.t, s: route.s }, false)
   }, [route.key, route.param])
   const qs = route.query ? route.query.toString() : "", r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param, qs])   // query (?tab=…) must be a dependency or tab links never switch
