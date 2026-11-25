@@ -44,7 +44,7 @@ function statement(o) {
 
 function profile(o) {
   return { symbol: String(o.symbol || "").toUpperCase(), name: o.name || null, exchange: o.exchange || null, currency: o.currency || "USD", sector: o.sector || null, industry: o.industry || null,
-    description: o.description || null, website: o.website || null, country: o.country || null, employees: num(o.employees), cik: o.cik || null, marketCap: num(o.marketCap), sharesOutstanding: num(o.sharesOutstanding),
+    description: o.description || null, descriptionUrl: o.descriptionUrl || null, descriptionSource: o.descriptionSource || null, website: o.website || null, country: o.country || null, employees: num(o.employees), cik: o.cik || null, marketCap: num(o.marketCap), sharesOutstanding: num(o.sharesOutstanding),
     ipoDate: o.ipoDate || null, assetType: o.assetType || "equity", source: o.source, meta: meta({ source: o.source, asOf: new Date(), freshness: "delayed" }) };
 }
 

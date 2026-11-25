@@ -11,6 +11,7 @@
 const P = {
   sec: require("./providers/sec"), fred: require("./providers/fred"), alpaca: require("./providers/alpaca"), yahoo: require("./providers/yahoo"), twelvedata: require("./providers/twelvedata"),
   finnhub: require("./providers/finnhub"), fmp: require("./providers/fmp"), alphavantage: require("./providers/alphavantage"), fx: require("./providers/fx"), coingecko: require("./providers/coingecko"), news: require("./providers/news"),
+  wiki: require("./providers/wiki"),
 };
 const S = require("./schemas");
 const C = require("./calc");
@@ -111,9 +112,14 @@ async function getMovers({ asOf, sector } = {}) {
 // ---------------- company ----------------
 async function getCompanyProfile(symbol) {
   const s = sym(symbol);
-  return cached("profile", s, async () => {
+  return cached("profile", s + "/v2", async () => {
     const r = await chain("profile", [[P.fmp, () => P.fmp.profile(s)], [P.finnhub, () => P.finnhub.profile(s)], [P.sec, () => P.sec.profile(s)]]);
     if (r.source !== "sec" && P.sec.configured()) { try { const sp = await P.sec.profile(s); if (sp) { r.data.cik = r.data.cik || sp.cik; r.data.industry = r.data.industry || sp.industry; } } catch (e) { /* optional */ } }
+    if (!r.data.description && allowed("wikipedia")) {
+      // Finnhub's profile2 carries no description and SEC only has the SIC label, so the last resort is a short
+      // Wikipedia summary (CC BY-SA 4.0); the article URL travels with it so the UI can attribute and link it.
+      try { const w = await P.wiki.description(r.data.name || s); if (w) { r.data.description = w.description; r.data.descriptionUrl = w.url; r.data.descriptionSource = "Wikipedia (CC BY-SA 4.0)"; } } catch (e) { /* optional */ }
+    }
     if (!r.data.sector && SP[s]) r.data.sector = SP[s];
     return r;
   });
@@ -160,13 +166,14 @@ const cleanText = (t) => (t == null ? t : P.news.decode(t));
 async function getNews(opts = {}) {
   const { asOf = null } = opts, limit = Math.max(1, Math.min(150, +opts.limit || 25));
   if (asOf) {
-    // News has no archive: the live feeds only carry recent days, so filtering to the demo cut-off would return
-    // nothing. Keep the cut-off where it has an effect (older items) and fall back to the current feed otherwise.
+    // News has no archive: the live feeds only carry recent days, so a demo visitor gets the headlines that were
+    // published on or before the cut-off and nothing after it. If the feed has already rolled past the cut-off the
+    // list is empty and says so; showing today's headlines would break the demo cut-off.
     const r = await getNews({ symbol: opts.symbol, category: opts.category, query: opts.query, limit: 150 });
     const cut = r.data.filter((n) => day(n.publishedAt) <= asOf);
     return cut.length
       ? { data: cut.slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines up to the demo date." } }
-      : { data: r.data.slice(0, limit), meta: { ...r.meta, asOf, note: "Live headlines: news is not archived for the demo date, so the current feed is shown." } };
+      : { data: [], meta: { ...r.meta, asOf, note: "No archived headlines for the demo date. The live feed does not go back that far." } };
   }
   const r = await getNewsCached(opts);
   return { ...r, data: (r.data || []).slice(0, limit).map((n) => ({ ...n, headline: cleanText(n.headline), summary: cleanText(n.summary) })) };

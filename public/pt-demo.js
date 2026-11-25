@@ -25,6 +25,9 @@
   /* The demo's "today" is frozen at 18 Aug 2026 (a Tuesday) so the simulated prices read as outdated;
      the page appends "(Outdated date used for DEMO only)" to every date it shows in this mode. */
   var DEMO_DATE = "2026-08-18";
+  /* USD/THB and HKD/USD on the demo date (Frankfurter, 2026-08-18). Keep these in step with DEMO_DATE: the demo
+     must not quote a later rate than the prices and filings it shows. */
+  var DEMO_USDTHB = 33.06, DEMO_HKDUSD = 0.1282;
   var _todayOverride = DEMO_DATE;
   function todayIso() { return _todayOverride || DEMO_DATE; }
   function daysAgoIso(n) { var d = new Date(todayIso() + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - n); return iso(d); }
@@ -121,7 +124,7 @@
       items: PORT.map(function (p) {
         return { acct: p.acct, tk: p.tk, theme: p.theme, cur: p.cur, qty: p.qty, cost: +(p.qty * p.avg).toFixed(2), px: null };
       }),
-      usdthb: 34.25, hkdusd: 0.1282
+      usdthb: DEMO_USDTHB, hkdusd: DEMO_HKDUSD
     };
   }
 
@@ -137,8 +140,8 @@
   function currentHoldings() {
     var d = storeGet("db.holdings/all");
     if (!d || !d.items || !d.items.length) { d = holdingsDoc(); storeSet("db.holdings/all", d); }
-    if (d.usdthb == null) d.usdthb = 34.25;
-    if (d.hkdusd == null) d.hkdusd = 0.1282;
+    if (d.usdthb == null || d.usdthb === 34.25) d.usdthb = DEMO_USDTHB;   // 34.25 was the pre-cut-off constant
+    if (d.hkdusd == null) d.hkdusd = DEMO_HKDUSD;
     return d;
   }
   function quoteSym(h) {
@@ -723,7 +726,7 @@
       pts.forEach(function (p) { if (p[1] > hi) { hi = p[1]; at = p[0]; } });
       if (hi > 0) ath[map[s]] = { v: hi, d: at };
     });
-    return { ath: ath, fx: { usdthb: 34.25, hkdusd: 0.1282 } };
+    return { ath: ath, fx: { usdthb: DEMO_USDTHB, hkdusd: DEMO_HKDUSD } };
   }
 
   /* ---- the PT_DATA_SOURCE-compatible adapter ---- */
