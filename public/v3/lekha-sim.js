@@ -186,7 +186,7 @@ function paint() {
   if (st.err && !st.res) { out.innerHTML = `<div class="empty">${esc(st.err)}</div>`; return; }
   if (!st.res) { out.innerHTML = `<div class="empty">Choose a horizon and path count, then run. Everything is computed in your browser from your holdings, their price history and the live 10-year yield.</div>`; return; }
   if (!st.res.completedPaths) {
-    out.innerHTML = '<div class="empty">Simulation stopped. 0 paths completed. Run again to calculate results.</div>';
+    out.innerHTML = '<div class="empty">No results yet. Choose the number of paths and press Run simulation.</div>';
     return;
   }
   const r = st.res, s = r.summary, o = s.horizons[st.hz], sv = st.meta.start, hIdx = DEFAULT_HORIZONS.findIndex(([c]) => c === st.hz);

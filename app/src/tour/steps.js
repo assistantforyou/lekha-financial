@@ -1,19 +1,16 @@
-/* The tour: a short, hands-on showcase of the advanced tools, on the sample portfolio. Every target is an element the app really
+/* The tour: a short walk through the app and two advanced tools, on the sample portfolio. Every target is an element the app really
    renders; nothing here is a mock-up. The visitor does the thing and the tool answers.
 
    Step fields
      target     functions tried in order; the first that returns a visible element wins. A step whose targets are all missing is skipped.
      hash       route to open (a function is allowed); none keeps the current page. A hash with ?tab= must match exactly.
-     act        true = hands-on: the app stays live, nothing is dimmed or blocked, a ring pulses on the real control and the step
-                moves on by itself when done() turns true. done() must be false when the step opens.
-     arm        optional: called when a hands-on step is ready; prepares the page (so the payoff is fast) and returns
-                { done, off } where done() reports that the visitor did the thing and off() removes any listeners.
-     settle     ms to linger on the payoff after the visitor acts, before the next step (default 700).
+     act        true = live: the app stays usable, nothing is dimmed or blocked, a ring marks the real control. The step never advances by itself.
+     arm        optional: called when a live step is ready; prepares the page and returns { done, off }. done() reports that the visitor tried the control; it only changes the card's wording (hint -> hintDone). The tour never runs a tool for the visitor.
      hint       the ui string shown under the title (default "act").
      retarget   re-resolve the target on every measure (the ring follows a control that appears or moves).
      pill/skipTo  the AI step shrinks to one line while the visitor asks; skipTo is the step id its Next jumps to.
      quiet      no target, no dim: a small card beside the page.
-     back()     returns to the previous step when the visitor backs out. */
+     where      show where the page lives in the navigation. */
 const byId = (id) => document.getElementById(id)
 const sel = (s) => () => document.querySelector(s)
 export const EXAMPLE = "AAPL"
@@ -38,11 +35,10 @@ const listen = (types, within) => {
   types.forEach((t) => document.addEventListener(t, on, true))
   return { done: () => hit, off: () => types.forEach((t) => document.removeEventListener(t, on, true)) }
 }
-const clicked = (within) => () => listen(["click"], within)
-const adjusted = (within) => () => listen(["input", "change", "pointerup"], within)
+const SCEN = '[aria-label="Scenario"]'
 
 /* Monte Carlo: the page auto-runs 100K paths (about 10 s on a phone), which would leave the visitor staring at a progress bar.
-   Stop that run and choose 10K paths (about a second), then ask the visitor to press Run and watch the fan chart and KPIs appear. */
+   Stop that run and choose 10K paths (about a second); the visitor then presses Run simulation themselves. */
 const armSim = () => {
   const l = listen(["click"], "#sim-go"), kpi = () => { const e = document.querySelector("#sim-out .sim-kpis"); return e ? e.textContent : "" }
   let base = kpi(), t0 = performance.now()
@@ -50,22 +46,31 @@ const armSim = () => {
   prep(); const i = setInterval(() => { if (performance.now() - t0 > 4000 || l.done()) return clearInterval(i); prep() }, 450)
   return { done: () => l.done() && !!kpi() && kpi() !== base, off: () => { clearInterval(i); l.off() } }
 }
+/* Stress test: the visitor presses Run simulation; done when the scenario table has been drawn after the press. */
+const armStress = () => {
+  const l = listen(["click"], "#ai-sim-run"); let changes = 0; const o = byId("ai-simout"), mo = new MutationObserver(() => { changes++ }); if (o) mo.observe(o, { childList: true, subtree: true, characterData: true })
+  return { done: () => l.done() && changes > 0 && !!document.querySelector("#ai-simout table"), off: () => { l.off(); mo.disconnect() } }
+}
+const armDcf = () => listen(["click", "input", "change"], SCEN + ", #dcf-growth, #dcf-discount, #dcf-terminalGrowth")
 
+/* Ten steps, the same on every screen size: orient (search, menu, portfolio), try two tools, see what a valuation is, meet the analyst, then a clear next step.
+   Nothing blocks on the visitor: each step has Next, and trying a tool only changes the wording of the card. */
 const welcome = { id: "welcome", hash: "portfolio/overview", ready: () => !!byId("kpis") }
-const sim = { id: "sim", hash: "simulation/main", target: [seen("#sim-go"), seen("#sim-hz")], retarget: true, act: true, hint: "hintSim", settle: 2600, arm: armSim }
-const stress = { id: "stress", hash: "analysis/stress", target: [seen("#ai-sim-run")], act: true, hint: "hintStress", settle: 2600, arm: clicked("#ai-sim-run") }
-const rrg = { id: "rrg", hash: "sector/now", target: [seen("#rrg-asof")], act: true, hint: "hintRrg", settle: 1800, arm: adjusted("#rrg-asof") }
-const dcf = { id: "dcf", hash: "company/" + EXAMPLE + "?tab=valuation", target: [seen("#dcf-growth"), seen("#dcf-discount")], act: true, hint: "hintDcf", settle: 2200, arm: adjusted("#dcf-growth, #dcf-discount, #dcf-terminalGrowth") }
+const search = { id: "search", hash: "portfolio/overview", target: [sel('[data-tour="search"]'), sel('[data-tour="search-icon"]')] }
+const nav = { id: "nav", hash: "portfolio/overview", target: [sel('[data-tour="nav"]'), sel('[data-tour="menu"]')], prefer: ["right"] }
+const summary = { id: "summary", where: true, hash: "portfolio/overview", target: [() => byId("kpis")] }
+const sim = { id: "sim", hash: "simulation/main", target: [seen("#sim-go")], retarget: true, act: true, hint: "hintSim", hintDone: "hintSimDone", arm: armSim }
+const stress = { id: "stress", hash: "analysis/stress", target: [seen("#ai-sim-run")], retarget: true, act: true, hint: "hintStress", hintDone: "hintStressDone", arm: armStress }
+const dcf = { id: "dcf", hash: "company/" + EXAMPLE + "?tab=valuation", target: [seen(SCEN), seen("#dcf-growth")], act: true, hint: "hintDcf", hintDone: "hintTried", arm: armDcf }
 const ask = { id: "ask", hash: () => "company/" + lastSym() + "?tab=ai", target: [sel('[data-tour="ask-box"]')], act: true, hint: "tryit", pill: true, skipTo: "finish" }
 const answer = { id: "answer", quiet: true }
 const finish = { id: "finish", hash: "portfolio/overview", ready: () => !!byId("kpis") }
 
-export const STEPS_DESKTOP = [welcome, sim, stress, rrg, dcf, ask, answer, finish]
-/* phones: the rotation graph and the 900 px fan chart are cramped at 390 px, so the phone tour keeps the tools that read well on a small screen */
-export const STEPS_MOBILE = [welcome, sim, stress, dcf, ask, answer, finish]
+export const STEPS_DESKTOP = [welcome, search, nav, summary, sim, stress, dcf, ask, answer, finish]
+export const STEPS_MOBILE = STEPS_DESKTOP.slice()
 export const STEPS = STEPS_DESKTOP.slice()
 /* chosen when the tour starts; the array is replaced in place so every importer keeps the same reference */
-export const setPlatform = () => { let m = false; try { m = matchMedia("(max-width: 640px)").matches } catch (e) {} STEPS.splice(0, STEPS.length, ...(m ? STEPS_MOBILE : STEPS_DESKTOP)) }
+export const setPlatform = () => { STEPS.splice(0, STEPS.length, ...STEPS_DESKTOP) }
 
 /* -> { el, alt } | { el: null } for a targeted step; { el: null, none: true } when a target-less step is ready */
 export function resolve(step) {

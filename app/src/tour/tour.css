@@ -8,7 +8,7 @@
 .tour-try { margin: 8px 0 0; font-size: 12.5px; font-weight: 600; color: var(--accent); }
 .tour-dim { position: fixed; inset: 0; background: rgba(4, 8, 14, .68); pointer-events: none; mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat;
   transition: mask-position .4s cubic-bezier(.4, 0, .2, 1), mask-size .4s cubic-bezier(.4, 0, .2, 1), -webkit-mask-position .4s cubic-bezier(.4, 0, .2, 1), -webkit-mask-size .4s cubic-bezier(.4, 0, .2, 1); }
-.tour-spot { position: fixed; left: 0; top: 0; border-radius: 7px; pointer-events: none; box-shadow: 0 0 0 2px var(--accent), 0 0 22px color-mix(in srgb, var(--accent) 38%, transparent);
+.tour-spot { position: fixed; left: 0; top: 0; border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 1.5px var(--accent), 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent);
   transition: transform .4s cubic-bezier(.4, 0, .2, 1), width .4s cubic-bezier(.4, 0, .2, 1), height .4s cubic-bezier(.4, 0, .2, 1), opacity .25s; }
 .tour-spot.two { border-radius: 6px; box-shadow: 0 0 0 1.5px var(--accent), 0 0 14px color-mix(in srgb, var(--accent) 30%, transparent); }
 .tour-card { position: fixed; left: 0; top: 0; width: 360px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow: auto; padding: 16px 18px 14px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 14px;
@@ -66,12 +66,12 @@
 .tour-root[data-live="1"] { pointer-events: none; }
 .tour-root[data-live="1"] .tour-card { pointer-events: auto; }
 .tour-card[data-hidden="1"] { opacity: 0; pointer-events: none !important; }
-.tour-card[data-mode="coach"], .tour-card[data-mode="quiet"], .tour-card[data-mode="pill"] { box-shadow: 0 12px 36px rgba(0, 0, 0, .5), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent); }
-.tour-card[data-mode="coach"] { padding: 11px 14px 10px; }
-.tour-card[data-mode="coach"] .tour-top { margin-bottom: 7px; }
-.tour-card[data-mode="coach"] .tour-title { font-size: 15px; margin-bottom: 3px; }
+.tour-card[data-mode="coach"], .tour-card[data-mode="quiet"], .tour-card[data-mode="pill"] { box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.tour-card[data-mode="coach"] { padding: 14px 16px 12px; }
+.tour-card[data-mode="coach"] .tour-top { margin-bottom: 9px; }
+.tour-card[data-mode="coach"] .tour-title { font-size: 15px; margin-bottom: 5px; }
 .tour-card[data-mode="coach"] .tour-try { margin: 0; font-size: 13px; line-height: 1.45; }
-.tour-card[data-mode="coach"] .tour-foot { margin-top: 9px; }
+.tour-card[data-mode="coach"] .tour-foot { margin-top: 12px; }
 .tour-card[data-mode="coach"] .tour-btn { height: 32px; font-size: 12.5px; padding: 0 12px; }
 .tour-card[data-mode="pill"] { padding: 8px 8px 8px 16px; border-radius: 999px; }
 .tour-pillrow { display: flex; align-items: center; gap: 10px; animation: tour-in .3s ease-out both; }
@@ -80,10 +80,30 @@
 .tour-card[data-mode="quiet"] { padding: 12px 14px 11px; }
 .tour-card[data-mode="quiet"] .tour-top { margin-bottom: 7px; }
 @media (max-width: 640px) {
-  .tour-foot.last { flex-wrap: wrap; }
   .tour-foot.last .tour-btn.pri { order: -1; flex: 1 1 100%; }
   .tour-foot.last .grow { display: none; }
-  .tour-foot.last .tour-btn:not(.pri) { flex: 1; }
+  .tour-foot.last .tour-btn:not(.pri) { flex: 1 1 100%; }
 }
-@keyframes tour-ripple { 0% { opacity: .65; inset: 0; } 100% { opacity: 0; inset: -11px; } }
+@keyframes tour-ripple { 0% { opacity: .5; inset: 0; } 100% { opacity: 0; inset: -7px; } }
 @media (prefers-reduced-motion: reduce) { .tour-root .tour-spot::after { animation: none !important; } .tour-pillrow { animation: none; } }
+
+/* ---- calm motion: between steps the card and the ring fade in at their new place, they do not travel across the page; geometry changes glide only once a step has settled ---- */
+.tour-root:not([data-settled="1"]) .tour-card, .tour-root:not([data-settled="1"]) .tour-spot { transition: opacity .25s ease; }
+.tour-root:not([data-settled="1"]) .tour-dim { transition: opacity .4s ease; }
+.tour-root[data-busy="1"] .tour-card, .tour-root[data-busy="1"] .tour-spot { opacity: 0 !important; transition: opacity .12s ease !important; pointer-events: none; }
+.tour-card[data-mode="coach"] .tour-try[data-tried="1"] { color: var(--fg); }
+
+/* ---- the closing call to action ---- */
+.tour-note { margin: 10px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+.tour-foot.last { flex-wrap: wrap; }
+.tour-link { flex: 1 1 100%; order: 3; margin-top: 2px; text-align: center; font-size: 12.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.tour-link:hover { color: var(--fg); }
+a.tour-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+@media (max-width: 640px) { .tour-link { order: 3; } }
+.tour-root:not([data-settled="1"]) .tour-card { transition: opacity .25s ease .08s; }   /* a beat after the step opens, so the card is measured before it shows */
+
+/* the closing buttons: Premium sits under the two main ones and above "I already have an account" */
+.tour-foot.last .tour-btn.prem { flex: 1 1 100%; order: 2; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--accent); }
+.tour-btn.prem:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.tour-foot.last .tour-btn.pri { order: 0; }
+@media (max-width: 640px) { .tour-card { max-width: calc(100vw - 28px); } .tour-card[data-mode="coach"] .tour-lang select { padding: 4px 6px; max-width: 96px; } }

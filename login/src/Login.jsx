@@ -140,7 +140,13 @@ export default function Login() {
         setMsg({ text: r.j?.error || "Could not create the account.", kind: "err" })
         return
       }
-      try { window.ptTrack && window.ptTrack("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB" }, "reg") } catch {}
+      try {
+        // the signup is tied to the ad it came from (first-touch tags kept by the app) and to the tour button when that is where it started
+        let extra = {}
+        try { const a = JSON.parse(localStorage.getItem("ptpub.v1.attr") || "null") || {}; for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]) if (a[k]) extra[k] = a[k] } catch {}
+        if (new URLSearchParams(location.search).get("from") === "tour") extra.signup_from = "tour"
+        window.ptTrack && window.ptTrack("CompleteRegistration", { status: true, content_name: "Free", value: 0, currency: "THB", ...extra }, "reg")
+      } catch {}
       if (r.j.session) {
         save(r.j.session)
         location.replace(nextUrl())
