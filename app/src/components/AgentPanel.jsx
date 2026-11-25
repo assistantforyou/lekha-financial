@@ -98,6 +98,8 @@ function Answer({ m, live }) {
   )
 }
 
+/* The Quick Tour listens for a question being sent and answered (it steps aside while the visitor asks, then returns beside the answer). */
+const tourSignal = (phase) => { try { window.dispatchEvent(new CustomEvent("lekha:ask", { detail: { phase } })) } catch (e) {} }
 export default function AgentPanel({ symbol, initial }) {
   const [threads, setThreads] = useState([])
   const [threadId, setThreadId] = useState(null)
@@ -152,6 +154,7 @@ export default function AgentPanel({ symbol, initial }) {
       { role: "user", content: q, at: Date.now(), attachments: attached.map((a) => a.name) },
       { role: "assistant", content: "", parts: [], at: Date.now() }])
     setBusy(true)
+    tourSignal("start")
     const ctl = new AbortController()
     abort.current = ctl
     let reply = ""
@@ -213,7 +216,7 @@ export default function AgentPanel({ symbol, initial }) {
           : e.message || "That request failed."
         setErr(msg)
       }
-    } finally { setBusy(false); abort.current = null }
+    } finally { setBusy(false); abort.current = null; tourSignal("done") }
   }
 
   async function openThread(id) {
@@ -337,7 +340,7 @@ export default function AgentPanel({ symbol, initial }) {
           </div>
         )}
 
-        <div className="rounded-lg border border-[var(--line)] p-2">
+        <div className="rounded-lg border border-[var(--line)] p-2" data-tour="ask-box">
           <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask(input) }}
             placeholder={symbol ? `Ask about ${symbol}…` : "Ask a question…"} rows={2} className="resize-none border-0 shadow-none focus-visible:ring-0" disabled={busy} />
           <div className="mt-1 flex flex-wrap items-center gap-1.5">

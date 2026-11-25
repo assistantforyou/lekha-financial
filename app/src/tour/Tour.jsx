@@ -4,8 +4,8 @@ import { Building2, ChevronRight, Languages, Layers, LineChart, MapPin, Search }
 import { FLAT } from "@/nav"
 import "./tour.css"
 import { COPY, LANG_LABEL, LANG_NATIVE, setTourLang, stepCopy, tourLang, ui } from "./copy"
-import { MOBILE_MAX, place, scrollDelta } from "./layout"
-import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, resolve, visible } from "./steps"
+import { M, MOBILE_MAX, place, scrollDelta } from "./layout"
+import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, modeOf, resolve, visible } from "./steps"
 import { onStartTour, shouldAutoStart, writeStatus } from "./store"
 
 const WF_ICONS = [Search, Building2, Layers, LineChart]
@@ -25,7 +25,7 @@ const revealInNav = (a) => {
   sc.scrollTop += (r.top - s.top) - (s.height - r.height) / 2
 }
 const WAIT = { company: 14000, tabs: 14000 }
-const sameGeo = (a, b) => !!a && !!b && a.side === b.side && a.mobile === b.mobile && a.card.x === b.card.x && a.card.y === b.card.y && a.card.w === b.card.w && JSON.stringify(a.spot) === JSON.stringify(b.spot) && JSON.stringify(a.spot2) === JSON.stringify(b.spot2)
+const sameGeo = (a, b) => !!a && !!b && a.hidden === b.hidden && a.side === b.side && a.mobile === b.mobile && a.card.x === b.card.x && a.card.y === b.card.y && a.card.w === b.card.w && JSON.stringify(a.spot) === JSON.stringify(b.spot) && JSON.stringify(a.spot2) === JSON.stringify(b.spot2)
 const pinned = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const p = getComputedStyle(e).position; if (p === "sticky" || p === "fixed") return true } return false }
 const header = () => document.querySelector(".shell > header")
 const frames = (n) => new Promise((r) => { const f = () => (n-- <= 0 ? r() : requestAnimationFrame(f)); f() })
@@ -36,12 +36,13 @@ const scrollIdle = () => new Promise((res) => { let last = window.scrollY, same 
 export default function Tour({ navigate }) {
   const [active, setActive] = useState(false), [ready, setReady] = useState(false)
   const [cur, setCur] = useState(0), [alt, setAlt] = useState(false), [busy, setBusy] = useState(true), [skipped, setSkipped] = useState([])
+  const [askPhase, setAskPhase] = useState("idle")
   const [geo, setGeo] = useState(null), [size, setSize] = useState({ w: 360, h: 240 }), [, setLangTick] = useState(0)
   useEffect(() => { const f = () => setLangTick((x) => x + 1); window.addEventListener("lekha:tourlang", f); return () => window.removeEventListener("lekha:tourlang", f) }, [])
   const R = useRef({ token: 0, el: null, prevFocus: null, instantT: 0 }), live = useRef({})
   const rootRef = useRef(null), cardRef = useRef(null), primaryRef = useRef(null)
   const [host] = useState(() => { const d = document.createElement("div"); d.id = "lekha-tour"; d.setAttribute("translate", "no"); d.className = "notranslate"; return d })
-  live.current = { cur, busy, skipped, size, active, alt }
+  live.current = { cur, busy, skipped, size, active, alt, askPhase }
 
   const finish = useCallback((status) => { R.current.token++; writeStatus(status); setActive(false); setReady(false) }, [])
 
@@ -97,7 +98,7 @@ export default function Tour({ navigate }) {
   useEffect(() => {
     if (!active || !ready) return
     document.body.appendChild(host)
-    if (isAct(STEPS[cur], alt)) return () => { host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
+    if (modeOf(STEPS[cur], alt) !== "card") return () => { host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
     const kids = [...document.body.children].filter((e) => e !== host && !/^(SCRIPT|STYLE|LINK)$/.test(e.tagName) && !e.inert)
     kids.forEach((e) => { e.inert = true })
     return () => { kids.forEach((e) => { e.inert = false }); host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
@@ -109,7 +110,7 @@ export default function Tour({ navigate }) {
     const k = (e) => {
       const t = e.target, typing = !!(t && t.closest && !t.closest("#lekha-tour") && t.closest("input, textarea, select, [contenteditable=\"true\"]"))
       if (typing && e.key !== "Escape") return                         // the visitor is typing in the highlighted box: the tour's shortcuts stay out of the way
-      if (isAct(STEPS[live.current.cur], live.current.alt)) return    // hands-on step: the app's own keys (Esc closes the search box, Ctrl K opens it) work as usual; the card has Skip
+      if (modeOf(STEPS[live.current.cur], live.current.alt) !== "card") return    // hands-on step: the app's own keys (Esc closes the search box, Ctrl K opens it) work as usual; the card has Skip
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); skip(); return }
       if (e.key === "/" || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); e.stopImmediatePropagation(); return }
       if (e.key === "ArrowRight" && !e.altKey && !e.metaKey) { e.preventDefault(); const l = live.current.cur === STEPS.length - 1; if (l) { if (!live.current.busy) finish("completed") } else move(1); return }
@@ -135,6 +136,15 @@ export default function Tour({ navigate }) {
     return () => clearInterval(i)
   }, [active, ready, busy, cur, alt, move])
 
+  /* ---- the AI step: the tour steps aside while the visitor asks, and comes back beside the answer a few seconds after it lands ---- */
+  useEffect(() => { setAskPhase("idle") }, [cur])
+  useEffect(() => {
+    const f = (e) => { if (!live.current.active) return; const st = STEPS[live.current.cur]; if (!st || !st.pill) return; setAskPhase(e.detail && e.detail.phase === "start" ? "busy" : "done") }
+    window.addEventListener("lekha:ask", f); return () => window.removeEventListener("lekha:ask", f)
+  }, [])
+  useEffect(() => { if (askPhase !== "done") return; const t = setTimeout(() => { const st = STEPS[live.current.cur]; if (st && st.pill) move(1) }, 4000); return () => clearTimeout(t) }, [askPhase, move])
+  const jump = useCallback((id) => { const i = STEPS.findIndex((x) => x.id === id); if (i >= 0 && !live.current.busy) goTo(i, 1) }, [goTo])
+
   /* ---- geometry: re-measure the real element on every scroll, resize, layout change and for a moment after each step ---- */
   const measure = useCallback(() => {
     const { cur: c, busy: b, size: sz } = live.current, step = STEPS[c]; if (!step) return
@@ -143,7 +153,20 @@ export default function Tour({ navigate }) {
     if (step.target && (step.retarget || !el || !el.isConnected || !visible(el))) { const r = resolve(step); if (r.el) { if (r.el !== R.current.el) { R.current.el = el = r.el; if (step.nav && r.el.closest("aside, [role=\"dialog\"]")) revealInNav(r.el) } else el = r.el } else if (b) return; else el = null }
     let rect = null, top = 0
     if (el) { const bb = el.getBoundingClientRect(), h = header(); rect = { left: bb.left, top: bb.top, right: bb.right, bottom: bb.bottom, height: bb.height }; top = h && !h.contains(el) ? h.getBoundingClientRect().bottom : 0 }
-    const g = place({ rect, vw, vh, card: sz, top, prefer: step.prefer, mobile }); g.mobile = mobile; g.spot2 = null
+    const mode = modeOf(step, live.current.alt), hidden = !!step.pill && live.current.askPhase !== "idle"
+    let g
+    if (mode === "quiet" || (mode === "coach" && mobile)) {
+      /* docked: above the keyboard (visual viewport) at the bottom, or under the header when the target sits in the lower half, so the card never covers what the visitor is using */
+      const vv = window.visualViewport, kb = vv ? Math.max(0, vh - vv.height - vv.offsetTop) : 0, visH = vh - kb, hb = header() ? Math.max(0, header().getBoundingClientRect().bottom) : 56
+      const cw = mobile ? Math.min(vw - 2 * M, 520) : Math.min(sz.w || 380, 400)
+      const low = !!rect && (rect.top + rect.bottom) / 2 > hb + (visH - hb) * 0.5, atTop = !!step.pill || (mode === "coach" && low)
+      const x = mobile || mode === "coach" ? Math.round((vw - cw) / 2) : vw - cw - 20
+      const y = atTop ? Math.round(hb + 10) : Math.round(visH - sz.h - 12)
+      const spot = rect && !hidden ? { x: Math.max(3, rect.left - 4), y: Math.max(top + 2, rect.top - 4), w: Math.min(vw - 3, rect.right + 4) - Math.max(3, rect.left - 4), h: Math.min(vh - 3, rect.bottom + 4) - Math.max(top + 2, rect.top - 4) } : null
+      g = { spot, card: { x, y, w: cw }, side: "dock-" + (atTop ? "top" : "bottom") + "-" + kb }
+    } else g = place({ rect, vw, vh, card: sz, top, prefer: step.prefer, mobile })
+    g.mobile = mobile; g.spot2 = null; g.hidden = hidden
+    if (hidden) g.spot = null
     if (step.where) { const l = locator(); if (l && l.matches("aside a")) revealInNav(l); if (l && !(el && l.contains(el))) { const lb = l.getBoundingClientRect(), hb = header() ? header().getBoundingClientRect().bottom : 0; if (lb.top >= hb - 1 && lb.bottom <= vh) g.spot2 = { x: Math.max(2, lb.left - 4), y: Math.max(2, lb.top - 3), w: Math.min(vw - 4, lb.right + 4) - Math.max(2, lb.left - 4), h: lb.height + 6 } } }
     setGeo((p) => (sameGeo(p, g) ? p : g))
   }, [])
@@ -180,7 +203,8 @@ export default function Tour({ navigate }) {
 
   if (!active || !ready || !geo) return null
   const step = STEPS[cur], id = step.id, last = cur === STEPS.length - 1, first = cur === 0
-  const act = isAct(step, alt), c = stepCopy(id, { key: shortcut(), symbol: lastSym() }), body = (alt || (id === "search" && touchOnly())) && c.a ? c.a : c.b
+  const mode = modeOf(step, alt), act = mode === "coach", pill = !!step.pill && mode === "coach"
+  const c = stepCopy(id, { key: shortcut(), symbol: lastSym() }), body = (alt || (id === "search" && touchOnly())) && c.a ? c.a : c.b
   const total = STEPS.length - skipped.length, n = cur + 1 - skipped.filter((s) => s < cur).length
   const sp = geo.spot, sp2 = geo.spot2, vw = document.documentElement.clientWidth, vh = window.innerHeight
   const ok = (r) => !!(r && r.w > 0 && r.h > 0), r1 = ok(sp) ? sp : null, r2 = ok(sp2) ? sp2 : null
@@ -190,41 +214,40 @@ export default function Tour({ navigate }) {
     maskSize: `${px(r2, "w")}px ${px(r2, "h")}px,${px(r1, "w")}px ${px(r1, "h")}px,100% 100%`, WebkitMaskSize: `${px(r2, "w")}px ${px(r2, "h")}px,${px(r1, "w")}px ${px(r1, "h")}px,100% 100%`,
     maskPosition: `${px(r2, "x")}px ${px(r2, "y")}px,${px(r1, "x")}px ${px(r1, "y")}px,0 0`, WebkitMaskPosition: `${px(r2, "x")}px ${px(r2, "y")}px,${px(r1, "x")}px ${px(r1, "y")}px,0 0` }
   const ring = (r) => (r ? { transform: `translate(${Math.round(r.x)}px,${Math.round(r.y)}px)`, width: Math.round(r.w), height: Math.round(r.h), opacity: 1 } : { transform: `translate(${Math.round(vw / 2)}px,${Math.round(vh / 2)}px)`, width: 0, height: 0, opacity: 0 })
-  const cardStyle = geo.mobile ? undefined : { transform: `translate(${geo.card.x}px,${geo.card.y}px)`, width: geo.card.w }
-  const label = ui("step", { n, total }), trail = step.where ? where(hashOf(step)) : null, roomy = !geo.mobile && vh >= 640 && !!c.pts
+  const cardStyle = { transform: `translate(${geo.card.x}px,${geo.card.y}px)`, width: geo.card.w }
+  const label = ui("step", { n, total }), trail = step.where && mode === "card" ? where(hashOf(step)) : null, roomy = !geo.mobile && vh >= 640 && !!c.pts && mode === "card"
   const lang = tourLang()
+  const top = <div className="tour-top"><span className="tour-count">{n} / {total}</span><div className="tour-track" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={n} aria-label={label}><i style={{ width: `${(n / total) * 100}%` }} /></div>
+    {mode !== "coach" && <label className="tour-lang" title={LANG_LABEL[lang]}><Languages aria-hidden="true" /><select value={lang} onChange={(e) => setTourLang(e.target.value)} aria-label={LANG_LABEL[lang]}>{Object.keys(COPY).map((k) => <option key={k} value={k} lang={k}>{LANG_NATIVE[k]}</option>)}</select></label>}</div>
+  const nextBtn = <button type="button" className={mode === "card" || mode === "quiet" ? "tour-btn pri" : "tour-btn"} ref={primaryRef} onClick={() => (step.skipTo ? jump(step.skipTo) : move(1))} disabled={busy}>{ui("next")}</button>
   return createPortal(
-    <div ref={rootRef} className="tour-root" data-live={act ? "1" : undefined} lang={tourLang()} translate="no">
-      {act && r1
-        ? [{ left: 0, top: 0, width: "100%", height: px(r1, "y") }, { left: 0, top: px(r1, "y") + px(r1, "h"), width: "100%", bottom: 0 }, { left: 0, top: px(r1, "y"), width: px(r1, "x"), height: px(r1, "h") }, { left: px(r1, "x") + px(r1, "w"), top: px(r1, "y"), right: 0, height: px(r1, "h") }].map((b, i) => <div key={i} className="tour-block part" style={b} aria-hidden="true" />)
-        : <div className="tour-block" aria-hidden="true" />}
+    <div ref={rootRef} className="tour-root" data-mode={mode} data-live={mode !== "card" ? "1" : undefined} lang={tourLang()} translate="no">
+      {mode === "card" && <div className="tour-block" aria-hidden="true" />}
       <div className="tour-dim" style={dim} aria-hidden="true" />
       <div className="tour-spot" style={ring(r1)} aria-hidden="true" />
       <div className="tour-spot two" style={ring(r2)} aria-hidden="true" />
-      <div ref={cardRef} className="tour-card" role="dialog" aria-modal={act ? undefined : "true"} aria-label={ui("label")} aria-labelledby="tour-t" aria-describedby="tour-b" aria-busy={busy} data-sheet={geo.mobile ? "1" : undefined} style={cardStyle} tabIndex={-1}>
-        <div className="tour-top"><span className="tour-count">{n} / {total}</span><div className="tour-track" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={n} aria-label={label}><i style={{ width: `${(n / total) * 100}%` }} /></div>
-          <label className="tour-lang" title={LANG_LABEL[lang]}><Languages aria-hidden="true" /><select value={lang} onChange={(e) => setTourLang(e.target.value)} aria-label={LANG_LABEL[lang]}>{Object.keys(COPY).map((k) => <option key={k} value={k} lang={k}>{LANG_NATIVE[k]}</option>)}</select></label></div>
-        {trail && <div className="tour-where"><MapPin aria-hidden="true" /><span translate="no">{trail[0]}</span><ChevronRight aria-hidden="true" /><b translate="no">{trail[1]}</b></div>}
-        <div className="tour-body" key={cur + (alt ? "a" : "")}>
-          <h2 className="tour-title" id="tour-t">{c.t}</h2>
-          <p className="tour-text" id="tour-b">{body}</p>
-          {act && <p className="tour-try">{ui(step.hint || "act")}</p>}
-          {roomy && <ul className="tour-pts">{c.pts.map(([k, v]) => <li key={k}><b>{k}</b><span>{v}</span></li>)}</ul>}
-          {last && c.wf && <ol className="tour-wf" aria-hidden="true">{c.wf.map((w, i) => { const I = WF_ICONS[i]; return <li key={i}><span><I />{w}</span>{i < c.wf.length - 1 && <ChevronRight className="sep" />}</li> })}</ol>}
-        </div>
-        <div className="tour-sr" role="status" aria-live="polite">{label}: {c.t}</div>
-        <div className="tour-foot">
-          {!last && <button type="button" className="tour-btn ghost" onClick={skip}>{ui("skip")}</button>}
-          <span className="grow" />
-          {!first && <button type="button" className="tour-btn" onClick={() => move(-1)} disabled={busy}>{ui("back")}</button>}
-          {last ? <>
-            {!signedIn() && <button type="button" className="tour-btn ghost" onClick={() => finish("completed")}>{ui("explore")}</button>}
-            {signedIn()
-              ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button>
-              : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => { writeStatus("completed"); location.href = "/login.html?mode=signup" }}>{ui("account")}</button>}
-          </>
-            : <button type="button" className={act ? "tour-btn" : "tour-btn pri"} ref={primaryRef} onClick={() => move(1)} disabled={busy}>{ui("next")}</button>}
-        </div>
+      <div ref={cardRef} className="tour-card" data-mode={pill ? "pill" : mode} data-hidden={geo.hidden ? "1" : undefined} role="dialog" aria-modal={mode === "card" ? "true" : undefined} aria-label={ui("label")} aria-labelledby="tour-t" aria-describedby="tour-b" aria-busy={busy} style={cardStyle} tabIndex={-1}>
+        {pill ? <div className="tour-pillrow" key="pill"><span className="tour-pill" id="tour-t">{ui("askpill")}</span>{nextBtn}</div> : <>
+          {top}
+          {trail && <div className="tour-where"><MapPin aria-hidden="true" /><span translate="no">{trail[0]}</span><ChevronRight aria-hidden="true" /><b translate="no">{trail[1]}</b></div>}
+          <div className="tour-body" key={cur + (alt ? "a" : "")}>
+            <h2 className="tour-title" id="tour-t">{c.t}</h2>
+            {act ? <p className="tour-try" id="tour-b">{ui(step.hint || "act")}</p> : <p className="tour-text" id="tour-b">{body}</p>}
+            {roomy && <ul className="tour-pts">{c.pts.map(([k, v]) => <li key={k}><b>{k}</b><span>{v}</span></li>)}</ul>}
+            {last && c.wf && <ol className="tour-wf" aria-hidden="true">{c.wf.map((w, i) => { const I = WF_ICONS[i]; return <li key={i}><span><I />{w}</span>{i < c.wf.length - 1 && <ChevronRight className="sep" />}</li> })}</ol>}
+          </div>
+          <div className="tour-sr" role="status" aria-live="polite">{label}: {c.t}</div>
+          <div className={"tour-foot" + (last ? " last" : "")}>
+            {!last && <button type="button" className="tour-btn ghost" onClick={skip}>{ui("skip")}</button>}
+            <span className="grow" />
+            {!first && <button type="button" className="tour-btn" onClick={() => move(-1)} disabled={busy}>{ui("back")}</button>}
+            {last ? <>
+              {!signedIn() && <button type="button" className="tour-btn ghost" onClick={() => finish("completed")}>{ui("explore")}</button>}
+              {signedIn()
+                ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button>
+                : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => { writeStatus("completed"); location.href = "/login.html?mode=signup" }}>{ui("account")}</button>}
+            </> : nextBtn}
+          </div></>}
       </div>
     </div>, host)
 }

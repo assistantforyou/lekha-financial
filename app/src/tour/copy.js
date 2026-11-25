@@ -6,7 +6,7 @@
 
 export const COPY = {
   en: {
-    ui: { next: "Next", act: "Your turn: tap or click the highlighted area. The tour continues by itself.", tryit: "Try it now: type a question in the highlighted box and send it.", back: "Back", skip: "Skip Tour", finish: "Start Exploring", label: "Quick Tour", step: "Step {n} of {total}", replay: "Replay tour", replayHead: "Quick tour", replayText: "A one-minute guided walk through search, navigation, holdings and research.", explore: "Keep exploring", account: "Create a free account", palette: "Take the Quick Tour" },
+    ui: { next: "Next", askpill: "Send your question to see the analyst work.", act: "Your turn: tap or click the highlighted area. The tour continues by itself.", tryit: "Try it now: type a question in the highlighted box and send it.", back: "Back", skip: "Skip Tour", finish: "Start Exploring", label: "Quick Tour", step: "Step {n} of {total}", replay: "Replay tour", replayHead: "Quick tour", replayText: "A one-minute guided walk through search, navigation, holdings and research.", explore: "Keep exploring", account: "Create a free account", palette: "Take the Quick Tour" },
     steps: {
       welcome: { t: "Welcome to LEKHA Financials", b: "Your workspace for researching companies, tracking your holdings and seeing how your portfolio is doing. This tour takes about a minute." },
       search: { t: "Start with search", b: "Find any company, ETF, index or crypto by name or ticker, plus filings, news and pages. Press {key} from anywhere.", a: "Tap here to find any company, ETF, index or crypto, plus filings, news and pages." },
@@ -20,12 +20,13 @@ export const COPY = {
       pick: { t: "Pick a company", b: "Type a name or ticker, for example Apple or AAPL, then choose it from the list." },
       askai: { t: "Ask about this company", b: "Ask AI opens the research agent already pointed at {symbol}." },
       gohold: { t: "Open your holdings", b: "Choose Holdings & ledger under My Portfolio to see every position you own." },
+      answer: { t: "Read the answer", b: "Every figure is cited to the evidence behind it. Take your time, then continue." },
       discover: { t: "Discover, not just look up", b: "Not sure what to research? Sector rotation shows where money is flowing. Macro & markets and the AI research agent go further." },
       finish: { t: "Your workflow", b: "Search, research, review your holdings, monitor performance. Explore freely. You can replay this tour from Preferences or the menu footer.", wf: ["Search", "Research", "Holdings", "Performance"] },
     },
   },
   th: {
-    ui: { next: "ถัดไป", act: "ถึงตาคุณ: แตะหรือคลิกบริเวณที่ไฮไลต์ ทัวร์จะไปต่อโดยอัตโนมัติ", tryit: "ลองเลย: พิมพ์คำถามในกล่องที่ไฮไลต์แล้วกดส่ง", back: "ย้อนกลับ", skip: "ข้ามทัวร์", finish: "เริ่มสำรวจ", label: "ทัวร์แนะนำ", step: "ขั้นที่ {n} จาก {total}", replay: "เปิดทัวร์อีกครั้ง", replayHead: "ทัวร์แนะนำ", replayText: "แนะนำการใช้งานหนึ่งนาที ครอบคลุมการค้นหา การนำทาง สินทรัพย์ที่ถือ และการค้นคว้า", explore: "สำรวจต่อ", account: "สร้างบัญชีฟรี", palette: "ดูทัวร์แนะนำ" },
+    ui: { next: "ถัดไป", askpill: "ส่งคำถามของคุณเพื่อดูการทำงานของนักวิเคราะห์", act: "ถึงตาคุณ: แตะหรือคลิกบริเวณที่ไฮไลต์ ทัวร์จะไปต่อโดยอัตโนมัติ", tryit: "ลองเลย: พิมพ์คำถามในกล่องที่ไฮไลต์แล้วกดส่ง", back: "ย้อนกลับ", skip: "ข้ามทัวร์", finish: "เริ่มสำรวจ", label: "ทัวร์แนะนำ", step: "ขั้นที่ {n} จาก {total}", replay: "เปิดทัวร์อีกครั้ง", replayHead: "ทัวร์แนะนำ", replayText: "แนะนำการใช้งานหนึ่งนาที ครอบคลุมการค้นหา การนำทาง สินทรัพย์ที่ถือ และการค้นคว้า", explore: "สำรวจต่อ", account: "สร้างบัญชีฟรี", palette: "ดูทัวร์แนะนำ" },
     steps: {
       welcome: { t: "ยินดีต้อนรับสู่ LEKHA Financials", b: "พื้นที่ทำงานสำหรับค้นคว้าบริษัท ติดตามสินทรัพย์ที่ถือ และดูว่าพอร์ตโฟลิโอของคุณเป็นอย่างไร ทัวร์นี้ใช้เวลาประมาณหนึ่งนาที" },
       search: { t: "เริ่มต้นด้วยการค้นหา", b: "ค้นหาบริษัท ETF ดัชนี หรือคริปโตด้วยชื่อหรือสัญลักษณ์ รวมถึงเอกสารที่ยื่น ข่าว และหน้าต่าง ๆ กด {key} ได้จากทุกหน้า", a: "แตะที่นี่เพื่อค้นหาบริษัท ETF ดัชนี หรือคริปโต รวมถึงเอกสารที่ยื่น ข่าว และหน้าต่าง ๆ" },
@@ -39,12 +40,13 @@ export const COPY = {
       pick: { t: "เลือกบริษัท", b: "พิมพ์ชื่อหรือสัญลักษณ์ เช่น Apple หรือ AAPL แล้วเลือกจากรายการ" },
       askai: { t: "ถามเกี่ยวกับบริษัทนี้", b: "ปุ่ม Ask AI เปิดตัวช่วยวิจัยที่ตั้งไว้ที่ {symbol} แล้ว" },
       gohold: { t: "เปิดรายการที่ถือครอง", b: "เลือก Holdings & ledger ใต้ My Portfolio เพื่อดูทุกสถานะที่คุณถือ" },
+      answer: { t: "อ่านคำตอบ", b: "ทุกตัวเลขอ้างอิงหลักฐานที่มา อ่านได้ตามสบาย แล้วค่อยไปต่อ" },
       discover: { t: "ค้นหาไอเดีย ไม่ใช่แค่ค้นชื่อ", b: "ยังไม่รู้จะค้นคว้าอะไร? Sector rotation แสดงว่าเงินกำลังไหลไปที่ใด ส่วน Macro & markets และ AI research agent ช่วยให้สำรวจต่อได้ลึกขึ้น" },
       finish: { t: "ขั้นตอนการใช้งานของคุณ", b: "ค้นหา ค้นคว้า ตรวจสอบสินทรัพย์ที่ถือ ติดตามผลการดำเนินงาน สำรวจได้อย่างอิสระ และเปิดทัวร์นี้ซ้ำได้จาก Preferences หรือท้ายเมนู", wf: ["ค้นหา", "ค้นคว้า", "สินทรัพย์ที่ถือ", "ผลการดำเนินงาน"] },
     },
   },
   "zh-Hans": {
-    ui: { next: "下一步", act: "轮到你了：点按高亮区域，导览会自动继续。", tryit: "现在试试：在高亮的输入框中输入问题并发送。", back: "上一步", skip: "跳过导览", finish: "开始探索", label: "快速导览", step: "第 {n} 步，共 {total} 步", replay: "重新播放导览", replayHead: "快速导览", replayText: "一分钟带你了解搜索、导航、持仓和研究。", explore: "继续探索", account: "创建免费账户", palette: "开始快速导览" },
+    ui: { next: "下一步", askpill: "发送你的问题，看看分析师如何工作。", act: "轮到你了：点按高亮区域，导览会自动继续。", tryit: "现在试试：在高亮的输入框中输入问题并发送。", back: "上一步", skip: "跳过导览", finish: "开始探索", label: "快速导览", step: "第 {n} 步，共 {total} 步", replay: "重新播放导览", replayHead: "快速导览", replayText: "一分钟带你了解搜索、导航、持仓和研究。", explore: "继续探索", account: "创建免费账户", palette: "开始快速导览" },
     steps: {
       welcome: { t: "欢迎使用 LEKHA Financials", b: "研究公司、跟踪持仓、了解投资组合表现的一站式工作台。本导览约需一分钟。" },
       search: { t: "从搜索开始", b: "按名称或代码查找任何公司、ETF、指数或加密资产，也可搜索文件、新闻和页面。随时按 {key}。", a: "点按此处查找任何公司、ETF、指数或加密资产，也可搜索文件、新闻和页面。" },
@@ -58,12 +60,13 @@ export const COPY = {
       pick: { t: "选择一家公司", b: "输入名称或代码，例如 Apple 或 AAPL，然后从列表中选择。" },
       askai: { t: "询问这家公司", b: "点击 Ask AI 会打开已指向 {symbol} 的研究助手。" },
       gohold: { t: "打开你的持仓", b: "在 My Portfolio 下选择 Holdings & ledger，查看你持有的每一个头寸。" },
+      answer: { t: "阅读回答", b: "每个数字都标注了对应的依据。慢慢看，准备好后再继续。" },
       discover: { t: "不只是查询，还能发现", b: "不知道研究什么？Sector rotation 显示资金流向何处。Macro & markets 和 AI research agent 可帮你深入探索。" },
       finish: { t: "你的使用流程", b: "搜索、研究、查看持仓、跟踪表现。你可以自由探索，并随时从 Preferences 或菜单底部重新播放本导览。", wf: ["搜索", "研究", "持仓", "表现"] },
     },
   },
   "zh-Hant": {
-    ui: { next: "下一步", act: "換你操作：點選標示區域，導覽會自動繼續。", tryit: "現在試試：在標示的輸入框中輸入問題並送出。", back: "上一步", skip: "略過導覽", finish: "開始探索", label: "快速導覽", step: "第 {n} 步，共 {total} 步", replay: "重新播放導覽", replayHead: "快速導覽", replayText: "一分鐘帶你了解搜尋、導覽、持倉和研究。", explore: "繼續探索", account: "建立免費帳戶", palette: "開始快速導覽" },
+    ui: { next: "下一步", askpill: "送出你的問題，看看分析師如何運作。", act: "換你操作：點選標示區域，導覽會自動繼續。", tryit: "現在試試：在標示的輸入框中輸入問題並送出。", back: "上一步", skip: "略過導覽", finish: "開始探索", label: "快速導覽", step: "第 {n} 步，共 {total} 步", replay: "重新播放導覽", replayHead: "快速導覽", replayText: "一分鐘帶你了解搜尋、導覽、持倉和研究。", explore: "繼續探索", account: "建立免費帳戶", palette: "開始快速導覽" },
     steps: {
       welcome: { t: "歡迎使用 LEKHA Financials", b: "研究公司、追蹤持倉、了解投資組合表現的一站式工作台。本導覽約需一分鐘。" },
       search: { t: "從搜尋開始", b: "依名稱或代號尋找任何公司、ETF、指數或加密資產，也可搜尋文件、新聞和頁面。隨時按 {key}。", a: "點按此處尋找任何公司、ETF、指數或加密資產，也可搜尋文件、新聞和頁面。" },
@@ -77,12 +80,13 @@ export const COPY = {
       pick: { t: "選擇一家公司", b: "輸入名稱或代號，例如 Apple 或 AAPL，然後從清單中選擇。" },
       askai: { t: "詢問這家公司", b: "點選 Ask AI 會開啟已指向 {symbol} 的研究助理。" },
       gohold: { t: "開啟你的持倉", b: "在 My Portfolio 下選擇 Holdings & ledger，查看你持有的每一個部位。" },
+      answer: { t: "閱讀回答", b: "每個數字都標註了對應的依據。慢慢看，準備好再繼續。" },
       discover: { t: "不只是查詢，還能發掘", b: "不知道研究什麼？Sector rotation 顯示資金流向何處。Macro & markets 和 AI research agent 可協助你深入探索。" },
       finish: { t: "你的使用流程", b: "搜尋、研究、檢視持倉、追蹤表現。你可以自由探索，並隨時從 Preferences 或選單底部重新播放本導覽。", wf: ["搜尋", "研究", "持倉", "表現"] },
     },
   },
   ja: {
-    ui: { next: "次へ", act: "操作してみましょう。ハイライトされた部分をタップまたはクリックすると、ツアーが自動で進みます。", tryit: "ここで試せます。ハイライトされた入力欄に質問を入力して送信してください。", back: "戻る", skip: "ツアーをスキップ", finish: "使い始める", label: "クイックツアー", step: "ステップ {n} / {total}", replay: "ツアーを再生", replayHead: "クイックツアー", replayText: "検索、ナビゲーション、保有銘柄、調査を1分で案内します。", explore: "そのまま使ってみる", account: "無料アカウントを作成", palette: "クイックツアーを見る" },
+    ui: { next: "次へ", askpill: "質問を送信して、アナリストの動きを確認しましょう。", act: "操作してみましょう。ハイライトされた部分をタップまたはクリックすると、ツアーが自動で進みます。", tryit: "ここで試せます。ハイライトされた入力欄に質問を入力して送信してください。", back: "戻る", skip: "ツアーをスキップ", finish: "使い始める", label: "クイックツアー", step: "ステップ {n} / {total}", replay: "ツアーを再生", replayHead: "クイックツアー", replayText: "検索、ナビゲーション、保有銘柄、調査を1分で案内します。", explore: "そのまま使ってみる", account: "無料アカウントを作成", palette: "クイックツアーを見る" },
     steps: {
       welcome: { t: "LEKHA Financials へようこそ", b: "企業の調査、保有銘柄の管理、ポートフォリオの状況把握のための作業スペースです。このツアーは約1分で終わります。" },
       search: { t: "まずは検索から", b: "企業、ETF、指数、暗号資産を名前やティッカーで探せます。開示書類、ニュース、ページも検索できます。どこからでも {key} で開きます。", a: "ここをタップして企業、ETF、指数、暗号資産を検索できます。開示書類、ニュース、ページも対象です。" },
@@ -96,12 +100,13 @@ export const COPY = {
       pick: { t: "企業を選ぶ", b: "社名またはティッカー（例: Apple、AAPL）を入力し、一覧から選びます。" },
       askai: { t: "この企業について質問する", b: "Ask AI を押すと、{symbol} を対象にしたリサーチエージェントが開きます。" },
       gohold: { t: "保有銘柄を開く", b: "My Portfolio の Holdings & ledger を選ぶと、保有しているすべてのポジションを確認できます。" },
+      answer: { t: "回答を読む", b: "すべての数字に根拠が示されています。ゆっくり読んでから先に進んでください。" },
       discover: { t: "探すだけでなく、見つける", b: "何を調べるか迷ったら、Sector rotation で資金の流れを確認できます。Macro & markets と AI research agent でさらに掘り下げられます。" },
       finish: { t: "基本の流れ", b: "検索、調査、保有銘柄の確認、パフォーマンスの把握。自由に使ってみてください。このツアーは Preferences またはメニュー下部からいつでも再生できます。", wf: ["検索", "調査", "保有銘柄", "パフォーマンス"] },
     },
   },
   ko: {
-    ui: { next: "다음", act: "직접 해 보세요. 강조된 영역을 누르거나 클릭하면 투어가 자동으로 이어집니다.", tryit: "지금 해 보세요. 강조된 입력창에 질문을 입력하고 전송하세요.", back: "이전", skip: "둘러보기 건너뛰기", finish: "시작하기", label: "빠른 둘러보기", step: "{total}단계 중 {n}단계", replay: "둘러보기 다시 보기", replayHead: "빠른 둘러보기", replayText: "검색, 탐색, 보유 종목, 조사를 1분 만에 안내합니다.", explore: "계속 둘러보기", account: "무료 계정 만들기", palette: "빠른 둘러보기 시작" },
+    ui: { next: "다음", askpill: "질문을 보내 분석가가 일하는 모습을 확인하세요.", act: "직접 해 보세요. 강조된 영역을 누르거나 클릭하면 투어가 자동으로 이어집니다.", tryit: "지금 해 보세요. 강조된 입력창에 질문을 입력하고 전송하세요.", back: "이전", skip: "둘러보기 건너뛰기", finish: "시작하기", label: "빠른 둘러보기", step: "{total}단계 중 {n}단계", replay: "둘러보기 다시 보기", replayHead: "빠른 둘러보기", replayText: "검색, 탐색, 보유 종목, 조사를 1분 만에 안내합니다.", explore: "계속 둘러보기", account: "무료 계정 만들기", palette: "빠른 둘러보기 시작" },
     steps: {
       welcome: { t: "LEKHA Financials에 오신 것을 환영합니다", b: "기업을 조사하고, 보유 종목을 추적하고, 포트폴리오 상태를 한눈에 확인하는 작업 공간입니다. 둘러보기는 약 1분이면 끝납니다." },
       search: { t: "검색으로 시작하세요", b: "이름이나 티커로 기업, ETF, 지수, 암호화폐를 찾고 공시, 뉴스, 페이지도 검색합니다. 어디서든 {key}를 누르세요.", a: "여기를 눌러 기업, ETF, 지수, 암호화폐와 공시, 뉴스, 페이지를 검색하세요." },
@@ -115,12 +120,13 @@ export const COPY = {
       pick: { t: "기업 선택", b: "회사명이나 티커(예: Apple, AAPL)를 입력하고 목록에서 선택하세요." },
       askai: { t: "이 기업에 대해 질문하기", b: "Ask AI를 누르면 {symbol}에 맞춰진 리서치 에이전트가 열립니다." },
       gohold: { t: "보유 종목 열기", b: "My Portfolio 아래의 Holdings & ledger를 선택하면 보유한 모든 포지션을 볼 수 있습니다." },
+      answer: { t: "답변 읽기", b: "모든 수치에 근거가 표시됩니다. 천천히 읽고 계속하세요." },
       discover: { t: "찾아보는 데서 발견하는 데까지", b: "무엇을 조사할지 모르겠다면 Sector rotation에서 자금 흐름을 확인하세요. Macro & markets와 AI research agent로 더 깊이 살펴볼 수 있습니다." },
       finish: { t: "추천 사용 흐름", b: "검색, 조사, 보유 종목 검토, 성과 모니터링. 자유롭게 둘러보세요. 이 둘러보기는 Preferences나 메뉴 하단에서 언제든 다시 볼 수 있습니다.", wf: ["검색", "조사", "보유 종목", "성과"] },
     },
   },
   es: {
-    ui: { next: "Siguiente", act: "Tu turno: toca o haz clic en la zona resaltada. El recorrido continúa solo.", tryit: "Pruébalo ahora: escribe una pregunta en el cuadro resaltado y envíala.", back: "Atrás", skip: "Omitir recorrido", finish: "Empezar a explorar", label: "Recorrido rápido", step: "Paso {n} de {total}", replay: "Repetir recorrido", replayHead: "Recorrido rápido", replayText: "Un paseo guiado de un minuto por la búsqueda, la navegación, las posiciones y la investigación.", explore: "Seguir explorando", account: "Crear una cuenta gratuita", palette: "Hacer el recorrido rápido" },
+    ui: { next: "Siguiente", askpill: "Envía tu pregunta para ver trabajar al analista.", act: "Tu turno: toca o haz clic en la zona resaltada. El recorrido continúa solo.", tryit: "Pruébalo ahora: escribe una pregunta en el cuadro resaltado y envíala.", back: "Atrás", skip: "Omitir recorrido", finish: "Empezar a explorar", label: "Recorrido rápido", step: "Paso {n} de {total}", replay: "Repetir recorrido", replayHead: "Recorrido rápido", replayText: "Un paseo guiado de un minuto por la búsqueda, la navegación, las posiciones y la investigación.", explore: "Seguir explorando", account: "Crear una cuenta gratuita", palette: "Hacer el recorrido rápido" },
     steps: {
       welcome: { t: "Te damos la bienvenida a LEKHA Financials", b: "Tu espacio para investigar empresas, seguir tus posiciones y ver cómo va tu cartera. Este recorrido dura aproximadamente un minuto." },
       search: { t: "Empieza por la búsqueda", b: "Encuentra cualquier empresa, ETF, índice o criptomoneda por nombre o ticker, además de presentaciones, noticias y páginas. Pulsa {key} desde cualquier lugar.", a: "Toca aquí para buscar cualquier empresa, ETF, índice o criptomoneda, además de presentaciones, noticias y páginas." },
@@ -134,12 +140,13 @@ export const COPY = {
       pick: { t: "Elige una empresa", b: "Escribe un nombre o un ticker, por ejemplo Apple o AAPL, y elígela de la lista." },
       askai: { t: "Pregunta sobre esta empresa", b: "Ask AI abre el agente de investigación ya enfocado en {symbol}." },
       gohold: { t: "Abre tus posiciones", b: "Elige Holdings & ledger en My Portfolio para ver cada posición que tienes." },
+      answer: { t: "Lee la respuesta", b: "Cada cifra cita la evidencia que la respalda. Tómate tu tiempo y continúa." },
       discover: { t: "Descubre, no solo consultes", b: "¿No sabes qué investigar? Sector rotation muestra hacia dónde fluye el dinero. Macro & markets y el AI research agent te llevan más lejos." },
       finish: { t: "Tu flujo de trabajo", b: "Busca, investiga, revisa tus posiciones y vigila el rendimiento. Explora con libertad. Puedes repetir este recorrido desde Preferences o el pie del menú.", wf: ["Buscar", "Investigar", "Posiciones", "Rendimiento"] },
     },
   },
   hi: {
-    ui: { next: "आगे", act: "आपकी बारी: हाइलाइट किए गए हिस्से पर टैप या क्लिक करें। टूर अपने आप आगे बढ़ेगा।", tryit: "अभी आज़माएँ: हाइलाइट किए गए बॉक्स में सवाल लिखें और भेजें।", back: "पीछे", skip: "टूर छोड़ें", finish: "खोजना शुरू करें", label: "क्विक टूर", step: "चरण {n} / {total}", replay: "टूर दोबारा चलाएँ", replayHead: "क्विक टूर", replayText: "खोज, नेविगेशन, होल्डिंग्स और शोध का एक मिनट का मार्गदर्शन।", explore: "आगे देखते रहें", account: "मुफ़्त खाता बनाएँ", palette: "क्विक टूर देखें" },
+    ui: { next: "आगे", askpill: "अपना सवाल भेजें और विश्लेषक को काम करते देखें।", act: "आपकी बारी: हाइलाइट किए गए हिस्से पर टैप या क्लिक करें। टूर अपने आप आगे बढ़ेगा।", tryit: "अभी आज़माएँ: हाइलाइट किए गए बॉक्स में सवाल लिखें और भेजें।", back: "पीछे", skip: "टूर छोड़ें", finish: "खोजना शुरू करें", label: "क्विक टूर", step: "चरण {n} / {total}", replay: "टूर दोबारा चलाएँ", replayHead: "क्विक टूर", replayText: "खोज, नेविगेशन, होल्डिंग्स और शोध का एक मिनट का मार्गदर्शन।", explore: "आगे देखते रहें", account: "मुफ़्त खाता बनाएँ", palette: "क्विक टूर देखें" },
     steps: {
       welcome: { t: "LEKHA Financials में आपका स्वागत है", b: "कंपनियों पर शोध करने, अपने होल्डिंग्स ट्रैक करने और पोर्टफोलियो की स्थिति समझने के लिए आपका कार्यक्षेत्र। यह टूर लगभग एक मिनट का है।" },
       search: { t: "खोज से शुरुआत करें", b: "नाम या टिकर से कोई भी कंपनी, ETF, इंडेक्स या क्रिप्टो खोजें, साथ ही फाइलिंग, समाचार और पेज भी। कहीं से भी {key} दबाएँ।", a: "कोई भी कंपनी, ETF, इंडेक्स या क्रिप्टो, साथ ही फाइलिंग, समाचार और पेज खोजने के लिए यहाँ टैप करें।" },
@@ -153,12 +160,13 @@ export const COPY = {
       pick: { t: "कंपनी चुनें", b: "नाम या टिकर लिखें, जैसे Apple या AAPL, और सूची से चुनें।" },
       askai: { t: "इस कंपनी के बारे में पूछें", b: "Ask AI दबाने पर रिसर्च एजेंट {symbol} के लिए पहले से तैयार खुलता है।" },
       gohold: { t: "अपनी होल्डिंग खोलें", b: "My Portfolio के अंतर्गत Holdings & ledger चुनें और अपनी हर पोज़िशन देखें।" },
+      answer: { t: "जवाब पढ़ें", b: "हर आँकड़े के साथ उसका प्रमाण दिया गया है। आराम से पढ़ें, फिर आगे बढ़ें।" },
       discover: { t: "सिर्फ़ खोजें नहीं, नए विचार पाएँ", b: "समझ नहीं आ रहा किस पर शोध करें? Sector rotation दिखाता है कि पैसा कहाँ बह रहा है। Macro & markets और AI research agent आपको और आगे ले जाते हैं।" },
       finish: { t: "आपका कार्य-प्रवाह", b: "खोजें, शोध करें, होल्डिंग्स देखें, प्रदर्शन पर नज़र रखें। खुलकर देखें। यह टूर आप Preferences या मेनू के नीचे से कभी भी दोबारा चला सकते हैं।", wf: ["खोजें", "शोध", "होल्डिंग्स", "प्रदर्शन"] },
     },
   },
   vi: {
-    ui: { next: "Tiếp", act: "Đến lượt bạn: chạm hoặc nhấp vào vùng được đánh dấu. Phần giới thiệu sẽ tự chuyển tiếp.", tryit: "Hãy thử ngay: nhập câu hỏi vào khung được đánh dấu rồi gửi.", back: "Quay lại", skip: "Bỏ qua", finish: "Bắt đầu khám phá", label: "Giới thiệu nhanh", step: "Bước {n} trên {total}", replay: "Xem lại phần giới thiệu", replayHead: "Giới thiệu nhanh", replayText: "Hướng dẫn một phút về tìm kiếm, điều hướng, vị thế và nghiên cứu.", explore: "Tiếp tục khám phá", account: "Tạo tài khoản miễn phí", palette: "Xem giới thiệu nhanh" },
+    ui: { next: "Tiếp", askpill: "Gửi câu hỏi để xem chuyên gia phân tích làm việc.", act: "Đến lượt bạn: chạm hoặc nhấp vào vùng được đánh dấu. Phần giới thiệu sẽ tự chuyển tiếp.", tryit: "Hãy thử ngay: nhập câu hỏi vào khung được đánh dấu rồi gửi.", back: "Quay lại", skip: "Bỏ qua", finish: "Bắt đầu khám phá", label: "Giới thiệu nhanh", step: "Bước {n} trên {total}", replay: "Xem lại phần giới thiệu", replayHead: "Giới thiệu nhanh", replayText: "Hướng dẫn một phút về tìm kiếm, điều hướng, vị thế và nghiên cứu.", explore: "Tiếp tục khám phá", account: "Tạo tài khoản miễn phí", palette: "Xem giới thiệu nhanh" },
     steps: {
       welcome: { t: "Chào mừng đến với LEKHA Financials", b: "Không gian làm việc để nghiên cứu doanh nghiệp, theo dõi các vị thế đang nắm giữ và xem danh mục của bạn đang ra sao. Phần giới thiệu này mất khoảng một phút." },
       search: { t: "Bắt đầu từ tìm kiếm", b: "Tìm bất kỳ công ty, ETF, chỉ số hay tiền mã hóa nào theo tên hoặc mã, cùng hồ sơ công bố, tin tức và các trang. Nhấn {key} ở bất cứ đâu.", a: "Chạm vào đây để tìm bất kỳ công ty, ETF, chỉ số hay tiền mã hóa nào, cùng hồ sơ công bố, tin tức và các trang." },
@@ -172,12 +180,13 @@ export const COPY = {
       pick: { t: "Chọn một công ty", b: "Nhập tên hoặc mã, ví dụ Apple hoặc AAPL, rồi chọn trong danh sách." },
       askai: { t: "Hỏi về công ty này", b: "Ask AI mở trợ lý nghiên cứu đã hướng sẵn tới {symbol}." },
       gohold: { t: "Mở danh mục nắm giữ", b: "Chọn Holdings & ledger trong My Portfolio để xem mọi vị thế bạn đang giữ." },
+      answer: { t: "Đọc câu trả lời", b: "Mỗi con số đều trích dẫn bằng chứng đứng sau. Cứ đọc thong thả rồi tiếp tục." },
       discover: { t: "Khám phá, không chỉ tra cứu", b: "Chưa biết nên nghiên cứu gì? Sector rotation cho thấy dòng tiền đang đi đâu. Macro & markets và AI research agent giúp bạn đi sâu hơn." },
       finish: { t: "Quy trình gợi ý", b: "Tìm kiếm, nghiên cứu, xem lại vị thế, theo dõi hiệu suất. Cứ thoải mái khám phá. Bạn có thể xem lại phần giới thiệu này từ Preferences hoặc cuối menu.", wf: ["Tìm kiếm", "Nghiên cứu", "Vị thế", "Hiệu suất"] },
     },
   },
   fr: {
-    ui: { next: "Suivant", act: "À vous : touchez ou cliquez la zone en surbrillance. La visite continue toute seule.", tryit: "Essayez maintenant : saisissez une question dans la zone en surbrillance et envoyez-la.", back: "Retour", skip: "Passer la visite", finish: "Commencer à explorer", label: "Visite rapide", step: "Étape {n} sur {total}", replay: "Rejouer la visite", replayHead: "Visite rapide", replayText: "Un parcours guidé d'une minute : recherche, navigation, positions et analyse.", explore: "Continuer à explorer", account: "Créer un compte gratuit", palette: "Faire la visite rapide" },
+    ui: { next: "Suivant", askpill: "Envoyez votre question pour voir l'analyste à l'œuvre.", act: "À vous : touchez ou cliquez la zone en surbrillance. La visite continue toute seule.", tryit: "Essayez maintenant : saisissez une question dans la zone en surbrillance et envoyez-la.", back: "Retour", skip: "Passer la visite", finish: "Commencer à explorer", label: "Visite rapide", step: "Étape {n} sur {total}", replay: "Rejouer la visite", replayHead: "Visite rapide", replayText: "Un parcours guidé d'une minute : recherche, navigation, positions et analyse.", explore: "Continuer à explorer", account: "Créer un compte gratuit", palette: "Faire la visite rapide" },
     steps: {
       welcome: { t: "Bienvenue sur LEKHA Financials", b: "Votre espace pour analyser des entreprises, suivre vos positions et voir comment se porte votre portefeuille. Cette visite dure environ une minute." },
       search: { t: "Commencez par la recherche", b: "Trouvez une entreprise, un ETF, un indice ou une cryptomonnaie par nom ou symbole, ainsi que des dépôts réglementaires, des actualités et des pages. Appuyez sur {key} depuis n'importe où.", a: "Touchez ici pour trouver une entreprise, un ETF, un indice ou une cryptomonnaie, ainsi que des dépôts, des actualités et des pages." },
@@ -191,6 +200,7 @@ export const COPY = {
       pick: { t: "Choisissez une entreprise", b: "Saisissez un nom ou un ticker, par exemple Apple ou AAPL, puis choisissez-la dans la liste." },
       askai: { t: "Posez une question sur cette entreprise", b: "Ask AI ouvre l'agent de recherche déjà centré sur {symbol}." },
       gohold: { t: "Ouvrez vos positions", b: "Choisissez Holdings & ledger sous My Portfolio pour voir chaque position que vous détenez." },
+      answer: { t: "Lisez la réponse", b: "Chaque chiffre cite les éléments qui le fondent. Prenez votre temps, puis continuez." },
       discover: { t: "Découvrez, ne vous contentez pas de chercher", b: "Pas d'idée de ce qu'il faut étudier ? Sector rotation montre où va l'argent. Macro & markets et l'AI research agent vont plus loin." },
       finish: { t: "Votre méthode de travail", b: "Rechercher, analyser, passer en revue vos positions, suivre la performance. Explorez librement. Vous pouvez rejouer cette visite depuis Preferences ou le bas du menu.", wf: ["Rechercher", "Analyser", "Positions", "Performance"] },
     },

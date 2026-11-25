@@ -9,6 +9,7 @@
    is interactive only when the second target matched (a phone, where the menu button stands in for the sidebar).
    back() returns to the previous step when the visitor backs out (closes the search box without choosing).
    retarget: true re-resolves the target on every measure (the highlight follows a link that appears after a click).
+   pill: the step shrinks to one line while the visitor asks (ask step only); skipTo: the step id its Next jumps to. quiet: no target, no dim.
    hint: the ui string shown under the copy (default "act"). hash: route to open (functions allowed); none keeps the current page. */
 const byId = (id) => document.getElementById(id)
 const sel = (s) => () => document.querySelector(s)
@@ -39,7 +40,8 @@ export const STEPS = [
   { id: "company", where: true, hash: () => "company/" + lastSym(), target: [sel('[data-tour="company-head"]')] },
   { id: "tabs", where: true, hash: () => "company/" + lastSym(), target: [sel('[data-tour="company-tabs"]')], act: true, done: () => tabNow() !== "overview" },
   { id: "askai", hash: () => "company/" + lastSym(), target: [sel('[data-tour="ask-ai"]')], act: true, done: () => tabNow() === "ai" },
-  { id: "ask", where: true, hash: () => "company/" + lastSym() + "?tab=ai", target: [sel('[data-tour="ask"]')], act: true, hint: "tryit" },
+  { id: "ask", hash: () => "company/" + lastSym() + "?tab=ai", target: [sel('[data-tour="ask-box"]')], act: true, hint: "tryit", pill: true, skipTo: "nav" },
+  { id: "answer", quiet: true },
   { id: "nav", target: [sel('[data-tour="nav"]'), sel('[data-tour="menu"]')], prefer: ["right"], act: "alt", done: () => !!document.querySelector('[role="dialog"] nav[aria-label="Main navigation"]') },
   { id: "gohold", target: [holdTarget], act: true, retarget: true, nav: true, done: () => currentPath() === "portfolio/holdings" },
   { id: "holdings", where: true, hash: "portfolio/holdings", target: [panelOf("tbl"), panelOf("ph-form")] },
@@ -59,3 +61,5 @@ export function resolve(step) {
   return { el: null, ok: false }
 }
 export const isAct = (step, alt) => !!step && !!step.act && (step.act !== "alt" || !!alt)
+/* card: explains, dims and blocks. coach: a compact card and a pulsing ring while the visitor does the thing, nothing dimmed or blocked. quiet: a small card beside the page, nothing dimmed. */
+export const modeOf = (step, alt) => (step.quiet ? "quiet" : isAct(step, alt) ? "coach" : "card")
