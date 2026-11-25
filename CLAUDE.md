@@ -51,6 +51,9 @@ Free ฿0 / Paid ฿399 / Premium ฿599; the Demo is a preview, never a plan. T
 ## Account backend additions
 `api/auth/[action].js` gained `email` (confirmation-link email change) and `delete` (password re-check + typed `DELETE`; refuses while a paid subscription is active). **`delete` is not exercised against production**; test with a throwaway account before relying on it.
 
+## Product analytics (PostHog, added 2026-11-25)
+One script, `public/pt-analytics.js`, is loaded by `/`, `/v2`, `/v3` and `/login.html`; it reads `GET /api/ph` (env `POSTHOG_KEY`, `POSTHOG_HOST`) and initialises the vendored `public/vendor/posthog.js` with autocapture, session replay (all inputs and on-screen text masked), heatmaps, exceptions, web vitals and manual pageviews. `app/src/lib/analytics.js` wraps it for React. Server events go through `api/_ph.js` (`api_request` in `api/_router.js`, `subscription_synced` in the Stripe webhook). Event names, privacy rules and setup: `docs/ANALYTICS.md`. Without a key everything is a no-op. Never send e-mails, prompts, questions, search text, holdings or balances.
+
 ## Findings from the audit (2026-11-19)
 See `docs/INTEGRATION_AUDIT.md`. Headlines: three overlapping price paths and no shared schema; implicit units; cache without policy or hit-rate accounting; `ai/ask` was portfolio-only (no price/news/filings/macro tools, no citations); no provider health view; the contact-less SEC User-Agent in `_edgar.js` (fixed to use `SEC_USER_AGENT`); AV budget shared with existing features. No FMP/Finnhub keys exist locally or (per notes) in production, so everything defaults to free providers.
 

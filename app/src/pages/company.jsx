@@ -19,12 +19,13 @@ import { useWatchlist, addToWatchlist, removeFromWatchlist } from "@/lib/watchli
 import { api, data as fetchData, prefetch, useData } from "@/lib/api"
 import { compact, date, dateTime, metric, mult, num, pct, price, tone } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
+import { capture } from "@/lib/analytics"
 
 const unwrap = (p) => (p && p.ok ? p.data : null)
 
 /* One tile: symbol, name, live price and today's move. Everything on the home screen comes from live data or from the user's own lists; nothing is a fixed list. */
-function Tile({ symbol, name, price: px, chg, ccy, navigate }) {
-  return <button onClick={() => navigate("company/" + encodeURIComponent(symbol))} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary">
+function Tile({ symbol, name, price: px, chg, ccy, navigate, source }) {
+  return <button onClick={() => { capture("company_opened", { source: source || "tile" }); navigate("company/" + encodeURIComponent(symbol)) }} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary">
     <div className="min-w-0"><div className="font-mono text-sm font-semibold">{symbol}</div><div className="truncate text-xs text-muted-foreground">{name || " "}</div></div>
     {px != null && <div className="shrink-0 text-right"><div className="num text-sm">{price(px, ccy)}</div>{chg != null && <div className={cn("num text-xs", tone(chg))}>{pct(chg, 2, true)}</div>}</div>}</button>
 }
@@ -36,10 +37,10 @@ function Home({ navigate }) {
   const mv = useData("movers", sector ? { sector } : {}, { refresh: 180000 })
   const m = mv.status === "ok" ? mv.data : null
   return (<div className="space-y-6">
-    <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) navigate("company/" + encodeURIComponent(q.trim().toUpperCase())) }} className="flex max-w-xl gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ticker, e.g. AAPL, SPY, BTC-USD (or press ⌘K to search by name)" className="pl-9" aria-label="Ticker" /></div><Button type="submit">Open</Button></form>
-    {pf.rows.length > 0 && <Section title="Your holdings" sub="live prices, largest first">{pf.rows.slice(0, 8).map((r) => <Tile key={r.tk} symbol={r.tk} chg={r.day} price={r.price} navigate={navigate} />)}</Section>}
-    {wl.length > 0 && <Section title="Your watchlist">{wl.slice(0, 12).map((w) => <Tile key={w.symbol} symbol={w.symbol} name={w.name} navigate={navigate} />)}</Section>}
-    {rc.length > 0 && <Section title="Recently viewed">{rc.map((r) => <Tile key={r.symbol} symbol={r.symbol} name={r.name} navigate={navigate} />)}</Section>}
+    <form onSubmit={(e) => { e.preventDefault(); if (q.trim()) { capture("company_opened", { source: "home_search" }); navigate("company/" + encodeURIComponent(q.trim().toUpperCase())) } }} className="flex max-w-xl gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ticker, e.g. AAPL, SPY, BTC-USD (or press ⌘K to search by name)" className="pl-9" aria-label="Ticker" /></div><Button type="submit">Open</Button></form>
+    {pf.rows.length > 0 && <Section title="Your holdings" sub="live prices, largest first">{pf.rows.slice(0, 8).map((r) => <Tile key={r.tk} symbol={r.tk} chg={r.day} price={r.price} navigate={navigate} source="home_holdings" />)}</Section>}
+    {wl.length > 0 && <Section title="Your watchlist">{wl.slice(0, 12).map((w) => <Tile key={w.symbol} symbol={w.symbol} name={w.name} navigate={navigate} source="home_watchlist" />)}</Section>}
+    {rc.length > 0 && <Section title="Recently viewed">{rc.map((r) => <Tile key={r.symbol} symbol={r.symbol} name={r.name} navigate={navigate} source="home_recent" />)}</Section>}
     {mv.status === "loading" && <div className="space-y-2" aria-busy="true"><Skeleton className="h-5 w-64" /><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14" />)}</div></div>}
     {mv.status === "error" && <ErrorBox message={mv.error} attempts={mv.attempts} onRetry={mv.reload} />}
     {m && <>
@@ -51,9 +52,9 @@ function Home({ navigate }) {
           {(m.sectors || []).map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
-      <Section title="Biggest gainers" sub={`among ${m.universe}${m.asOf ? `, as of ${date(m.asOf)}` : " today"} · ${m.breadth.up} up, ${m.breadth.down} down`}>{m.gainers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
-      <Section title="Biggest decliners">{m.losers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
-      <Section title="Most traded" sub="by dollar volume">{m.actives.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} />)}</Section>
+      <Section title="Biggest gainers" sub={`among ${m.universe}${m.asOf ? `, as of ${date(m.asOf)}` : " today"} · ${m.breadth.up} up, ${m.breadth.down} down`}>{m.gainers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} source="movers" />)}</Section>
+      <Section title="Biggest decliners">{m.losers.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} source="movers" />)}</Section>
+      <Section title="Most traded" sub="by dollar volume">{m.actives.map((x) => <Tile key={x.symbol} symbol={x.symbol} name={x.name} price={x.price} chg={x.changePercent} ccy={x.currency} navigate={navigate} source="movers" />)}</Section>
       <p className="text-[11.5px] text-muted-foreground">Computed from live quotes of {m.universe} (the most liquid US stocks), not a full-market screener. Change the sector to rank one industry on its own. Any ticker, ETF, index or crypto symbol can be opened from the box above.</p></>}
   </div>)
 }
@@ -154,7 +155,7 @@ function Peers({ b, navigate }) {
 const TABS = [["overview", "Overview"], ["financials", "Financials"], ["valuation", "Valuation"], ["growth", "Growth"], ["news", "News"], ["filings", "Filings"], ["earnings", "Earnings"], ["peers", "Peers"], ["ai", "AI analyst"]]
 function Workspace({ symbol, route, navigate }) {
   const s = useData("company", { symbol }), wl = useWatchlist(), tab = (route.query && route.query.get("tab")) || "overview"
-  const setTab = (t) => navigate(`company/${encodeURIComponent(symbol)}?tab=${t}`)
+  const setTab = (t) => { capture("company_tab_viewed", { tab: t }); navigate(`company/${encodeURIComponent(symbol)}?tab=${t}`) }
   // The quote and the news list are cheap and cached on their own, so the header appears in about a second while the
   // heavier bundle (statements, filings, ratios, peers) fills the tabs behind it.
   const live = useData("quote", { symbol }, { refresh: 15000 }), liveNews = useData("news", { symbol, limit: 60 }, { refresh: 300000 })
@@ -174,7 +175,7 @@ function Workspace({ symbol, route, navigate }) {
         {q ? <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1"><span className="num text-3xl font-semibold">{price(q.price, q.currency)}</span><span className={cn("num text-base", tone(q.change))}>{q.change != null ? (q.change > 0 ? "+" : "") + num(q.change) : ""} ({pct(q.changePercent, 2, true)})</span>{sp.length > 1 && <Spark points={sp} up={!!(q.change >= 0)} w={116} h={32} />}<FreshBadge meta={q.meta} /><SourceTag source={q.source} asOf={q.timestamp} />{live.status === "ok" && <span className="text-[11px] text-muted-foreground" title="Price refreshes every 15 s while this tab is visible">● auto-refresh 15s</span>}</div>
           : pending ? <div className="mt-2 flex items-center gap-2"><Skeleton className="h-7 w-28" /><Skeleton className="h-4 w-20" /></div>
             : <p className="mt-1 text-sm text-muted-foreground">No live quote available from any provider.</p>}</div>
-      <div className="flex gap-2"><Button variant="outline" onClick={() => (watched ? removeFromWatchlist(symbol) : addToWatchlist(symbol, prof && prof.name))}>{watched ? <><StarOff />Unwatch</> : <><Star />Watch</>}</Button><Button onClick={() => setTab("ai")}><Bot />Ask AI</Button></div></div>
+      <div className="flex gap-2"><Button variant="outline" onClick={() => { capture("watchlist_changed", { action: watched ? "remove" : "add", source: "company" }); watched ? removeFromWatchlist(symbol) : addToWatchlist(symbol, prof && prof.name) }}>{watched ? <><StarOff />Unwatch</> : <><Star />Watch</>}</Button><Button onClick={() => setTab("ai")}><Bot />Ask AI</Button></div></div>
     {failed && <ErrorBox message={s.error} attempts={s.attempts} onRetry={s.reload} />}
     {nothing && <Alert variant="warn"><AlertTitle>No data found for {symbol}</AlertTitle><AlertDescription>Check the ticker. US companies resolve through SEC EDGAR; ETFs, indices and crypto use market data providers (examples: SPY, ^GSPC, BTC-USD, 0700.HK).</AlertDescription></Alert>}
     <Tabs value={tab} onValueChange={setTab}><TabsList data-tour="company-tabs" className="h-auto flex-wrap">{TABS.map(([k, l]) => <TabsTrigger key={k} value={k} className="h-8">{l}</TabsTrigger>)}</TabsList>

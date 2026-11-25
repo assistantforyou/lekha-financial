@@ -7,6 +7,7 @@ import { EmptyBox } from "@/components/common"
 import { PageHeader } from "@/components/common"
 import { ReportView } from "./council"
 import { loadReports, removeReport } from "@/lib/reports"
+import { capture } from "@/lib/analytics"
 
 const verdictVariant = (v) => (v === "Buy" ? "up" : v === "Sell" || v === "Reduce" ? "down" : v === "Hold" ? "secondary" : "warn")
 
@@ -22,6 +23,7 @@ export default function ReportsPage({ navigate }) {
     await removeReport(id)
     setList((xs) => xs.filter((x) => x.id !== id))
     if (open && open.id === id) setOpen(null)
+    capture("report_deleted")
   }
 
   return (
@@ -42,7 +44,7 @@ export default function ReportsPage({ navigate }) {
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((r) => (
-            <Card key={r.id} className="cursor-pointer transition-colors hover:border-[var(--accent)]" onClick={() => setOpen(r)}>
+            <Card key={r.id} className="cursor-pointer transition-colors hover:border-[var(--accent)]" onClick={() => { capture("report_opened", { scope_kind: r.scope === "portfolio" ? "portfolio" : "ticker", verdict: (r.ceo && r.ceo.verdict) || "none" }); setOpen(r) }}>
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-sm leading-snug">{r.question}</CardTitle>

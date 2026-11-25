@@ -9,6 +9,7 @@ import { Input, Textarea } from "@/components/ui/input"
 import { PageHeader } from "@/components/common"
 import { api } from "@/lib/api"
 import { newReportId, saveReport } from "@/lib/reports"
+import { capture } from "@/lib/analytics"
 
 const LENSES = [
   ["investor", "Long-term investor"],
@@ -165,6 +166,9 @@ export default function CouncilPage({ navigate }) {
     const question = q.trim()
     if (question.length < 3 || busy) return
     setBusy(true); setErr("")
+    const started = Date.now()
+    const scopeKind = String(scope || "portfolio").trim().toLowerCase() === "portfolio" ? "portfolio" : "ticker"
+    capture("council_started", { scope_kind: scopeKind })
     try {
       const evidence = await evidenceFor(scope)
       const r = await api("/api/ai/council-v3", {
@@ -174,8 +178,10 @@ export default function CouncilPage({ navigate }) {
       const doc = { id: newReportId(), question: r.question, scope: r.scope, at: new Date().toISOString(), ceo: r.ceo, perspectives: r.perspectives, meta: r.meta }
       setRep(doc)
       await saveReport(doc)
+      capture("council_completed", { scope_kind: scopeKind, verdict: (r.ceo && r.ceo.verdict) || "none", evidence_quality: (r.ceo && r.ceo.evidenceQuality) || "unknown", duration_ms: Date.now() - started })
       toast("Report saved to AI research reports")
     } catch (e) {
+      capture("council_failed", { scope_kind: scopeKind, reason: e.code || "error" })
       if (e.code === "premium_required") setErr("The council is a Premium feature. Upgrade in Account, then run it again.")
       else if (e.code === "no_holdings") setErr("Add holdings to your portfolio, or set the scope to a ticker.")
       else if (e.code === "ai_limit") setErr(e.message)

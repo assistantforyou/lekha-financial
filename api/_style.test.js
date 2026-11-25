@@ -6,7 +6,8 @@ const assert = require("assert"), fs = require("fs"), path = require("path");
 const ROOT = path.join(__dirname, "..");
 const BAD = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}\u{2B06}\u{FE0F}\u{20E3}]/gu;
 const ALLOWED = new Set(["✓"]); // check mark in theme/selection menus
-const SKIP_DIRS = new Set(["node_modules", ".git", "docs", ".vercel", ".claude"]);
+// vendor/ holds third-party bundles copied verbatim (posthog-js); their glyphs are not our copy to edit.
+const SKIP_DIRS = new Set(["node_modules", ".git", "docs", ".vercel", ".claude", "vendor"]);
 const EXTS = new Set([".js", ".jsx", ".mjs", ".html", ".css", ".json", ".svg"]);
 const decode = (t) => t.replace(/\\u\{([0-9a-f]+)\}|\\u([0-9a-f]{4})/gi, (m, a, b) => { try { return String.fromCodePoint(parseInt(a || b, 16)); } catch (e) { return m; } });
 

@@ -9,6 +9,7 @@ import { addToWatchlist, removeFromWatchlist, useWatchlist } from "@/lib/watchli
 import { api } from "@/lib/api"
 import { price, pct, tone, compact, ago } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
+import { capture } from "@/lib/analytics"
 
 const REFRESH_MS = 20000
 // symbols the data layer understands: letters/digits plus . - ^ = (BRK.B, BTC-USD, ^GSPC, EURUSD=X)
@@ -38,9 +39,9 @@ export default function Watchlist({ item, navigate }) {
   }, [wl, q, sort])
   const submit = useCallback((e) => {
     e.preventDefault(); const s = add.trim().toUpperCase().replace(/\s+/g, "")
-    if (!s) return; if (!VALID.test(s)) return setAddErr(`“${add.trim()}” is not a valid ticker. Use letters and digits, e.g. AAPL, BRK.B, BTC-USD, ^GSPC.`)
-    if (wl.some((w) => w.symbol === s)) return setAddErr(`${s} is already on your watchlist.`)
-    addToWatchlist(s); setAdd(""); setAddErr(null)
+    if (!s) return; if (!VALID.test(s)) { capture("watchlist_add_rejected", { reason: "invalid" }); return setAddErr(`“${add.trim()}” is not a valid ticker. Use letters and digits, e.g. AAPL, BRK.B, BTC-USD, ^GSPC.`) }
+    if (wl.some((w) => w.symbol === s)) { capture("watchlist_add_rejected", { reason: "duplicate" }); return setAddErr(`${s} is already on your watchlist.`) }
+    addToWatchlist(s); capture("watchlist_changed", { action: "add", source: "watchlist_page" }); setAdd(""); setAddErr(null)
   }, [add, wl])
   const missing = syms && !state.loading && state.at ? wl.filter((w) => !q[w.symbol]).map((w) => w.symbol) : []
   const th = (k, label, align) => <TableHead key={k} className={align === "right" ? "text-right" : ""} aria-sort={sort.k === k ? (sort.dir > 0 ? "ascending" : "descending") : "none"}>
@@ -53,13 +54,13 @@ export default function Watchlist({ item, navigate }) {
       {state.error && <ErrorBox message={state.error} onRetry={() => setTick((n) => n + 1)} />}
       {missing.length > 0 && !state.error && <p className="text-xs text-[var(--warn)]" role="status">No quote from any provider for {missing.join(", ")}. Check the spelling, or remove it.</p>}
       <Card><CardContent className="pt-5"><Table><TableHeader><TableRow>{COLS.map(([k, l, a]) => th(k, l, a))}<TableHead>Data</TableHead><TableHead /></TableRow></TableHeader>
-        <TableBody>{rows.map((w) => { const x = q[w.symbol]; return <TableRow key={w.symbol} tabIndex={0} className="cursor-pointer" onClick={() => navigate("company/" + w.symbol)} onKeyDown={(e) => { if (e.key === "Enter") navigate("company/" + w.symbol) }}>
+        <TableBody>{rows.map((w) => { const x = q[w.symbol]; return <TableRow key={w.symbol} tabIndex={0} className="cursor-pointer" onClick={() => { capture("company_opened", { source: "watchlist_row" }); navigate("company/" + w.symbol) }} onKeyDown={(e) => { if (e.key === "Enter") { capture("company_opened", { source: "watchlist_row" }); navigate("company/" + w.symbol) } }}>
           <TableCell><div className="font-mono font-semibold">{w.symbol}</div><div className="text-[11px] text-muted-foreground">{x && x.name ? x.name : w.name || ""}</div></TableCell>
           <TableCell className="num text-right">{x ? price(x.price, x.currency) : state.loading ? "…" : "–"}</TableCell>
           <TableCell className={cn("num text-right", x && tone(x.changePercent))}>{x ? pct(x.changePercent, 2, true) : ""}</TableCell>
           <TableCell className="num text-right text-muted-foreground">{x && x.volume != null ? compact(x.volume, false) : "–"}</TableCell>
           <TableCell>{x && <><FreshBadge meta={x.meta} /> <span className="text-[11px] text-muted-foreground">{x.source}</span></>}</TableCell>
-          <TableCell className="text-right"><Button variant="ghost" size="icon" aria-label={"Remove " + w.symbol} onClick={(e) => { e.stopPropagation(); removeFromWatchlist(w.symbol) }}><Trash2 /></Button></TableCell></TableRow> })}</TableBody></Table>
+          <TableCell className="text-right"><Button variant="ghost" size="icon" aria-label={"Remove " + w.symbol} onClick={(e) => { e.stopPropagation(); capture("watchlist_changed", { action: "remove", source: "watchlist_page" }); removeFromWatchlist(w.symbol) }}><Trash2 /></Button></TableCell></TableRow> })}</TableBody></Table>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><Button size="sm" variant="outline" className="h-7" onClick={() => setTick((n) => n + 1)} disabled={state.loading}><RefreshCw className={state.loading ? "animate-spin" : ""} />Refresh</Button>
           <span>{state.loading && !state.at ? "Loading quotes… · " : state.at ? `Updated ${ago(state.at)} · ` : ""}Auto-refresh every 20 s while this tab is visible. Quotes come from the first available provider (Alpaca IEX, then Finnhub, FMP, Yahoo, Twelve Data). Saved to your account when signed in.</span></div></CardContent></Card></div>}
   </div>)

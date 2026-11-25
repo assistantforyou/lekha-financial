@@ -7,6 +7,7 @@ import { COPY, LANG_LABEL, LANG_NATIVE, setTourLang, stepCopy, tourLang, ui } fr
 import { MOBILE_MAX, place, scrollDelta } from "./layout"
 import { EXAMPLE, STEPS, currentPath, resolve, visible } from "./steps"
 import { onStartTour, shouldAutoStart, writeStatus } from "./store"
+import { capture } from "@/lib/analytics"
 
 const WF_ICONS = [Search, Building2, Layers, LineChart]
 const reduced = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch (e) { return false } }
@@ -43,7 +44,7 @@ export default function Tour({ navigate }) {
   const [host] = useState(() => { const d = document.createElement("div"); d.id = "lekha-tour"; d.setAttribute("translate", "no"); d.className = "notranslate"; return d })
   live.current = { cur, busy, skipped, size, active }
 
-  const finish = useCallback((status) => { R.current.token++; writeStatus(status); setActive(false); setReady(false) }, [])
+  const finish = useCallback((status) => { capture("tour_finished", { status, steps_seen: live.current.cur + 1, steps_skipped: live.current.skipped.length }); R.current.token++; writeStatus(status); setActive(false); setReady(false) }, [])
 
   /* ---- go to a step: navigate if needed, wait for its target, scroll it into the free band, then show it ---- */
   const goTo = useCallback((i, dir = 1) => {
@@ -68,6 +69,7 @@ export default function Tour({ navigate }) {
           if (d != null && Math.abs(d) >= 2) { window.scrollBy({ top: d, behavior: reduced() ? "auto" : "smooth" }); await scrollIdle(); if (token !== R.current.token) return }
         }
         R.current.el = r.el; setAlt(!!r.alt); setCur(i); setBusy(false); setReady(true)
+        capture("tour_step_viewed", { step: step.id, index: i })
         return
       }
       if (performance.now() - t0 > limit) return fail()
@@ -78,6 +80,7 @@ export default function Tour({ navigate }) {
 
   const begin = useCallback(() => {
     if (live.current.active) return
+    capture("tour_started", { auto: shouldAutoStart() })
     R.current.prevFocus = document.activeElement; writeStatus("in_progress")
     setSkipped([]); setCur(0); setAlt(false); setReady(false); setActive(true); goTo(0, 1)
   }, [goTo])
@@ -185,7 +188,7 @@ export default function Tour({ navigate }) {
       <div className="tour-spot two" style={ring(r2)} aria-hidden="true" />
       <div ref={cardRef} className="tour-card" role="dialog" aria-modal="true" aria-label={ui("label")} aria-labelledby="tour-t" aria-describedby="tour-b" aria-busy={busy} data-sheet={geo.mobile ? "1" : undefined} style={cardStyle} tabIndex={-1}>
         <div className="tour-top"><span className="tour-count">{n} / {total}</span><div className="tour-track" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={n} aria-label={label}><i style={{ width: `${(n / total) * 100}%` }} /></div>
-          <label className="tour-lang" title={LANG_LABEL[lang]}><Languages aria-hidden="true" /><select value={lang} onChange={(e) => setTourLang(e.target.value)} aria-label={LANG_LABEL[lang]}>{Object.keys(COPY).map((k) => <option key={k} value={k} lang={k}>{LANG_NATIVE[k]}</option>)}</select></label></div>
+          <label className="tour-lang" title={LANG_LABEL[lang]}><Languages aria-hidden="true" /><select value={lang} onChange={(e) => { capture("tour_language_changed", { lang: e.target.value }); setTourLang(e.target.value) }} aria-label={LANG_LABEL[lang]}>{Object.keys(COPY).map((k) => <option key={k} value={k} lang={k}>{LANG_NATIVE[k]}</option>)}</select></label></div>
         {trail && <div className="tour-where"><MapPin aria-hidden="true" /><span translate="no">{trail[0]}</span><ChevronRight aria-hidden="true" /><b translate="no">{trail[1]}</b></div>}
         <div className="tour-body" key={cur + (alt ? "a" : "")}>
           <h2 className="tour-title" id="tour-t">{c.t}</h2>
@@ -202,7 +205,7 @@ export default function Tour({ navigate }) {
             {!signedIn() && <button type="button" className="tour-btn ghost" onClick={() => finish("completed")}>{ui("explore")}</button>}
             {signedIn()
               ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button>
-              : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => { writeStatus("completed"); location.href = "/login.html?mode=signup" }}>{ui("account")}</button>}
+              : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => { capture("tour_account_clicked"); writeStatus("completed"); location.href = "/login.html?mode=signup" }}>{ui("account")}</button>}
           </>
             : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => move(1)} disabled={busy}>{ui("next")}</button>}
         </div>

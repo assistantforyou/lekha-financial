@@ -9,6 +9,7 @@ import { LineChart } from "@/components/common"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
 import { trackCustom } from "@/lib/pixel"
+import { capture } from "@/lib/analytics"
 import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
 import { cn } from "@/lib/utils"
 
@@ -148,6 +149,8 @@ export default function AgentPanel({ symbol, initial }) {
     if (!q || busy) return
     setErr("")
     setWall(false)
+    const started = Date.now()
+    capture("agent_question_started", { mode, has_symbol: !!symbol, attachments: files.length, thread: !!threadId })
     /* Funnel signal for the retargeting audience: who tried the analyst. No question text is sent to Meta. */
     trackCustom("AskAnalyst", { content_category: "analyst", content_type: "product" })
     const attached = files
@@ -201,9 +204,11 @@ export default function AgentPanel({ symbol, initial }) {
         setThreadId(id)
         refreshThreads()
       }
+      capture("agent_question_completed", { mode, duration_ms: Date.now() - started, reply_chars: reply.length, has_thread: !!id })
     } catch (e) {
-      if (e.name === "AbortError") patch(base + 1, (m) => ({ ...m, parts: [...m.parts, { type: "error", message: "Stopped." }] }))
+      if (e.name === "AbortError") { capture("agent_question_stopped", { mode }); patch(base + 1, (m) => ({ ...m, parts: [...m.parts, { type: "error", message: "Stopped." }] })) }
       else if (e.code === "signup_required") {
+        capture("agent_signup_wall", { mode })
         /* Keep the question so the account flow can hand it back after signup. */
         try { localStorage.setItem("ptpub.v1.pendingAsk", q) } catch (x) {}
         patch(base + 1, (m) => ({ ...m, content: "", parts: [] }))
@@ -211,6 +216,7 @@ export default function AgentPanel({ symbol, initial }) {
         setWall(true)
       }
       else {
+        capture("agent_question_failed", { mode, reason: e.code || (e.status ? "http_" + e.status : "error") })
         const msg = e.code === "deep_unavailable" ? "Deep mode needs the Paid plan. Switch to Fast, or upgrade in Account."
           : e.status === 429 ? e.message
           : e.status === 402 ? e.message
@@ -234,6 +240,7 @@ export default function AgentPanel({ symbol, initial }) {
       if (!t) { setErr("That thread is no longer available."); return }
       setThreadId(id)
       setMsgs((t.messages || []).map((m) => ({ role: m.role, content: m.content, parts: [], at: m.at })))
+      capture("agent_thread_opened", { messages: (t.messages || []).length })
     } catch (e) { setErr(e.message) }
   }
 
@@ -244,6 +251,7 @@ export default function AgentPanel({ symbol, initial }) {
       dropLocalThread(id)
       if (id === threadId) { setThreadId(null); setMsgs([]) }
       refreshThreads()
+      capture("agent_thread_deleted")
     } catch (e) { toast(e.message) }
   }
 
@@ -268,7 +276,7 @@ export default function AgentPanel({ symbol, initial }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]" data-tour="ask">
       <aside className="order-2 space-y-2 lg:order-1">
-        <Button variant="outline" size="sm" className="w-full justify-start gap-1.5" onClick={() => { setThreadId(null); setMsgs([]); setErr("") }} disabled={busy}>
+        <Button variant="outline" size="sm" className="w-full justify-start gap-1.5" onClick={() => { capture("agent_thread_started"); setThreadId(null); setMsgs([]); setErr("") }} disabled={busy}>
           <Plus className="size-4" /> New thread
         </Button>
         <div className="max-h-72 space-y-1 overflow-auto lg:max-h-[520px]">
@@ -353,7 +361,7 @@ export default function AgentPanel({ symbol, initial }) {
             </label>
             <div className="flex overflow-hidden rounded-md border border-[var(--line)] text-xs">
               {["fast", "deep"].map((m) => (
-                <button key={m} type="button" onClick={() => setMode(m)} disabled={busy}
+                <button key={m} type="button" onClick={() => { capture("agent_mode_changed", { mode: m }); setMode(m) }} disabled={busy}
                   className={cn("px-2.5 py-1 capitalize", mode === m ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]")}>{m}</button>
               ))}
             </div>

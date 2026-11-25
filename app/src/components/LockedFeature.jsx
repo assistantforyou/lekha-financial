@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import * as A from "@/lib/account"
 import { FEATURES, PLAN_NAME, PRICE, planFor } from "@/lib/entitlements"
+import { capture } from "@/lib/analytics"
 
 const errMsg = (e) => (e && e.message) || "Billing is not available right now."
 
@@ -20,6 +21,7 @@ export default function LockedFeature({ feature, title, tier, me, signedIn, demo
   const lapsed = !!(me && ["past_due", "unpaid", "incomplete"].includes(me.sub_status))
   useEffect(() => { if (confirming) setBusy(false) }, [confirming])
   const upgrade = async () => {
+    capture("upgrade_clicked", { feature, plan, state: !signedIn || demo ? "anonymous" : lapsed ? "lapsed" : subscriber ? "subscriber" : "free" })
     if (!signedIn || demo) { navigate("account/profile"); return }
     setBusy(true)
     try { const j = subscriber || lapsed ? await A.portal() : await A.checkout(plan); location.href = j.url }
@@ -43,7 +45,7 @@ export default function LockedFeature({ feature, title, tier, me, signedIn, demo
         ? <p className="mt-6 inline-flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Loader2 className="size-4 animate-spin" />Waiting for Stripe to confirm the subscription. This screen opens the feature as soon as your account is updated.</p>
         : <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
             <Button onClick={upgrade} disabled={busy} aria-describedby="locked-title">{busy ? <><Loader2 className="animate-spin" />Opening secure billing…</> : <>{label}<ArrowRight /></>}</Button>
-            <Button variant="outline" onClick={() => navigate("account/plans")}>Compare plans</Button>
+            <Button variant="outline" onClick={() => { capture("plans_compared", { feature, plan }); navigate("account/plans") }}>Compare plans</Button>
           </div>}
       {lapsed && !confirming && <p className="mt-4 text-[12px] text-muted-foreground">The latest payment for your subscription was not received, so paid features are paused until Stripe confirms it.</p>}
       {demo && <p className="mt-4 text-[12px] text-muted-foreground">The demo is a free preview with a sample portfolio. {PLAN_NAME[plan]} features need a subscription on your own account.</p>}

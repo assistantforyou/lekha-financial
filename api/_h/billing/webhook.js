@@ -1,6 +1,7 @@
 // Stripe webhook: keeps pt_profiles.sub_status / period_end in step with the subscription. Signature-verified.
 const { sb } = require("../../_lib");
 const { stripe, verifySignature, periodEnd, priceMap } = require("../../_stripe");
+const ph = require("../../_ph");
 
 const raw = (req) => new Promise((resolve, reject) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => resolve(Buffer.concat(c).toString("utf8"))); req.on("error", reject); });
 
@@ -42,6 +43,8 @@ async function applySub(sub, userId) {
   if (!Array.isArray(rows) || rows.length !== 1 || rows[0]?.[key] !== id) {
     throw new Error("Entitlement update did not confirm the intended profile");
   }
+  // plan lifecycle for analytics: identifiers and plan names only, never billing details
+  ph.capture("subscription_synced", userId || id, { plan: body.plan, status: sub.status, canceled: sub.cancel_at_period_end === true, source: "stripe_webhook" });
 }
 
 module.exports = async (req, res) => {

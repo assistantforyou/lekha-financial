@@ -1,4 +1,5 @@
 import { track, planParams } from "@/lib/pixel"
+import { capture, identify } from "@/lib/analytics"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronRight, FlaskConical, PanelLeftOpen } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -36,8 +37,8 @@ export default function App() {
   const [menu, setMenu] = useState(false), [search, setSearch] = useState(false), [theme, setTheme] = useState(false), [lang, setLang] = useState(false)
   /* The desktop tree can be collapsed to give a wide screen entirely to the data. The choice is remembered. */
   const [nav, setNav] = useState(() => { try { return localStorage.getItem("ptpub.v1.app.nav") !== "closed" } catch (e) { return true } })
-  const toggleNav = useCallback(() => setNav((v) => { try { localStorage.setItem("ptpub.v1.app.nav", v ? "closed" : "open") } catch (e) {} return !v }), [])
-  useEffect(() => { if (search) track("Search", { content_category: "command_palette" }) }, [search])
+  const toggleNav = useCallback(() => setNav((v) => { try { localStorage.setItem("ptpub.v1.app.nav", v ? "closed" : "open") } catch (e) {} capture("nav_toggled", { open: !v }); return !v }), [])
+  useEffect(() => { if (search) { track("Search", { content_category: "command_palette" }); capture("search_opened", { surface: "app" }) } }, [search])
   const me = useMe(), sess = useSession()
   const navigate = useCallback((path) => { const h = "#/" + path.replace(/^#?\/?/, ""); if (location.hash === h) window.dispatchEvent(new HashChangeEvent("hashchange")); else location.hash = h }, [])
   useEffect(() => { window.LEKHA_SHELL && window.LEKHA_SHELL._register(navigate) }, [navigate])
@@ -54,6 +55,7 @@ export default function App() {
     try { if (route.t !== "company") localStorage.setItem("ptpub.v1.app.route", JSON.stringify(route.key)) } catch (e) {}
     window.scrollTo(0, 0); setMenu(false)
     track("ViewContent", { content_name: item.title, content_category: item.groupTitle || route.t || "app", content_type: "product" })
+    capture("screen_viewed", { screen: route.key, group: item.groupTitle || route.t || "app", pane: isPane, has_param: !!route.param })
     if (!isPane && window.LEKHA_SHELL) window.LEKHA_SHELL._setRoute({ t: route.t, s: route.s }, false)
   }, [route.key, route.param])
   const qs = route.query ? route.query.toString() : "", r = useMemo(() => ({ ...route, t: route.t, s: route.s }), [route.key, route.param, qs])   // query (?tab=…) must be a dependency or tab links never switch
@@ -64,11 +66,15 @@ export default function App() {
      every module re-check the subscription. */
   const feature = featureOfRoute(route.key), tier = demo || !signedIn ? "demo" : me && me.tier ? me.tier : null
   const gateLoading = !!feature && tier === null, gated = !!feature && tier !== null && !allows(tier, feature)
+  /* Account identity and plan for PostHog. The id is the Supabase user id; no e-mail or name leaves the browser. */
+  useEffect(() => { if (sess && sess.user_id) identify(sess.user_id, { plan: me && me.tier ? me.tier : undefined, admin: !!(me && me.is_admin), surface: "app" }) }, [sess && sess.user_id, me && me.tier, me && me.is_admin])
+  useEffect(() => { if (gated) capture("paywall_viewed", { screen: route.key, feature, plan: tier }) }, [gated, route.key, feature, tier])
   /* back from Stripe Checkout or the billing portal: the redirect proves nothing, so poll the verified plan until the webhook lands */
   const [confirming, setConfirming] = useState(() => /[?&]billing=(success|portal)(&|$)/.test(location.search))
   useEffect(() => {
     const b = new URLSearchParams(location.search).get("billing"); if (!b) return
     try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {}
+    capture("checkout_returned", { result: b })
     if (b === "success") toast("Checkout returned. Your plan changes when Stripe confirms the subscription.")
     else if (b === "cancel") toast("Checkout cancelled. Nothing was charged.")
   }, [])
@@ -83,7 +89,7 @@ export default function App() {
     if (!confirming || !tier) return
     if (firstTier.current === undefined) { firstTier.current = tier; if (!(feature && gated === false)) return }
     if (tier !== firstTier.current || (feature && gated === false)) {
-      if (tier !== firstTier.current && (tier === "paid" || tier === "premium")) { const pp = planParams(tier); if (pp) { track("Subscribe", { ...pp, predicted_ltv: pp.value * 12 }, "sub-" + tier); track("Purchase", pp, "buy-" + tier) } }
+      if (tier !== firstTier.current && (tier === "paid" || tier === "premium")) { const pp = planParams(tier); if (pp) { track("Subscribe", { ...pp, predicted_ltv: pp.value * 12 }, "sub-" + tier); track("Purchase", pp, "buy-" + tier) } capture("plan_activated", { plan: tier }) }
       setConfirming(false); toast.success(`Your account is on the ${tier[0].toUpperCase() + tier.slice(1)} plan.`)
       // the classic engine, its data source and the feature modules read the plan once at load: reload so they start on the verified plan
       if (tier !== firstTier.current) setTimeout(() => location.reload(), 1500)

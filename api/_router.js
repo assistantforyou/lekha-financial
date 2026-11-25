@@ -15,6 +15,7 @@ function resolve(routes, rest) {
 }
 
 const audit = require("./_audit");
+const ph = require("./_ph");
 
 function group(name, routes, opts = {}) {
   const handler = async (req, res) => {
@@ -30,7 +31,20 @@ function group(name, routes, opts = {}) {
       const t = Buffer.concat(chunks).toString("utf8");
       try { req.body = t ? JSON.parse(t) : {}; } catch (e) { req.body = {}; }
     }
-    return audit.around(name, rest, req, res, () => mod(req, res));
+    const started = Date.now();
+    try {
+      return await audit.around(name, rest, req, res, () => mod(req, res));
+    } finally {
+      // one event per API call: route, outcome and duration only; the user id is the Supabase id, never an e-mail
+      if (name !== "ph") {
+        try {
+          ph.capture("api_request", req.__uid || "anonymous", {
+            group: name, route: rest || "root", method: req.method,
+            status: res.statusCode, duration_ms: Date.now() - started,
+          });
+        } catch (e) {}
+      }
+    }
   };
   if (opts.rawBody) handler.config = { api: { bodyParser: false } };
   return handler;
