@@ -55,7 +55,7 @@ export default function Tour({ navigate }) {
   const [host] = useState(() => { const d = document.createElement("div"); d.id = "lekha-tour"; d.setAttribute("translate", "no"); d.className = "notranslate"; return d })
   live.current = { cur, busy, skipped, size, active, alt, askPhase, tried, typing }
 
-  const finish = useCallback((status, action) => { const at = STEPS[live.current.cur]; capture("tour_finished", { status, action: action || "none", step: at ? at.id : "unknown", index: live.current.cur, total: STEPS.length, steps_seen: live.current.cur + 1, steps_skipped: live.current.skipped.length }); R.current.token++; funnel(status === "completed" ? "TourComplete" : "TourSkip", { step: at ? at.id : undefined, platform: platformNow(), action }); writeStatus(status); setActive(false); setReady(false) }, [])
+  const finish = useCallback((status, action) => { const at = STEPS[live.current.cur]; capture("tour_finished", { status, action: action || "none", step: at ? at.id : "unknown", index: live.current.cur, total: STEPS.length, steps_seen: live.current.cur + 1, steps_skipped: live.current.skipped.length }); R.current.token++; window.LEKHA_TOUR_ACTIVE = false; funnel(status === "completed" ? "TourComplete" : "TourSkip", { step: at ? at.id : undefined, platform: platformNow(), action }); writeStatus(status); setActive(false); setReady(false) }, [])
 
   /* ---- go to a step: navigate if needed, wait for its target, scroll it into the free band, then show it ---- */
   const goTo = useCallback((i, dir = 1) => {
@@ -91,11 +91,13 @@ export default function Tour({ navigate }) {
 
   const begin = useCallback(() => {
     if (live.current.active) return
+    window.LEKHA_TOUR_ACTIVE = true
     capture("tour_started", { auto: shouldAutoStart() })
     R.current.prevFocus = document.activeElement; writeStatus("in_progress"); setPlatform(); funnel("TourStart", { platform: platformNow() })
     setSkipped([]); setCur(0); setAlt(false); setReady(false); setActive(true); goTo(0, 1)
   }, [goTo])
   useEffect(() => onStartTour(begin), [begin])
+  useEffect(() => () => { window.LEKHA_TOUR_ACTIVE = false }, [])
   /* The Quick Tour starts by itself, but not over the language prompt: when the prompt is up it waits for the answer (or 8 s), then starts. */
   useEffect(() => {
     if (!shouldAutoStart()) return
@@ -183,10 +185,12 @@ export default function Tour({ navigate }) {
   /* ---- the AI step: the tour steps aside while the visitor asks, and comes back beside the answer a few seconds after it lands ---- */
   useEffect(() => { setAskPhase("idle") }, [cur])
   useEffect(() => {
-    const f = (e) => { if (!live.current.active) return; const st = STEPS[live.current.cur]; if (!st || !st.pill) return; const ph = e.detail && e.detail.phase; setAskPhase(ph === "start" ? "busy" : ph === "done" ? "done" : "idle")   /* a failed question brings the prompt back instead of moving on */ }
+    const f = (e) => { if (!live.current.active) return; const st = STEPS[live.current.cur]; if (!st || !st.pill) return; const ph = e.detail && e.detail.phase; setAskPhase(ph === "start" ? "busy" : ph === "done" ? "done" : ph === "wall" ? "wall" : "idle")   /* a failed question brings the prompt back instead of moving on */ }
     window.addEventListener("lekha:ask", f); return () => window.removeEventListener("lekha:ask", f)
   }, [])
   useEffect(() => { if (askPhase !== "done") return; const t = setTimeout(() => { const st = STEPS[live.current.cur]; if (st && st.pill) move(1) }, 4000); return () => clearTimeout(t) }, [askPhase, move])
+  /* no free answer left: do not leave a card asking for one, move to the closing step */
+  useEffect(() => { if (askPhase !== "wall") return; const t = setTimeout(() => { const i = STEPS.findIndex((x) => x.id === "finish"); if (i >= 0) goTo(i, 1) }, 1200); return () => clearTimeout(t) }, [askPhase, goTo])
   const goPremium = useCallback(() => { funnel("TourCta", { step: "finish", platform: platformNow(), action: "premium" }); finish("completed", "premium"); navigate("account/plans") }, [finish, navigate])
   const jump = useCallback((id) => { const i = STEPS.findIndex((x) => x.id === id); if (i >= 0 && !live.current.busy) goTo(i, 1) }, [goTo])
 

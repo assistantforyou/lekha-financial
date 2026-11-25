@@ -88,11 +88,15 @@ body{background:var(--bg);color:var(--fg);margin:0}
 .sim-fan{width:100%;height:auto;display:block}
 .sim-fan .b90{fill:color-mix(in srgb,var(--chart) 14%,transparent)}.sim-fan .b50{fill:color-mix(in srgb,var(--chart) 28%,transparent)}
 .sim-fan .med{fill:none;stroke:var(--fg);stroke-width:2}.sim-fan .bull{fill:none;stroke:var(--up);stroke-width:1.2;stroke-dasharray:4 3}.sim-fan .bear{fill:none;stroke:var(--down);stroke-width:1.2;stroke-dasharray:4 3}
+.sim-fan .sim-paths{fill:none;stroke-width:.7;opacity:.22;vector-effect:non-scaling-stroke;stroke-linejoin:round}.sim-fan .sim-paths.gain{stroke:var(--up)}.sim-fan .sim-paths.loss{stroke:var(--down)}
 .sim-fan .now{stroke:var(--accent);stroke-dasharray:2 4}.sim-fan .ax{fill:var(--muted);font:11px var(--f-mono)}
 .sim-fan .lab-p90{fill:var(--up)}.sim-fan .lab-p10{fill:var(--down)}.sim-fan .lab-p50{fill:var(--fg)}
 .sim-ev line{stroke:var(--muted);stroke-width:1;opacity:.45}.sim-ev.estimated line{stroke-dasharray:3 3}
 .legend .sw{display:inline-block;width:14px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .legend .sw.b90{background:color-mix(in srgb,var(--chart) 14%,transparent)}.legend .sw.b50{background:color-mix(in srgb,var(--chart) 28%,transparent)}.legend .sw.med{background:var(--fg);height:2px}
+.legend .sw.path{background:var(--chart);opacity:.32;height:2px}
+.sim-opt{display:inline-flex;align-items:center;gap:6px;margin-left:10px;color:var(--muted);cursor:pointer}
+.sim-opt input{accent-color:var(--chart)}
 .legend .sw.ev{width:1px;height:12px;border-left:1px solid var(--muted)}.legend .sw.ev.estimated{border-left-style:dashed}
 .sim-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:18px;margin:14px 0}
 .sim-hist{width:100%;height:auto}.sim-hist .pos{fill:color-mix(in srgb,var(--up) 60%,transparent)}.sim-hist .neg{fill:color-mix(in srgb,var(--down) 60%,transparent)}.sim-hist .ax{fill:var(--muted);font:11px var(--f-mono)}

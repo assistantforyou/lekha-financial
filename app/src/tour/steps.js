@@ -38,12 +38,19 @@ const listen = (types, within) => {
 const SCEN = '[aria-label="Scenario"]'
 
 /* Monte Carlo: the page auto-runs 100K paths (about 10 s on a phone), which would leave the visitor staring at a progress bar.
-   Stop that run and choose 10K paths (about a second); the visitor then presses Run simulation themselves. */
+   Clear that run, choose 10K paths and leave the tool empty; the visitor then presses Run simulation themselves. */
 const armSim = () => {
   const l = listen(["click"], "#sim-go"), kpi = () => { const e = document.querySelector("#sim-out .sim-kpis"); return e ? e.textContent : "" }
-  let base = kpi(), t0 = performance.now()
-  const prep = () => { const stop = byId("sim-stop"); if (stop && visible(stop)) stop.click(); const n = document.querySelector('#sim-n [data-n="10000"]'); if (n && !n.classList.contains("on") && n.getAttribute("aria-pressed") !== "true" && !l.done()) n.click() }
-  prep(); const i = setInterval(() => { if (performance.now() - t0 > 4000 || l.done()) return clearInterval(i); prep() }, 450)
+  const reset = () => {
+    const api = window.LEKHA_SIM
+    if (api && typeof api.resetForTour === "function") { api.resetForTour({ hz: "1Y", paths: 10000 }); return }
+    const stop = byId("sim-stop"); if (stop && visible(stop)) stop.click()
+    const n = document.querySelector('#sim-n [data-n="10000"]'); if (n && n.getAttribute("aria-pressed") !== "true") n.click()
+  }
+  reset()
+  const base = kpi()
+  let tries = 0
+  const i = setInterval(() => { if (l.done() || ++tries > 20) return clearInterval(i); reset() }, 250)
   return { done: () => l.done() && !!kpi() && kpi() !== base, off: () => { clearInterval(i); l.off() } }
 }
 /* Stress test: the visitor presses Run simulation; done when the scenario table has been drawn after the press. */
@@ -56,8 +63,8 @@ const armDcf = () => listen(["click", "input", "change"], SCEN + ", #dcf-growth,
 /* Ten steps, the same on every screen size: orient (search, menu, portfolio), try two tools, see what a valuation is, meet the analyst, then a clear next step.
    Nothing blocks on the visitor: each step has Next, and trying a tool only changes the wording of the card. */
 const welcome = { id: "welcome", hash: "portfolio/overview", ready: () => !!byId("kpis") }
-const search = { id: "search", hash: "portfolio/overview", target: [sel('[data-tour="search"]'), sel('[data-tour="search-icon"]')] }
-const nav = { id: "nav", hash: "portfolio/overview", target: [sel('[data-tour="nav"]'), sel('[data-tour="menu"]')], prefer: ["right"] }
+const search = { id: "search", hash: "portfolio/overview", target: [sel('[data-tour="search"]'), sel('[data-tour="search-icon"]')], act: true, hint: "hintSearch" }
+const nav = { id: "nav", hash: "portfolio/overview", target: [sel('[data-tour="nav"]'), sel('[data-tour="menu"]')], prefer: ["right"], act: true, hint: "hintNav" }
 const summary = { id: "summary", where: true, hash: "portfolio/overview", target: [() => byId("kpis")] }
 const sim = { id: "sim", hash: "simulation/main", target: [seen("#sim-go")], retarget: true, act: true, hint: "hintSim", hintDone: "hintSimDone", arm: armSim }
 const stress = { id: "stress", hash: "analysis/stress", target: [seen("#ai-sim-run")], retarget: true, act: true, hint: "hintStress", hintDone: "hintStressDone", arm: armStress }

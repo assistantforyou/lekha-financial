@@ -2,6 +2,7 @@
    Real Monte Carlo from core/engine.js via sim-runner.js. Each run is capped at 1,000,000 paths and the UI always shows the
    number of paths actually completed. Inputs come from the classic engine state (PT_APP.S): no second data fetch. */
 import { run, MAX_PATHS, MODEL_VERSION, DEFAULT_HORIZONS } from "./sim-runner.js";
+import { runStream } from "../core/engine.js";
 import { FOMC, CPI, JOBS, nextReport } from "../core/calendar.js";
 
 const SPX = "INDEXSP:.INX", DAY = 864e5;
@@ -9,6 +10,9 @@ const PRESETS = [[10000, "10K"], [100000, "100K"], [1000000, "1M"]];
 const HZ = DEFAULT_HORIZONS.map(([c]) => c);
 const HZ_LABEL = { "21D": "21 days", "1M": "1 month", "3M": "3 months", "6M": "6 months", "1Y": "1 year" };
 const LO = -3, W = 5 / 2500, RB = 2502; // must match sim-aggregate.js histogram layout
+/* Path sample for the chart: a small set of real paths from the same model, drawn as lines. The statistics above still come
+   from every path of the full run; these are a visual sample only, and the count is stated on the chart. */
+const SAMPLE_N = 120, SAMPLE_STEP = 3;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const pc = (x, d = 1, sign = true) => x == null || !isFinite(x) ? "–" : (sign && x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x * 100).toFixed(d) + "%";
@@ -69,7 +73,18 @@ export function buildSimInput() {
 }
 
 /* ---------- rendering ---------- */
-let host, st = { hz: "1Y", paths: 100000, job: null, res: null, prog: null, meta: null, input: null, err: null, auto: false };
+let host, st = { hz: "1Y", paths: 100000, job: null, res: null, prog: null, meta: null, input: null, err: null, auto: false, sample: null, showPaths: true };
+/* Re-run a small number of paths through the same engine and keep their daily values. Cheap: 120 paths is 30,240 daily steps. */
+function samplePaths(inp) {
+  if (!inp) return null;
+  try {
+    const out = [], days = 252;
+    runStream(inp, (inp.seed ^ 0x9e3779b9) >>> 0, SAMPLE_N, (p, value) => {
+      const a = []; for (let d = 0; d <= days; d += SAMPLE_STEP) a.push(value[d]); out.push(a);
+    });
+    return out;
+  } catch (e) { console.warn("[sim] path sample failed", e && e.message); return null; }
+}
 const money = (usd) => { const A = window.PT_APP; return A && A.lekha ? A.lekha.money(usd, 0) : "$" + Math.round(usd).toLocaleString("en-US"); };
 const demo = () => !!window.PT_DEMO_MODE;
 
@@ -102,7 +117,7 @@ function start() {
   try { st.job = run({ input: b.input, paths: Math.min(st.paths, MAX_PATHS), seed, onProgress: (p) => { st.prog = p; progress(); } }); }
   catch (e) { st.err = "The simulation could not start: " + e.message; st.job = null; paint(); return; }
   seg(); progress(); host.querySelector("#sim-go").hidden = true; host.querySelector("#sim-stop").hidden = false;
-  st.job.promise.then((r) => { st.res = { ...r, at: new Date().toISOString() }; window.LEKHA_SIM_LAST = simSummary(); })
+  st.job.promise.then((r) => { st.res = { ...r, at: new Date().toISOString() }; st.sample = samplePaths(b.input); window.LEKHA_SIM_LAST = simSummary(); })
     .catch((e) => { st.err = "Simulation failed: " + (e && e.message || e); })
     .finally(() => { st.job = null; seg(); host.querySelector("#sim-go").hidden = false; host.querySelector("#sim-stop").hidden = true; host.querySelector("#sim-prog").hidden = true; paint(); });
 }
@@ -118,7 +133,7 @@ export function simSummary() {
     horizon: "1Y", p5: h.p5, p50: h.p50, p95: h.p95, mean: h.mean, pGain: h.pGain, pLoss10: h.pLoss10, cvar5: h.cvar5, ddMedian: h.dd && h.dd.median, dd95: h.dd && h.dd.p95 };
 }
 
-function fanSvg(sum, hz, startV, events) {
+function fanSvg(sum, hz, startV, events, paths) {
   const days = sum.horizons[hz].days, rows = sum.fan.filter((r) => r.day <= days); if (rows.length < 2) return "";
   const Wd = 900, H = 300, L = 70, R = 70, T = 16, B = 30, v = (r) => startV * (1 + r);
   const lo = Math.min(...rows.map((r) => v(r.p5))), hi = Math.max(...rows.map((r) => v(r.p95))), pad = (hi - lo) * 0.06;
@@ -128,14 +143,26 @@ function fanSvg(sum, hz, startV, events) {
   const ticks = []; for (let i = 0; i <= 4; i++) { const val = y0 + (i / 4) * (y1 - y0); ticks.push(`<line x1="${L}" x2="${Wd - R}" y1="${Y(val)}" y2="${Y(val)}" class="gl"/><text x="${L - 8}" y="${Y(val) + 4}" text-anchor="end" class="ax">${esc(money(val))}</text>`); }
   const ev = events.filter((e) => e.day <= days).map((e) => `<g class="sim-ev ${e.status}"><line x1="${X(e.day)}" x2="${X(e.day)}" y1="${T}" y2="${H - B}"/><title>${esc(e.label)} · ${esc(e.date)} · ${e.status === "scheduled" ? "scheduled (official calendar)" : "estimated date (usual reporting slot)"}</title></g>`).join("");
   const last = rows[rows.length - 1], lab = (k, t) => `<text x="${Wd - R + 6}" y="${Y(v(last[k])) + 4}" class="ax lab-${k}">${t}</text>`;
-  return `<svg viewBox="0 0 ${Wd} ${H}" class="sim-fan" role="img" aria-label="Projected portfolio value, percentile bands">${ticks.join("")}${ev}
-    <polygon points="${band("p95", "p5")}" class="b90"/><polygon points="${band("p75", "p25")}" class="b50"/>
+  /* real simulated paths, clipped to the band's vertical scale */
+  let sample = "";
+  if (paths && paths.length && st.showPaths) {
+    const cid = "simclip" + (++clipSeq), n = Math.min(paths[0].length, Math.floor(days / SAMPLE_STEP) + 1);
+    const draw = (a) => { let s = ""; for (let i = 0; i < n; i++) { const val = startV * a[i]; if (!(val > 0)) continue; s += `${i ? "L" : "M"}${X(i * SAMPLE_STEP).toFixed(1)},${Y(val).toFixed(1)}`; } return s; };
+    const up = paths.filter((a) => a[Math.min(n, a.length) - 1] >= 1).map(draw).join("");
+    const dn = paths.filter((a) => a[Math.min(n, a.length) - 1] < 1).map(draw).join("");
+    sample = `<clipPath id="${cid}"><rect x="${L}" y="${T}" width="${Wd - L - R}" height="${H - T - B}"/></clipPath>` +
+      `<g clip-path="url(#${cid})">${up ? `<path d="${up}" class="sim-paths gain"/>` : ""}${dn ? `<path d="${dn}" class="sim-paths loss"/>` : ""}</g>` +
+      `<title>${paths.length} individual simulated paths from the same model</title>`;
+  }
+  return `<svg viewBox="0 0 ${Wd} ${H}" class="sim-fan" role="img" aria-label="Projected portfolio value, percentile bands${sample ? " with individual simulated paths" : ""}">${ticks.join("")}${ev}
+    <polygon points="${band("p95", "p5")}" class="b90"/><polygon points="${band("p75", "p25")}" class="b50"/>${sample}
     <line x1="${L}" x2="${Wd - R}" y1="${Y(startV)}" y2="${Y(startV)}" class="now"/>
     <path d="${line("p90")}" class="bull"/><path d="${line("p10")}" class="bear"/><path d="${line("p50")}" class="med"/>
     ${lab("p90", "Bull P90")}${lab("p50", "Base P50")}${lab("p10", "Bear P10")}
     <text x="${L}" y="${H - 8}" class="ax">Today</text><text x="${Wd - R}" y="${H - 8}" text-anchor="end" class="ax">+${days} trading days</text>
     <g class="hov" aria-hidden="true"><line class="hov-cross" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/><circle class="hov-dot" r="3.5" cx="0" cy="0" visibility="hidden"/><circle class="hov-dot" r="3" cx="0" cy="0" opacity=".55" visibility="hidden"/><rect class="hov-hit" x="${L}" y="${T}" width="${Wd - L - R}" height="${H - T - B}"/></g></svg>`;
 }
+let clipSeq = 0;
 
 /* Hover on the fan chart: crosshair + readout of the percentile band and any catalyst on that day. */
 function attachFanHover(svg, res, hz, startV, events) {
@@ -196,8 +223,9 @@ function paint() {
   out.innerHTML = `${st.err ? `<p class="note warn">${esc(st.err)}</p>` : ""}
   <div class="kpis sim-kpis">${kpi("Current value", esc(money(sv)), "start of every path")}${kpi("Median projection", esc(money(sv * (1 + o.p50))), pc(o.p50) + " · " + HZ_LABEL[st.hz], tone(o.p50))}
     ${kpi("Bull case (P90)", esc(money(sv * (1 + o.p90))), pc(o.p90), "up")}${kpi("Bear case (P10)", esc(money(sv * (1 + o.p10))), pc(o.p10), "down")}${kpi("Probability of gain", (o.pGain * 100).toFixed(1) + "%", "loss: " + (o.pLoss * 100).toFixed(1) + "%")}</div>
-  <div class="chart">${fanSvg(s, st.hz, sv, st.input.events)}</div>
-  <div class="legend"><span><i class="sw b90"></i>P5–P95</span><span><i class="sw b50"></i>P25–P75</span><span><i class="sw med"></i>Median</span><span><i class="sw ev scheduled"></i>Scheduled event</span><span><i class="sw ev estimated"></i>Estimated earnings date</span></div>
+  <div class="chart">${fanSvg(s, st.hz, sv, st.input.events, st.sample)}</div>
+  <div class="legend"><span><i class="sw b90"></i>P5–P95</span><span><i class="sw b50"></i>P25–P75</span><span><i class="sw med"></i>Median</span>${st.sample ? `<span><i class="sw path"></i>${st.sample.length} individual paths</span>` : ""}<span><i class="sw ev scheduled"></i>Scheduled event</span><span><i class="sw ev estimated"></i>Estimated earnings date</span>
+    ${st.sample ? `<label class="sim-opt"><input type="checkbox" id="sim-paths"${st.showPaths ? " checked" : ""}> Show paths</label>` : ""}</div>
   <div class="sim-grid"><div><h3>Distribution at ${HZ_LABEL[st.hz]}</h3>${histSvg(r.aggregate, hIdx, o)}</div>
     <div><h3>Risk intelligence</h3><table class="kv"><tbody>
     <tr><td class="l">Expected return (mean)</td><td class="${tone(o.mean)}">${pc(o.mean)}</td></tr><tr><td class="l">Median return</td><td class="${tone(o.p50)}">${pc(o.p50)}</td></tr>
@@ -214,9 +242,11 @@ function paint() {
     <li><b>Data:</b> ${st.meta.holdings} holdings, prices to ${esc(st.meta.asOf)}; risk-free rate ${(st.meta.rf * 100).toFixed(2)}% ${st.meta.rfLive ? "(live US 10-year)" : "(fallback assumption, not live)"}; equity risk premium 5% (assumption)${st.meta.missing.length ? `; default risk used for ${esc(st.meta.missing.join(", "))} (not enough history)` : ""}.</li>
     <li><b>Model:</b> daily returns = expected return + beta × market shock + stock-specific noise; 15% of paths are a high-volatility regime; beta and volatility estimated from one year of daily prices against the S&amp;P 500; expected return = risk-free + beta × ERP. Weights are held as today (no rebalancing); cash earns the risk-free rate.</li>
     <li><b>Statistics:</b> streamed into fixed-width histograms (≈0.2% return resolution) so a million paths never sit in memory; percentiles interpolate within a bin; mean, CVaR and probabilities are exact over the completed paths.</li>
+    <li><b>Lines on the chart:</b> ${st.sample ? st.sample.length : 0} separate paths drawn from the same model and seed basis, three out of every five trading days, clipped to the band's scale. They are a visual sample; every number above is computed from all ${r.completedPaths.toLocaleString("en-US")} completed paths. The sample reproduces identically for the same holdings, day and seed.</li>
     <li>A simulation describes a range of outcomes under these assumptions. It is not a prediction or investment advice.</li></ul>
     <div class="row"><button class="btn" id="sim-json" type="button">Export JSON</button><button class="btn" id="sim-svg" type="button">Export chart SVG</button></div></details>`;
   try { attachFanHover(out.querySelector(".sim-fan"), s, st.hz, sv, st.input.events); } catch (e) { console.warn("[sim] hover failed", e && e.message); }
+  const opt = out.querySelector("#sim-paths"); if (opt) opt.onchange = () => { st.showPaths = opt.checked; paint(); };
   out.querySelector("#sim-json").onclick = () => dl("lekha-simulation.json", "application/json", JSON.stringify({ ...simSummary(), horizons: s.horizons, fan: s.fan, events: st.input.events, assumptions: st.meta }, null, 2));
   out.querySelector("#sim-svg").onclick = () => { const svg = out.querySelector(".sim-fan"); if (svg) dl("lekha-projection.svg", "image/svg+xml", svg.outerHTML.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"')); };
 }
