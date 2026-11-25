@@ -55,7 +55,7 @@ export default function Tour({ navigate }) {
   const [host] = useState(() => { const d = document.createElement("div"); d.id = "lekha-tour"; d.setAttribute("translate", "no"); d.className = "notranslate"; return d })
   live.current = { cur, busy, skipped, size, active, alt, askPhase, tried, typing }
 
-  const finish = useCallback((status, action) => { capture("tour_finished", { status, action: action || "none", steps_seen: live.current.cur + 1, steps_skipped: live.current.skipped.length }); R.current.token++; funnel(status === "completed" ? "TourComplete" : "TourSkip", { step: STEPS[live.current.cur] ? STEPS[live.current.cur].id : undefined, platform: platformNow(), action }); writeStatus(status); setActive(false); setReady(false) }, [])
+  const finish = useCallback((status, action) => { const at = STEPS[live.current.cur]; capture("tour_finished", { status, action: action || "none", step: at ? at.id : "unknown", index: live.current.cur, total: STEPS.length, steps_seen: live.current.cur + 1, steps_skipped: live.current.skipped.length }); R.current.token++; funnel(status === "completed" ? "TourComplete" : "TourSkip", { step: at ? at.id : undefined, platform: platformNow(), action }); writeStatus(status); setActive(false); setReady(false) }, [])
 
   /* ---- go to a step: navigate if needed, wait for its target, scroll it into the free band, then show it ---- */
   const goTo = useCallback((i, dir = 1) => {
