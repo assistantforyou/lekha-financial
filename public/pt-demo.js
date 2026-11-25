@@ -729,6 +729,26 @@
     return { ath: ath, fx: { usdthb: DEMO_USDTHB, hkdusd: DEMO_HKDUSD } };
   }
 
+  /* The demo's USD/THB is the ECB reference rate for the demo date. It is read from /api/data/fx, which pins an
+     anonymous caller to DEMO_DATE, so the footer shows a rate that came from the data rather than from a constant;
+     the constants above are only the fallback for an offline boot. */
+  function applyFx(rate) {
+    if (!(rate > 0)) return;
+    DEMO_USDTHB = rate;
+    var d = storeGet("db.holdings/all");
+    if (d && d.items && d.items.length) { d.usdthb = rate; storeSet("db.holdings/all", d); }
+    try { if (typeof window !== "undefined" && window.PT_HOLD && window.PT_HOLD.apply) window.PT_HOLD.apply(); } catch (e) { }
+  }
+  function refreshFx() {
+    try {
+      if (typeof window === "undefined" || !window.fetch) return;
+      window.fetch("/api/data/fx?from=USD&to=THB", { headers: { accept: "application/json" } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { var t = j && j.data && j.data.rates && j.data.rates.THB; if (t && Math.abs(t - DEMO_USDTHB) > 0.001) applyFx(t); })
+        .catch(function () { });
+    } catch (e) { }
+  }
+
   /* ---- the PT_DATA_SOURCE-compatible adapter ---- */
   /* The demo is a full preview: every dataset below is simulated locally for the sample portfolio, nothing is locked. */
   function source() {
@@ -802,6 +822,10 @@
       live: computeLive(buildHistory(), holdingSymbols(), holdingMap()),
       extras: extras()
     };
+  }
+
+  if (typeof window !== "undefined") {
+    if (document.readyState === "loading") window.addEventListener("DOMContentLoaded", refreshFx); else setTimeout(refreshFx, 0);
   }
 
   return {

@@ -63,4 +63,14 @@ async function intraday(symbol, { days = 1, asOf = null } = {}) {
     return keep.map((r) => S.bar(r[0].slice(0, 16) + ":00Z", r[1], r[2], r[3], r[4], r[5]));
   });
 }
-module.exports = { pickPrice, name, configured, license: "Free IEX feed for personal/dev use; redistribution requires an Alpaca data agreement.", quotes, history, intraday };
+// Alpaca keeps its Benzinga news archive, so a date window returns the headlines of those days (the demo reads the
+// window that ends at its cut-off).
+async function news(symbol, { start, end, limit = 50 } = {}) {
+  if (!configured()) throw notConfigured(name);
+  const qs = new URLSearchParams({ symbols: symbol, start, end, limit: String(limit), sort: "desc" });
+  return obs.timed(name, "news", async () => {
+    const j = await request(name, `https://data.alpaca.markets/v1beta1/news?${qs}`, { headers: H() });
+    return (j && j.news || []).map((n) => S.newsItem({ id: "ap" + n.id, headline: n.headline, publisher: n.source, publishedAt: n.created_at, url: n.url, tickers: n.symbols || [symbol], summary: n.summary, source: "Alpaca news" }));
+  });
+}
+module.exports = { pickPrice, name, configured, license: "Free IEX feed for personal/dev use; redistribution requires an Alpaca data agreement.", quotes, history, intraday, news };

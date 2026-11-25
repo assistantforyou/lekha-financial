@@ -12,8 +12,13 @@ async function quote(sym) {
   const j = await get("quote", `quote?symbol=${encodeURIComponent(sym)}`); if (!j || !(j.c > 0)) throw new Error("finnhub_empty");
   return S.quote({ symbol: sym, price: j.c, previousClose: j.pc, open: j.o, high: j.h, low: j.l, timestamp: j.t ? new Date(j.t * 1000) : null, freshness: "realtime", source: "Finnhub" });
 }
-async function companyNews(sym, days = 14) {
-  const j = await get("company-news", `company-news?symbol=${encodeURIComponent(sym)}&from=${day(new Date(Date.now() - days * 864e5))}&to=${day(new Date())}`);
+// Finnhub keeps about a year of company news, so a window can be asked for by date: the demo uses this to read the
+// headlines that were published around its cut-off instead of showing an empty list.
+async function companyNews(sym, range = {}) {
+  const days = typeof range === "number" ? range : 14;
+  const from = (range && range.from) || day(new Date(Date.now() - days * 864e5));
+  const to = (range && range.to) || day(new Date());
+  const j = await get("company-news", `company-news?symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}`);
   return (j || []).map((n) => S.newsItem({ id: "fh" + n.id, headline: n.headline, publisher: n.source, publishedAt: n.datetime * 1000, url: n.url, tickers: [sym], summary: n.summary, source: "Finnhub" }));
 }
 async function marketNews(cat = "general") {

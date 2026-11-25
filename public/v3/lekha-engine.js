@@ -1256,12 +1256,31 @@ const pc=(v,dp=0)=>v==null||!isFinite(v)?"–":pct(v,dp);
 const pu=(v,dp=0)=>v==null||!isFinite(v)?"–":pct(v,dp,false);
 const pm=v=>v==null?"–":v<-2?"< −200%":pc(v);
 function vCtx(){const rf=S.tnx!=null?S.tnx:RF_FALLBACK;return {rf,rfLive:S.tnx!=null,erp:S.vset.erp,sbc:S.vset.sbc,mos:S.vset.mos,L:S.valin}}
+/* Same model as the company page. Each holding is valued by /api/data/valuation (the FCFF DCF for
+   industrials, residual income for banks) and those numbers replace the portfolio scenario DCF below,
+   so the two screens cannot report different intrinsic values. The legacy rows stay for exploration. */
+const NV={};let nvBusy=false,nvDone=false;
+const NV_LABEL={fcff:"FCFF DCF",ri:"Residual income"};
+function nvAuthed(u){return (window.PT_AUTH&&window.PT_AUTH.fetch?window.PT_AUTH.fetch(u):fetch(u))}
+function nvApply(r,nv){if(!r||!r.iv||!nv||!(nv.base>0))return;r.nv=nv;
+  r.iv={bear:nv.bear||nv.base,base:nv.base,bull:nv.bull||nv.base};if(nv.price>0)r.px=nv.price;
+  r.engine=NV_LABEL[nv.model]||"FCFF DCF";const b=r.iv.base;
+  r.mos=b>0?(b-r.px)/b:-Infinity;r.buy=b*(1-r.reqMos);r.up=b/r.px-1;r.down=r.iv.bear/r.px-1;r.bullUp=r.iv.bull/r.px-1;
+  r.status=r.mos>=r.reqMos?"pass":r.mos>=r.reqMos-0.10?"near":"fail"}
+function nvLoad(){if(nvBusy||nvDone)return;const todo=Object.keys(S.fund).filter(t=>!(t in NV));if(!todo.length){nvDone=true;return}
+  nvBusy=true;let i=0;
+  const step=()=>{const batch=todo.slice(i,i+3);i+=3;
+    Promise.all(batch.map(t=>nvAuthed("/api/data/valuation?symbol="+encodeURIComponent(t))
+      .then(r=>r.ok?r.json():null).then(j=>{const d=j&&j.data;NV[t]=d&&d.intrinsicPerShare>0?{base:d.intrinsicPerShare,bear:d.scenarios&&d.scenarios.bear,bull:d.scenarios&&d.scenarios.bull,price:d.price,model:d.v2&&d.v2.model,data:d}:null})
+      .catch(()=>{NV[t]=null})))
+    .then(()=>{if(i<todo.length)return step();nvBusy=false;nvDone=true;if(S.tab==="val"){computeVal();renderValAll(true)}})};
+  step()}
 function computeVal(){if(!S.valin||!Object.keys(S.fund).length){S.vres=null;return null}
   const ctx=vCtx();const {list,total}=aggregate();const res={};
-  for(const t in S.fund){try{res[t]=valueOne(S.fund[t],ctx)}catch(e){res[t]={t,method:S.fund[t].method,conf:"Calculation error",notes:["Calculation error: "+e.message]}}}
+  for(const t in S.fund){try{res[t]=valueOne(S.fund[t],ctx)}catch(e){res[t]={t,method:S.fund[t].method,conf:"Calculation error",notes:["Calculation error: "+e.message]}}nvApply(res[t],NV[t])}
   for(const h of list){const r=res[h.ticker];if(r){r.weight=h.weight;r.value=h.value;r.held=h.shares;r.theme=h.theme}}
   S.vres={res,ctx,list,total};if(!S.vSel||!res[S.vSel]||!res[S.vSel].iv&&!res[S.vSel].implied&&!res[S.vSel].rev){const c=Object.values(res).filter(r=>r.iv&&r.weight).sort((a,b)=>b.weight-a.weight)[0];S.vSel=c?c.t:null}
-  maybeWriteHist();return S.vres}
+  maybeWriteHist();if(!nvDone)nvLoad();return S.vres}
 function vRows(){if(!S.vres)return[];const rs=Object.values(S.vres.res).filter(r=>r.weight>0||r.value>0);
   const key={mos:r=>r.iv?r.mos:-1e9,upside:r=>r.iv?r.up:-1e9,downside:r=>r.iv?r.down:-1e9,weight:r=>r.weight||0,sector:r=>r.sector||"zz"}[S.vSort]||(r=>r.mos);
   const show=rs.filter(r=>S.vFunds||r.method!=="nav");
@@ -1348,7 +1367,18 @@ function renderValC(){const box=$("val-c"),sel=$("val-sel");if(!S.vres){box.inne
   const ctx=S.vres.ctx;let h=`<div class="vc-head"><div><b class="vc-t">${esc(r.t)}</b> <span class="muted">${esc(r.sector||"")} · ${esc(V_CLS[r.cls]||"")} · ${esc(r.conf)} confidence</span></div>`;
   if(r.iv)h+=`<div class="vc-big"><span>Price <b>${usd(r.px)}</b></span><span>Bear <b>${usd(r.iv.bear)}</b></span><span>Base <b>${usd(r.iv.base)}</b></span><span>Bull <b>${usd(r.iv.bull)}</b></span><span>Buy below <b>${usd(r.buy)}</b></span><span>MOS <b style="color:${V_STAT[r.status]}">${pc(r.mos)}</b> <span class="muted">needs ${pu(r.reqMos)}</span></span></div>`;
   h+=`</div>`;
-  if(f.method==="dcf"&&r.iv){
+  if(r.engine&&r.iv){const d=(r.nv&&r.nv.data)||{},pk=(d.v2&&d.v2.pack)||{};
+    h+=`<p class="note">Bear, base and bull are produced by the ${esc(r.engine)} that values every company page, so this holding reports the same intrinsic value here and on its own page.</p>`;
+    h+=`<div class="vc-grid"><div><h3>Inputs · company model</h3><table class="kv"><tbody>
+      <tr><th>Model</th><td>${esc(r.engine)}</td></tr>
+      <tr><th>Risk-free (US 10Y)</th><td>${pk.rf!=null?pc(pk.rf,2):"–"}</td></tr>
+      <tr><th>Equity risk premium</th><td>${pk.erp!=null?pc(pk.erp,2):"–"}</td></tr>
+      <tr><th>Beta raw → adjusted</th><td>${pk.beta?pk.beta.raw.toFixed(2)+" → "+pk.beta.adjusted.toFixed(2):"–"} <span class="muted">5-year weekly regression</span></td></tr>
+      <tr><th>Shares</th><td>${pk.shares&&pk.shares.basis?esc(pk.shares.basis):"–"}</td></tr>
+      <tr><th>Latest fiscal year</th><td>${esc(pk.latestFiscalYearEnd||"–")}</td></tr>
+      <tr><th>Terminal value share</th><td>${r.nv&&r.nv.data&&r.nv.data.dcf&&r.nv.data.dcf.terminalValueShare!=null?pu(r.nv.data.dcf.terminalValueShare):"–"}</td></tr>
+      <tr><th>Full model</th><td><a href="#/company/${esc(r.t)}?tab=valuation">Open the company page</a></td></tr></tbody></table></div></div>`}
+  else if(f.method==="dcf"&&r.iv){
     const P=VAL_SC.base;if(!S.vCustom)S.vCustom={g1:+(r.g1.base*100).toFixed(1),m:+r.sm.base.toFixed(1),W:+r.Ws.base.toFixed(2),gT:P.gT};const c=S.vCustom;const cu=vCustom(r,f,c);
     h+=`<div class="chart" id="vc-chart"></div><div class="vc-sliders">`+
       [["g1","Year-1 revenue growth",-20,150,0.5,"%"],["m","Steady FCF margin",-10,70,0.5,"%"],["W","Discount rate (WACC)",5,16,0.05,"%"],["gT","Terminal growth",0,4.5,0.1,"%"]].map(([k,l,mn,mx,st,u])=>
@@ -1386,7 +1416,7 @@ function renderValC(){const box=$("val-c"),sel=$("val-sel");if(!S.vres){box.inne
   h+=vExpectHtml(r,f);
   h+=`<ul class="vc-notes">${r.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>`+vHistHtml(r.t);
   box.innerHTML=h;
-  if(f.method==="dcf"&&r.iv){drawValCChart(r,f);box.querySelectorAll(".vc-sliders input").forEach(inp=>inp.addEventListener("input",()=>{S.vCustom[inp.dataset.k]=+inp.value;
+  if(f.method==="dcf"&&r.iv&&!r.engine){drawValCChart(r,f);box.querySelectorAll(".vc-sliders input").forEach(inp=>inp.addEventListener("input",()=>{S.vCustom[inp.dataset.k]=+inp.value;
       const c=S.vCustom;if(c.gT>c.W-1){c.gT=+(c.W-1).toFixed(1)}const cu=vCustom(r,f,c);$("vs-"+inp.dataset.k).textContent=(+inp.value).toFixed(inp.dataset.k==="W"?2:1)+"%";
       $("vs-iv").textContent=usd(cu.iv);$("vs-mos").textContent=pc(cu.iv>0?(cu.iv-r.px)/cu.iv:null);drawValCChart(r,f)}));
     $("vs-reset").onclick=()=>{S.vCustom=null;renderValC()}}}

@@ -163,17 +163,39 @@ function dedupe(items) {
 }
 // text is cleaned on the way out as well as on the way in, so rows already sitting in the shared cache are fixed too
 const cleanText = (t) => (t == null ? t : P.news.decode(t));
+// The demo reads the news of its own date. The live feeds only carry recent days, so when nothing survives the cut-off
+// the window before it is read from an archive (Finnhub keeps about a year, Alpaca its Benzinga archive) rather than
+// leaving the page empty. Only headlines dated on or before the cut-off are ever returned.
+async function archiveNews(s, asOf, limit) {
+  const to = asOf, from = new Date(Date.parse(asOf + "T00:00:00Z") - 14 * 864e5).toISOString().slice(0, 10);
+  const r = await cached("news", `archive/${s}/${asOf}`, async () => {
+    const parts = [], attempts = [];
+    const add = async (prov, run) => { if (prov.configured && !prov.configured()) { attempts.push({ provider: prov.name, status: "skipped" }); return; } try { const got = await run(); parts.push(...got); attempts.push({ provider: prov.name, status: got.length ? "ok" : "empty" }); } catch (e) { attempts.push({ provider: prov.name, status: "error", error: String(e.message).slice(0, 80) }); } };
+    await Promise.all([
+      add(P.finnhub, () => P.finnhub.companyNews(s, { from, to })),
+      add(P.alpaca, () => P.alpaca.news(s, { start: from + "T00:00:00Z", end: to + "T23:59:59Z" })),
+    ]);
+    const items = parts.length ? dedupe(parts).filter((n) => day(n.publishedAt) <= asOf) : [];
+    return { data: items.slice(0, 60), source: "archive", attempts };
+  }, { ttl: 24 * 7 * 6e4 });
+  return { ...r, data: (r.data || []).slice(0, limit) };
+}
 async function getNews(opts = {}) {
   const { asOf = null } = opts, limit = Math.max(1, Math.min(150, +opts.limit || 25));
   if (asOf) {
-    // News has no archive: the live feeds only carry recent days, so a demo visitor gets the headlines that were
-    // published on or before the cut-off and nothing after it. If the feed has already rolled past the cut-off the
-    // list is empty and says so; showing today's headlines would break the demo cut-off.
-    const r = await getNews({ symbol: opts.symbol, category: opts.category, query: opts.query, limit: 150 });
-    const cut = r.data.filter((n) => day(n.publishedAt) <= asOf);
+    const s = opts.symbol ? sym(opts.symbol) : null;
+    const r = await getNews({ symbol: opts.symbol, category: opts.category, query: opts.query, limit: 150 }).catch(() => ({ data: [], meta: {} }));
+    let cut = r.data.filter((n) => day(n.publishedAt) <= asOf);
+    if (!cut.length && s) {
+      const a = await archiveNews(s, asOf, 150).catch(() => ({ data: [], attempts: [] }));
+      cut = a.data;
+      if (cut.length) return { data: cut.slice(0, limit), source: "archive", meta: { ...r.meta, asOf, attempts: a.attempts, note: "Headlines published in the two weeks before the demo date." } };
+    }
+    if (opts.category) cut = cut.filter((n) => n.category === opts.category);
+    if (opts.query) { const q = opts.query.toLowerCase(); cut = cut.filter((n) => (n.headline + " " + (n.summary || "")).toLowerCase().includes(q)); }
     return cut.length
       ? { data: cut.slice(0, limit), meta: { ...r.meta, asOf, note: "Headlines up to the demo date." } }
-      : { data: [], meta: { ...r.meta, asOf, note: "No archived headlines for the demo date. The live feed does not go back that far." } };
+      : { data: [], meta: { ...r.meta, asOf, note: "No headlines were published for this symbol in the two weeks before the demo date." } };
   }
   const r = await getNewsCached(opts);
   return { ...r, data: (r.data || []).slice(0, limit).map((n) => ({ ...n, headline: cleanText(n.headline), summary: cleanText(n.summary) })) };
