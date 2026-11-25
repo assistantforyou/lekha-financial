@@ -5,7 +5,7 @@ import { FLAT } from "@/nav"
 import "./tour.css"
 import { COPY, LANG_LABEL, LANG_NATIVE, setTourLang, stepCopy, tourLang, ui } from "./copy"
 import { MOBILE_MAX, place, scrollDelta } from "./layout"
-import { EXAMPLE, STEPS, currentPath, resolve, visible } from "./steps"
+import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, resolve, visible } from "./steps"
 import { onStartTour, shouldAutoStart, writeStatus } from "./store"
 
 const WF_ICONS = [Search, Building2, Layers, LineChart]
@@ -41,7 +41,7 @@ export default function Tour({ navigate }) {
   const R = useRef({ token: 0, el: null, prevFocus: null, instantT: 0 }), live = useRef({})
   const rootRef = useRef(null), cardRef = useRef(null), primaryRef = useRef(null)
   const [host] = useState(() => { const d = document.createElement("div"); d.id = "lekha-tour"; d.setAttribute("translate", "no"); d.className = "notranslate"; return d })
-  live.current = { cur, busy, skipped, size, active }
+  live.current = { cur, busy, skipped, size, active, alt }
 
   const finish = useCallback((status) => { R.current.token++; writeStatus(status); setActive(false); setReady(false) }, [])
 
@@ -49,7 +49,7 @@ export default function Tour({ navigate }) {
   const goTo = useCallback((i, dir = 1) => {
     const token = ++R.current.token, step = STEPS[i], t0 = performance.now(), limit = WAIT[step.id] || 6000
     setBusy(true)
-    if (currentPath() !== step.hash) navigate(step.hash)
+    const want = hashOf(step); if (want && (want.includes("?") ? fullPath() : currentPath()) !== want) navigate(want)
     const fail = () => {
       setSkipped((s) => (s.includes(i) ? s : [...s, i]))
       const n = i + dir
@@ -97,11 +97,11 @@ export default function Tour({ navigate }) {
   useEffect(() => {
     if (!active || !ready) return
     document.body.appendChild(host)
-    if (STEPS[cur].interactive) return () => { host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
+    if (isAct(STEPS[cur], alt)) return () => { host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
     const kids = [...document.body.children].filter((e) => e !== host && !/^(SCRIPT|STYLE|LINK)$/.test(e.tagName) && !e.inert)
     kids.forEach((e) => { e.inert = true })
     return () => { kids.forEach((e) => { e.inert = false }); host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
-  }, [active, ready, host, cur])
+  }, [active, ready, host, cur, alt])
 
   /* ---- keyboard: Esc skips, arrows move, Tab stays inside the card, and the app's own shortcuts are held back ---- */
   useEffect(() => {
@@ -109,11 +109,12 @@ export default function Tour({ navigate }) {
     const k = (e) => {
       const t = e.target, typing = !!(t && t.closest && !t.closest("#lekha-tour") && t.closest("input, textarea, select, [contenteditable=\"true\"]"))
       if (typing && e.key !== "Escape") return                         // the visitor is typing in the highlighted box: the tour's shortcuts stay out of the way
+      if (isAct(STEPS[live.current.cur], live.current.alt)) return    // hands-on step: the app's own keys (Esc closes the search box, Ctrl K opens it) work as usual; the card has Skip
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); skip(); return }
       if (e.key === "/" || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); e.stopImmediatePropagation(); return }
       if (e.key === "ArrowRight" && !e.altKey && !e.metaKey) { e.preventDefault(); const l = live.current.cur === STEPS.length - 1; if (l) { if (!live.current.busy) finish("completed") } else move(1); return }
       if (e.key === "ArrowLeft" && !e.altKey && !e.metaKey) { e.preventDefault(); move(-1); return }
-      if (e.key === "Tab" && cardRef.current && !STEPS[live.current.cur].interactive) {
+      if (e.key === "Tab" && cardRef.current) {
         const f = [...cardRef.current.querySelectorAll("button:not([disabled])")]; if (!f.length) { e.preventDefault(); return }
         const i = f.indexOf(document.activeElement)
         if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus() } else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus() }
@@ -122,12 +123,24 @@ export default function Tour({ navigate }) {
     window.addEventListener("keydown", k, true); return () => window.removeEventListener("keydown", k, true)
   }, [active, skip, move, finish])
 
+  /* ---- hands-on steps: move on by itself when the visitor has done the thing (or back out when they undo it) ---- */
+  useEffect(() => {
+    const step = STEPS[cur]; if (!active || !ready || busy || !isAct(step, alt)) return
+    let fired = false; const d0 = step.done ? !!step.done() : true, t0 = performance.now()
+    const i = setInterval(() => {
+      if (fired || live.current.busy || live.current.cur !== cur) return
+      if (step.done && !d0 && step.done()) { fired = true; setTimeout(() => { if (live.current.cur === cur && !live.current.busy) move(1) }, 380); return }
+      if (step.back && performance.now() - t0 > 900 && step.back()) { fired = true; move(-1) }
+    }, 150)
+    return () => clearInterval(i)
+  }, [active, ready, busy, cur, alt, move])
+
   /* ---- geometry: re-measure the real element on every scroll, resize, layout change and for a moment after each step ---- */
   const measure = useCallback(() => {
     const { cur: c, busy: b, size: sz } = live.current, step = STEPS[c]; if (!step) return
     const vw = document.documentElement.clientWidth, vh = window.innerHeight, mobile = vw < MOBILE_MAX
     let el = R.current.el
-    if (step.target && (!el || !el.isConnected || !visible(el))) { const r = resolve(step); if (r.el) { R.current.el = el = r.el } else if (b) return; else el = null }
+    if (step.target && (step.retarget || !el || !el.isConnected || !visible(el))) { const r = resolve(step); if (r.el) { if (r.el !== R.current.el) { R.current.el = el = r.el; if (step.nav && r.el.closest("aside, [role=\"dialog\"]")) revealInNav(r.el) } else el = r.el } else if (b) return; else el = null }
     let rect = null, top = 0
     if (el) { const bb = el.getBoundingClientRect(), h = header(); rect = { left: bb.left, top: bb.top, right: bb.right, bottom: bb.bottom, height: bb.height }; top = h && !h.contains(el) ? h.getBoundingClientRect().bottom : 0 }
     const g = place({ rect, vw, vh, card: sz, top, prefer: step.prefer, mobile }); g.mobile = mobile; g.spot2 = null
@@ -167,7 +180,7 @@ export default function Tour({ navigate }) {
 
   if (!active || !ready || !geo) return null
   const step = STEPS[cur], id = step.id, last = cur === STEPS.length - 1, first = cur === 0
-  const c = stepCopy(id, { key: shortcut(), symbol: EXAMPLE }), body = (alt || (id === "search" && touchOnly())) && c.a ? c.a : c.b
+  const act = isAct(step, alt), c = stepCopy(id, { key: shortcut(), symbol: lastSym() }), body = (alt || (id === "search" && touchOnly())) && c.a ? c.a : c.b
   const total = STEPS.length - skipped.length, n = cur + 1 - skipped.filter((s) => s < cur).length
   const sp = geo.spot, sp2 = geo.spot2, vw = document.documentElement.clientWidth, vh = window.innerHeight
   const ok = (r) => !!(r && r.w > 0 && r.h > 0), r1 = ok(sp) ? sp : null, r2 = ok(sp2) ? sp2 : null
@@ -178,24 +191,24 @@ export default function Tour({ navigate }) {
     maskPosition: `${px(r2, "x")}px ${px(r2, "y")}px,${px(r1, "x")}px ${px(r1, "y")}px,0 0`, WebkitMaskPosition: `${px(r2, "x")}px ${px(r2, "y")}px,${px(r1, "x")}px ${px(r1, "y")}px,0 0` }
   const ring = (r) => (r ? { transform: `translate(${Math.round(r.x)}px,${Math.round(r.y)}px)`, width: Math.round(r.w), height: Math.round(r.h), opacity: 1 } : { transform: `translate(${Math.round(vw / 2)}px,${Math.round(vh / 2)}px)`, width: 0, height: 0, opacity: 0 })
   const cardStyle = geo.mobile ? undefined : { transform: `translate(${geo.card.x}px,${geo.card.y}px)`, width: geo.card.w }
-  const label = ui("step", { n, total }), trail = step.where ? where(step.hash) : null, roomy = !geo.mobile && vh >= 640 && !!c.pts
+  const label = ui("step", { n, total }), trail = step.where ? where(hashOf(step)) : null, roomy = !geo.mobile && vh >= 640 && !!c.pts
   const lang = tourLang()
   return createPortal(
-    <div ref={rootRef} className="tour-root" data-live={step.interactive ? "1" : undefined} lang={tourLang()} translate="no">
-      {step.interactive && r1
+    <div ref={rootRef} className="tour-root" data-live={act ? "1" : undefined} lang={tourLang()} translate="no">
+      {act && r1
         ? [{ left: 0, top: 0, width: "100%", height: px(r1, "y") }, { left: 0, top: px(r1, "y") + px(r1, "h"), width: "100%", bottom: 0 }, { left: 0, top: px(r1, "y"), width: px(r1, "x"), height: px(r1, "h") }, { left: px(r1, "x") + px(r1, "w"), top: px(r1, "y"), right: 0, height: px(r1, "h") }].map((b, i) => <div key={i} className="tour-block part" style={b} aria-hidden="true" />)
         : <div className="tour-block" aria-hidden="true" />}
       <div className="tour-dim" style={dim} aria-hidden="true" />
       <div className="tour-spot" style={ring(r1)} aria-hidden="true" />
       <div className="tour-spot two" style={ring(r2)} aria-hidden="true" />
-      <div ref={cardRef} className="tour-card" role="dialog" aria-modal={step.interactive ? undefined : "true"} aria-label={ui("label")} aria-labelledby="tour-t" aria-describedby="tour-b" aria-busy={busy} data-sheet={geo.mobile ? "1" : undefined} style={cardStyle} tabIndex={-1}>
+      <div ref={cardRef} className="tour-card" role="dialog" aria-modal={act ? undefined : "true"} aria-label={ui("label")} aria-labelledby="tour-t" aria-describedby="tour-b" aria-busy={busy} data-sheet={geo.mobile ? "1" : undefined} style={cardStyle} tabIndex={-1}>
         <div className="tour-top"><span className="tour-count">{n} / {total}</span><div className="tour-track" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={n} aria-label={label}><i style={{ width: `${(n / total) * 100}%` }} /></div>
           <label className="tour-lang" title={LANG_LABEL[lang]}><Languages aria-hidden="true" /><select value={lang} onChange={(e) => setTourLang(e.target.value)} aria-label={LANG_LABEL[lang]}>{Object.keys(COPY).map((k) => <option key={k} value={k} lang={k}>{LANG_NATIVE[k]}</option>)}</select></label></div>
         {trail && <div className="tour-where"><MapPin aria-hidden="true" /><span translate="no">{trail[0]}</span><ChevronRight aria-hidden="true" /><b translate="no">{trail[1]}</b></div>}
         <div className="tour-body" key={cur + (alt ? "a" : "")}>
           <h2 className="tour-title" id="tour-t">{c.t}</h2>
           <p className="tour-text" id="tour-b">{body}</p>
-          {step.interactive && <p className="tour-try">{ui("tryit")}</p>}
+          {act && <p className="tour-try">{ui(step.hint || "act")}</p>}
           {roomy && <ul className="tour-pts">{c.pts.map(([k, v]) => <li key={k}><b>{k}</b><span>{v}</span></li>)}</ul>}
           {last && c.wf && <ol className="tour-wf" aria-hidden="true">{c.wf.map((w, i) => { const I = WF_ICONS[i]; return <li key={i}><span><I />{w}</span>{i < c.wf.length - 1 && <ChevronRight className="sep" />}</li> })}</ol>}
         </div>
@@ -210,7 +223,7 @@ export default function Tour({ navigate }) {
               ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button>
               : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => { writeStatus("completed"); location.href = "/login.html?mode=signup" }}>{ui("account")}</button>}
           </>
-            : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => move(1)} disabled={busy}>{ui("next")}</button>}
+            : <button type="button" className={act ? "tour-btn" : "tour-btn pri"} ref={primaryRef} onClick={() => move(1)} disabled={busy}>{ui("next")}</button>}
         </div>
       </div>
     </div>, host)
