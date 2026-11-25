@@ -24,7 +24,7 @@ cp node_modules/posthog-js/dist/array.full.js public/vendor/posthog.js
 `public/pt-analytics.js` initialises PostHog once per page with:
 
 * autocapture of clicks and form submissions (`mask_all_text: true`), pageleave, heatmaps;
-* session replay with every input and all on-screen text masked (`maskTextSelector: "*"`, `blockSelector: "[data-ph-block]"`): replay shows layout and interaction, never balances, holdings or wording;
+* session replay with the interface readable (`maskTextSelector: "[data-ph-mask]"`, `blockSelector: "[data-ph-block]"`): typed input stays masked, and any element marked `data-ph-mask` or `data-ph-block` is hidden;
 * exception capture and web vitals;
 * manual pageviews on hash, history and popstate changes, tagged with the surface (`app`, `v3`, `v2`, `login`);
 * identity from the Supabase session (`user_id` only, never the e-mail), reset on sign-out;

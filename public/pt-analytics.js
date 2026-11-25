@@ -186,9 +186,10 @@
           capture_exceptions: true,
           capture_performance: { web_vitals: true },
           session_recording: {
-            // a financial product: replay shows layout and interaction, never the values or the words on screen
+            // Replays show the interface and its values, so the owner can see exactly what happened. Typed input
+            // stays masked; wrap anything that must stay private in [data-ph-mask] or block it with [data-ph-block].
             maskAllInputs: true,
-            maskTextSelector: "*",
+            maskTextSelector: "[data-ph-mask]",
             blockSelector: "[data-ph-block]",
           },
           before_send: scrub,
