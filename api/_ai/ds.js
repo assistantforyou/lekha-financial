@@ -3,6 +3,7 @@
 // OpenAI-compatible API: https://api.deepseek.com/chat/completions
 const { logUsage } = require("../_costs");
 const { sb } = require("../_lib");
+const { captureGeneration } = require("./observability");
 
 const BASE = "https://api.deepseek.com";
 const KEY = () => String(process.env.DEEPSEEK_API_KEY || "").trim();
@@ -125,6 +126,7 @@ function log(job, model, usage, extra) {
 
 // Non-streaming completion. Retries transport failures and throttling, never a usable answer.
 async function complete(o = {}) {
+  const startedAt = Date.now();
   if (!ready()) throw err("not_configured", 503);
   if (stub()) {
     const json = o.responseFormat === "json";
@@ -175,7 +177,7 @@ async function complete(o = {}) {
     if (!msg) { last = err("empty", 502); if (i < attempts - 1) { await pause(backoff(i)); continue; } throw last; }
     const usage = usageOf(j.usage);
     log(o.job, model, usage, o.meta);
-    return {
+    const result = {
       text: String(msg.content || ""),
       reasoning: String(msg.reasoning_content || ""),
       toolCalls: Array.isArray(msg.tool_calls) ? msg.tool_calls : [],
@@ -184,6 +186,8 @@ async function complete(o = {}) {
       attempts: i + 1,
       finishReason: j.choices[0].finish_reason || null,
     };
+    await captureGeneration(o.posthog, { options: o, result, latency: Date.now() - startedAt, stream: false });
+    return result;
   }
   throw last || err("upstream", 502);
 }
@@ -191,6 +195,7 @@ async function complete(o = {}) {
 // Streaming completion. Yields reasoning and text as they arrive and the assembled assistant
 // message at the end (including tool calls), so the tool loop can pass it back verbatim.
 async function* stream(o = {}) {
+  const startedAt = Date.now();
   if (!ready()) throw err("not_configured", 503);
   if (stub()) {
     const text = "Stub answer. DEEPSEEK_STUB is on, so no model call was made.";
@@ -238,7 +243,7 @@ async function* stream(o = {}) {
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
-  let text = "", reasoning = "", finishReason = null, usage = null;
+  let text = "", reasoning = "", finishReason = null, usage = null, firstTokenAt = null;
   const calls = new Map();
 
   const take = (line) => {
@@ -265,8 +270,8 @@ async function* stream(o = {}) {
         if (!ch) continue;
         if (ch.finish_reason) finishReason = ch.finish_reason;
         const d = ch.delta || {};
-        if (d.reasoning_content) { reasoning += d.reasoning_content; yield { type: "reasoning", text: d.reasoning_content }; }
-        if (d.content) { text += d.content; yield { type: "text", text: d.content }; }
+        if (d.reasoning_content) { firstTokenAt = firstTokenAt || Date.now(); reasoning += d.reasoning_content; yield { type: "reasoning", text: d.reasoning_content }; }
+        if (d.content) { firstTokenAt = firstTokenAt || Date.now(); text += d.content; yield { type: "text", text: d.content }; }
         if (Array.isArray(d.tool_calls)) {
           for (const tc of d.tool_calls) {
             const i = Number.isFinite(tc.index) ? tc.index : calls.size;
@@ -286,6 +291,20 @@ async function* stream(o = {}) {
 
   const u = usageOf(usage);
   log(o.job, model, u, o.meta);
+  const result = {
+    text,
+    reasoning,
+    usage: u,
+    model,
+    finishReason,
+  };
+  await captureGeneration(o.posthog, {
+    options: o,
+    result,
+    latency: Date.now() - startedAt,
+    stream: true,
+    timeToFirstToken: firstTokenAt == null ? null : firstTokenAt - startedAt,
+  });
   yield {
     type: "done",
     message: {
@@ -294,11 +313,7 @@ async function* stream(o = {}) {
       reasoning_content: reasoning,
       ...(calls.size ? { tool_calls: [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v) } : {}),
     },
-    text,
-    reasoning,
-    usage: u,
-    model,
-    finishReason,
+    ...result,
   };
 }
 

@@ -8,6 +8,7 @@ const { listState, putState } = require("../../_state");
 const { langOf, withLang } = require("../ai/_lang");
 const loop = require("../../_ai/loop");
 const ds = require("../../_ai/ds");
+const { createAIContext } = require("../../_ai/observability");
 
 const DAY = 86400000;
 const MAX_MESSAGES = 40;
@@ -96,6 +97,7 @@ module.exports = async function handler(req, res) {
   const persisted = !p.demo && !!p.user_id;
   const existing = persisted ? await loadThread(p.user_id, id) : null;
   const history = existing ? existing.messages.slice(-6) : [];
+  const observability = createAIContext({ sessionId: `chat:${id}`, distinctId: p.demo ? undefined : p.user_id });
 
   // Answers are never served from cache: every question retrieves live data first, so a repeated question
   // gets a fresh answer built on current prices and headlines.
@@ -118,6 +120,7 @@ module.exports = async function handler(req, res) {
       attachments,
       history,
       langHint,
+      observability,
       signal: ctl.signal,
       budgetMs: mode === "deep" ? 150000 : 60000,
     })) {

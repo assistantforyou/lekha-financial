@@ -14,6 +14,7 @@ import { Tooltip } from "@/components/ui/tooltip"
 import { trackCustom, funnel } from "@/lib/pixel"
 import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
 import { cn } from "@/lib/utils"
+import { capturePostHog, logPostHog } from "@/lib/posthog"
 
 /* One chat surface for every AI question. Answers arrive as typed parts: reasoning, tool calls, text and evidence.
    Fast mode answers from prefetched evidence in a single stream; Deep mode lets the model choose tools and shows its
@@ -183,6 +184,8 @@ export default function AgentPanel({ symbol, initial }) {
         },
       })
       funnel("AnswerSeen"); answered = true
+      capturePostHog("ai_answer_completed", { answer_mode: demo ? "fast" : mode, attachment_count: attached.length, has_company_context: Boolean(symbol) })
+      logPostHog("info", "ai answer completed", { answer_mode: demo ? "fast" : mode, attachment_count: attached.length, has_company_context: Boolean(symbol) })
       const id = out.threadId || threadId
       if (id) {
         // Keep a copy in this browser as well, so a conversation survives a reload even without an account.
