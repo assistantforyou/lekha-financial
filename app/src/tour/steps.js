@@ -1,7 +1,8 @@
 /* The eleven steps. Every target is an element the app really renders; nothing here is a mock-up.
    target: functions tried in order; the first one that returns a visible element wins. A match after the first one
    (a different layout at a narrower width, or an empty portfolio) switches the step to its alternative copy (`a`).
-   A step with no target is a centred card. A step whose targets are all missing is skipped, never shown broken. */
+   A step with no target is a centred card. A step whose targets are all missing is skipped, never shown broken.
+   interactive: the app stays live inside the highlighted element (the visitor does the thing), everything outside it is still blocked. */
 const byId = (id) => document.getElementById(id)
 const sel = (s) => () => document.querySelector(s)
 const panelOf = (id) => () => { const e = byId(id); return e && e.closest("section") }
@@ -16,7 +17,7 @@ export const STEPS = [
   { id: "holdings", where: true, hash: "portfolio/holdings", target: [panelOf("tbl"), panelOf("ph-form")] },
   { id: "company", where: true, hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-head"]')] },
   { id: "tabs", where: true, hash: "company/" + EXAMPLE, target: [sel('[data-tour="company-tabs"]')] },
-  { id: "ask", where: true, hash: "research/agent", target: [sel('[data-tour="ask"]')] },
+  { id: "ask", interactive: true, where: true, hash: "research/agent", target: [sel('[data-tour="ask"]')] },
   { id: "discover", where: true, hash: "sector/now", target: [() => byId("rot-sum"), sel('section[aria-labelledby="locked-title"]')] },   // Free and demo: the Paid lock screen
   { id: "finish", hash: "portfolio/overview", ready: () => !!byId("kpis") },
 ]

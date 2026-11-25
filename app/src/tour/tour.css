@@ -3,6 +3,10 @@
 .tour-root { position: fixed; inset: 0; z-index: 2000; font-family: var(--f-body); font-size: 14px; line-height: 1.5; color: var(--fg); -webkit-font-smoothing: antialiased; animation: tour-fade .25s ease-out both; }
 /* swallows clicks on the app underneath; wheel and touch scrolling still reach the page */
 .tour-block { position: fixed; inset: 0; }
+.tour-block.part { inset: auto; }
+.tour-root[data-live="1"] { pointer-events: none; }
+.tour-root[data-live="1"] .tour-block, .tour-root[data-live="1"] .tour-card { pointer-events: auto; }
+.tour-try { margin: 8px 0 0; font-size: 12.5px; font-weight: 600; color: var(--accent); }
 .tour-dim { position: fixed; inset: 0; background: rgba(4, 8, 14, .68); pointer-events: none; mask-repeat: no-repeat; -webkit-mask-repeat: no-repeat;
   transition: mask-position .4s cubic-bezier(.4, 0, .2, 1), mask-size .4s cubic-bezier(.4, 0, .2, 1), -webkit-mask-position .4s cubic-bezier(.4, 0, .2, 1), -webkit-mask-size .4s cubic-bezier(.4, 0, .2, 1); }
 .tour-spot { position: fixed; left: 0; top: 0; border-radius: 7px; pointer-events: none; box-shadow: 0 0 0 2px var(--accent), 0 0 22px color-mix(in srgb, var(--accent) 38%, transparent);

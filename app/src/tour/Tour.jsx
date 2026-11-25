@@ -97,20 +97,23 @@ export default function Tour({ navigate }) {
   useEffect(() => {
     if (!active || !ready) return
     document.body.appendChild(host)
+    if (STEPS[cur].interactive) return () => { host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
     const kids = [...document.body.children].filter((e) => e !== host && !/^(SCRIPT|STYLE|LINK)$/.test(e.tagName) && !e.inert)
     kids.forEach((e) => { e.inert = true })
     return () => { kids.forEach((e) => { e.inert = false }); host.remove(); const p = R.current.prevFocus; if (p && p.isConnected && p.focus) { try { p.focus({ preventScroll: true }) } catch (e) {} } }
-  }, [active, ready, host])
+  }, [active, ready, host, cur])
 
   /* ---- keyboard: Esc skips, arrows move, Tab stays inside the card, and the app's own shortcuts are held back ---- */
   useEffect(() => {
     if (!active) return
     const k = (e) => {
+      const t = e.target, typing = !!(t && t.closest && !t.closest("#lekha-tour") && t.closest("input, textarea, select, [contenteditable=\"true\"]"))
+      if (typing && e.key !== "Escape") return                         // the visitor is typing in the highlighted box: the tour's shortcuts stay out of the way
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); skip(); return }
       if (e.key === "/" || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); e.stopImmediatePropagation(); return }
       if (e.key === "ArrowRight" && !e.altKey && !e.metaKey) { e.preventDefault(); const l = live.current.cur === STEPS.length - 1; if (l) { if (!live.current.busy) finish("completed") } else move(1); return }
       if (e.key === "ArrowLeft" && !e.altKey && !e.metaKey) { e.preventDefault(); move(-1); return }
-      if (e.key === "Tab" && cardRef.current) {
+      if (e.key === "Tab" && cardRef.current && !STEPS[live.current.cur].interactive) {
         const f = [...cardRef.current.querySelectorAll("button:not([disabled])")]; if (!f.length) { e.preventDefault(); return }
         const i = f.indexOf(document.activeElement)
         if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus() } else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus() }
@@ -178,18 +181,21 @@ export default function Tour({ navigate }) {
   const label = ui("step", { n, total }), trail = step.where ? where(step.hash) : null, roomy = !geo.mobile && vh >= 640 && !!c.pts
   const lang = tourLang()
   return createPortal(
-    <div ref={rootRef} className="tour-root" lang={tourLang()} translate="no">
-      <div className="tour-block" aria-hidden="true" />
+    <div ref={rootRef} className="tour-root" data-live={step.interactive ? "1" : undefined} lang={tourLang()} translate="no">
+      {step.interactive && r1
+        ? [{ left: 0, top: 0, width: "100%", height: px(r1, "y") }, { left: 0, top: px(r1, "y") + px(r1, "h"), width: "100%", bottom: 0 }, { left: 0, top: px(r1, "y"), width: px(r1, "x"), height: px(r1, "h") }, { left: px(r1, "x") + px(r1, "w"), top: px(r1, "y"), right: 0, height: px(r1, "h") }].map((b, i) => <div key={i} className="tour-block part" style={b} aria-hidden="true" />)
+        : <div className="tour-block" aria-hidden="true" />}
       <div className="tour-dim" style={dim} aria-hidden="true" />
       <div className="tour-spot" style={ring(r1)} aria-hidden="true" />
       <div className="tour-spot two" style={ring(r2)} aria-hidden="true" />
-      <div ref={cardRef} className="tour-card" role="dialog" aria-modal="true" aria-label={ui("label")} aria-labelledby="tour-t" aria-describedby="tour-b" aria-busy={busy} data-sheet={geo.mobile ? "1" : undefined} style={cardStyle} tabIndex={-1}>
+      <div ref={cardRef} className="tour-card" role="dialog" aria-modal={step.interactive ? undefined : "true"} aria-label={ui("label")} aria-labelledby="tour-t" aria-describedby="tour-b" aria-busy={busy} data-sheet={geo.mobile ? "1" : undefined} style={cardStyle} tabIndex={-1}>
         <div className="tour-top"><span className="tour-count">{n} / {total}</span><div className="tour-track" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={n} aria-label={label}><i style={{ width: `${(n / total) * 100}%` }} /></div>
           <label className="tour-lang" title={LANG_LABEL[lang]}><Languages aria-hidden="true" /><select value={lang} onChange={(e) => setTourLang(e.target.value)} aria-label={LANG_LABEL[lang]}>{Object.keys(COPY).map((k) => <option key={k} value={k} lang={k}>{LANG_NATIVE[k]}</option>)}</select></label></div>
         {trail && <div className="tour-where"><MapPin aria-hidden="true" /><span translate="no">{trail[0]}</span><ChevronRight aria-hidden="true" /><b translate="no">{trail[1]}</b></div>}
         <div className="tour-body" key={cur + (alt ? "a" : "")}>
           <h2 className="tour-title" id="tour-t">{c.t}</h2>
           <p className="tour-text" id="tour-b">{body}</p>
+          {step.interactive && <p className="tour-try">{ui("tryit")}</p>}
           {roomy && <ul className="tour-pts">{c.pts.map(([k, v]) => <li key={k}><b>{k}</b><span>{v}</span></li>)}</ul>}
           {last && c.wf && <ol className="tour-wf" aria-hidden="true">{c.wf.map((w, i) => { const I = WF_ICONS[i]; return <li key={i}><span><I />{w}</span>{i < c.wf.length - 1 && <ChevronRight className="sep" />}</li> })}</ol>}
         </div>
