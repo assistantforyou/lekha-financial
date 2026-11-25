@@ -35,3 +35,37 @@ const bars = (entries) => entries.map(([date, close]) => [date, 0, 0, 0, close])
 const stock = bars([["2025-01-01",100],["2025-01-02",120],["2025-01-04",96],["2025-01-05",96]]);
 const index = bars([["2025-01-01",100],["2025-01-02",110],["2025-01-03",115],["2025-01-04",99],["2025-01-05",99]]);
 near(c.betaFromBars(stock, index), 2);
+
+// ---- DCF default growth helpers ----
+{
+  // medianGrowth: median of year-over-year growth, newest first, needs 3 usable observations
+  near(c.medianGrowth([160, 140, 120, 100, 90, 80], 5), 1 / 7, 1e-12);                       // growths 14.3, 16.7, 20, 11.1, 12.5 -> median 14.3%
+  assert.strictEqual(c.medianGrowth([120, 100, 90], 5), null, "two observations are not enough");
+  near(c.medianGrowth([100, 100, 100, 100], 5), 0);
+  assert.ok(c.medianGrowth([90, 100, 110, 120, 130], 5) < 0, "a shrinking business has negative median growth");
+  // normalizedFcf: mean FCF margin of 3 years x latest revenue
+  near(c.normalizedFcf([100, 90, 80], [20, 18, 10], 3), 100 * ((0.2 + 0.2 + 0.125) / 3), 1e-9);
+  assert.strictEqual(c.normalizedFcf([100, 90], [20, 18], 3), null, "fewer than 3 years");
+  assert.strictEqual(c.normalizedFcf([100, 90, 80], [-5, -4, -3], 3), null, "non-positive average margin");
+  // a thin latest year (AMZN-like) no longer decides the base
+  assert.ok(c.normalizedFcf([100, 90, 80], [1, 9, 8], 3) > 5, "thin latest year is smoothed");
+  // fundableGrowth: ROIC x net reinvestment (|capex| - D&A + R&D) / NOPAT, bounded 0..1; D&A from ebitda - operatingIncome
+  const row = { operatingIncome: 100, ebitda: 110, capex: -30, rAndD: 20 };           // NOPAT 79, net reinvestment (30 - 10 + 20) / 79
+  near(c.fundableGrowth([row, row, row], 0.5), 0.5 * (40 / 79), 1e-9);
+  assert.strictEqual(c.fundableGrowth([{ operatingIncome: -5, capex: -1 }], 0.5), null, "no positive NOPAT");
+  assert.strictEqual(c.fundableGrowth([row], null), null);
+  assert.ok(c.fundableGrowth([{ operatingIncome: 10, ebitda: 10, capex: -500 }], 1) <= 1, "reinvestment is bounded at 100%");
+  // impliedGrowth: running dcf() at the implied growth reproduces the price
+  const base = { fcf: 98.767e9, years: 10, terminalGrowth: 0.025, discount: 0.083, netDebt: 3.6e10, shares: 14.59e9 };
+  for (const g of [-0.05, 0.0, 0.04, 0.12, 0.3]) {
+    const px = c.dcf({ ...base, growth: g }).perShare, ig = c.impliedGrowth({ ...base, price: px });
+    near(ig, g, 1e-6); near(c.dcf({ ...base, growth: ig }).perShare, px, 1e-4);
+  }
+  assert.strictEqual(c.impliedGrowth({ ...base, price: 1e7 }), null, "price above anything 40% growth can justify");
+  assert.strictEqual(c.impliedGrowth({ ...base, price: 1 }), null, "price below anything -10% growth gives");
+  assert.strictEqual(c.impliedGrowth({ ...base, fcf: -1, price: 100 }), null);
+  // discount inputs aligned with the classic Intrinsic value page
+  near(c.blumeBeta(1), 1); near(c.blumeBeta(0), 0.33); near(c.blumeBeta(0.74), 0.67 * 0.74 + 0.33); assert.strictEqual(c.blumeBeta(null), null);
+  assert.strictEqual(c.ERP_DEFAULT, 0.0441);
+}
+

@@ -313,16 +313,37 @@ async function getValuation(symbol, overrides = {}) {
   const comparable = !!currency && currency === quoteCurrency;
   const rfRate = rf && rf.data.latest ? rf.data.latest.value / 100 : 0.04;
   const b = hist && mkt ? C.betaFromBars(hist.data, mkt.data) : null;
-  const fcf = overrides.fcf != null ? overrides.fcf : a0.freeCashFlow;
-  const hg = A.length >= 4 ? C.cagr(A[Math.min(4, A.length - 1)].freeCashFlow, a0.freeCashFlow, Math.min(4, A.length - 1)) : null;
-  const g = overrides.growth != null ? overrides.growth : Math.max(0, Math.min(0.15, hg != null ? hg : 0.05));
-  const ke = C.costOfEquity(rfRate, b != null ? Math.max(0.6, Math.min(2, b)) : 1, overrides.erp != null ? overrides.erp : 0.05), debt = a0.totalDebt || 0, mc = comparable && price && shares ? price * shares : null;
+  const terminalGrowth = overrides.terminalGrowth != null ? overrides.terminalGrowth : 0.025, years = overrides.years || 10;
+  /* FCF base: the mean FCF margin of the last 3 fiscal years times the latest revenue, so one capex-heavy or windfall year does not decide the value.
+     With fewer than 3 years of history the latest fiscal-year FCF is used, and a non-positive 3-year margin means the DCF does not apply. */
+  const revenues = A.map((r) => r.revenue), fcfs = A.map((r) => r.freeCashFlow), enough = A.length >= 3;
+  const nFcf = enough ? C.normalizedFcf(revenues, fcfs, 3) : null;
+  const fcf = overrides.fcf != null ? overrides.fcf : enough ? nFcf : a0.freeCashFlow;
+  const fcfBasis = overrides.fcf != null ? "user override" : enough ? "3-year average free-cash-flow margin x latest revenue" : "latest fiscal-year free cash flow (fewer than 3 years of history)";
+  /* Growth: median year-over-year revenue growth over up to 5 years, limited by what the company's own returns can fund (ROIC x net reinvestment,
+     never below the terminal rate) and by 12%. Revenue is far steadier than cash flow; the ceiling stops history from extrapolating growth the business cannot reinvest for. */
+  const revG = C.medianGrowth(revenues, 5), tax = 0.21, rNow = C.roic(a0.operatingIncome, tax, a0.totalDebt, a0.shareholdersEquity, a0.cash), fundG = C.fundableGrowth(A, rNow, tax);
+  const ceilFund = fundG != null ? Math.max(fundG, terminalGrowth) : null;
+  let g, growthBasis;
+  if (overrides.growth != null) { g = overrides.growth; growthBasis = "user override"; }
+  else if (revG == null) { g = 0.05; growthBasis = "default 5% (fewer than 4 years of revenue history)"; }
+  else {
+    const caps = [[0.12, "the 12% cap"], ...(ceilFund != null ? [[ceilFund, `fundable growth ${(ceilFund * 100).toFixed(1)}% (return on capital x net reinvestment)`]] : [])].sort((x, y) => x[0] - y[0])[0];
+    g = Math.max(0, Math.min(revG, caps[0]));
+    growthBasis = `median ${Math.min(5, A.length - 1)}-year revenue growth ${(revG * 100).toFixed(1)}%` + (revG > caps[0] ? `, limited by ${caps[1]}` : "") + (revG < 0 ? ", floored at 0%" : "");
+  }
+  const growthSources = { revenueMedian: revG, fundableCeiling: ceilFund, cap: 0.12 };
+  const betaAdj = b != null ? C.blumeBeta(b) : null;   // Blume-adjusted like the classic Intrinsic value page
+  const ke = C.costOfEquity(rfRate, betaAdj != null ? Math.max(0.6, Math.min(2, betaAdj)) : 1, overrides.erp != null ? overrides.erp : C.ERP_DEFAULT), debt = a0.totalDebt || 0, mc = comparable && price && shares ? price * shares : null;
   const kd = a0.interestExpense && debt ? Math.min(0.12, Math.abs(a0.interestExpense) / debt) : 0.05;
   const w = overrides.discount != null ? overrides.discount : (mc && ke != null ? C.wacc({ equity: mc, debt, costEquity: ke, costDebt: kd }) : ke);
   const netDebt = (a0.totalDebt || 0) - (a0.cash || 0) - (a0.shortTermInvestments || 0);
-  const out = w != null ? C.dcf({ fcf, growth: g, years: overrides.years || 10, terminalGrowth: overrides.terminalGrowth != null ? overrides.terminalGrowth : 0.025, discount: w, netDebt, shares }) : null;
-  const assumptions = { freeCashFlow: fcf, growth: g, growthBasis: overrides.growth != null ? "user override" : hg != null ? "historical FCF CAGR, capped 0–15%" : "default 5% (history unavailable)", terminalGrowth: overrides.terminalGrowth != null ? overrides.terminalGrowth : 0.025, discount: w, riskFree: rfRate, beta: b, costOfEquity: ke, costOfDebt: kd, netDebt, shares, years: overrides.years || 10 };
-  return { data: { symbol: s, price, currency, quoteCurrency, intrinsicPerShare: out && out.perShare, marginOfSafety: comparable && out && out.perShare > 0 && price ? 1 - price / out.perShare : null, dcf: out, assumptions, kind: "calculated", note: "Model output, not a price target. Every assumption is listed and editable; free cash flow and shares come from SEC filings.", meta: S.meta({ source: "calculated from SEC EDGAR + market data", kind: "calculated", freshness: "delayed" }) }, meta: { source: "calculated", attempts: [] } };
+  const out = w != null ? C.dcf({ fcf, growth: g, years, terminalGrowth, discount: w, netDebt, shares }) : null;
+  const implied = comparable && w != null ? C.impliedGrowth({ price, fcf, years, terminalGrowth, discount: w, netDebt, shares }) : null;   // the growth the market price implies, on the same assumptions
+  let impliedNote = null;   // when no growth between -10% and 40% reproduces the price, say which side it is on
+  if (comparable && w != null && implied == null && out && Number.isFinite(price) && price > 0) { const hi = C.dcf({ fcf, growth: 0.4, years, terminalGrowth, discount: w, netDebt, shares }); impliedNote = hi && price > hi.perShare ? "above 40%" : "below -10%"; }
+  const assumptions = { freeCashFlow: fcf, growth: g, growthBasis, growthSources, fcfBasis, terminalGrowth, discount: w, riskFree: rfRate, beta: b, betaAdjusted: betaAdj, equityRiskPremium: overrides.erp != null ? overrides.erp : C.ERP_DEFAULT, costOfEquity: ke, costOfDebt: kd, netDebt, shares, years };
+  return { data: { symbol: s, price, currency, quoteCurrency, intrinsicPerShare: out && out.perShare, impliedGrowth: implied, impliedGrowthNote: impliedNote, marginOfSafety: comparable && out && out.perShare > 0 && price ? 1 - price / out.perShare : null, dcf: out, assumptions, kind: "calculated", note: "Model output, not a price target. Every assumption is listed and editable. Free cash flow and shares come from SEC filings; the default growth is median 5-year revenue growth limited by what the company's returns can fund, and the market-implied growth shows what the current price assumes.", meta: S.meta({ source: "calculated from SEC EDGAR + market data", kind: "calculated", freshness: "delayed" }) }, meta: { source: "calculated", attempts: [] } };
 }
 
 // ---------------- the whole company workspace in one round trip ----------------
