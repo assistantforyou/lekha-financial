@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { Bot, ChevronRight, Loader2, Paperclip, Plus, Send, Square, Trash2, Wrench } from "lucide-react"
+import { Bot, ChevronRight, Loader2, Lock, Paperclip, Plus, Send, Square, Trash2, Wrench } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,6 +9,8 @@ import Markdown from "@/components/Markdown"
 import { ChartCard } from "@/components/Charts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
+import { isDemo, useSession } from "@/lib/engine"
+import { Tooltip } from "@/components/ui/tooltip"
 import { trackCustom, funnel } from "@/lib/pixel"
 import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
 import { cn } from "@/lib/utils"
@@ -105,7 +107,8 @@ export default function AgentPanel({ symbol, initial }) {
   const [threadId, setThreadId] = useState(null)
   const [msgs, setMsgs] = useState([])
   const [input, setInput] = useState("")
-  const [mode, setMode] = useState("fast")
+  const [mode, setMode] = useState("fast"), [lockNote, setLockNote] = useState(false)
+  const sess = useSession(), demo = isDemo() && !(sess && sess.access_token)   // the demo is Fast only; Deep is shown locked
   const [files, setFiles] = useState([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState("")
@@ -157,10 +160,10 @@ export default function AgentPanel({ symbol, initial }) {
     tourSignal("start")
     const ctl = new AbortController()
     abort.current = ctl
-    let reply = ""
+    let reply = "", answered = false
     try {
       const out = await streamChat({
-        message: q, threadId, mode, symbol, signal: ctl.signal,
+        message: q, threadId, mode: demo ? "fast" : mode, symbol, signal: ctl.signal,
         attachments: attached,
         lang: window.PT_I18N ? window.PT_I18N.lang : "en",
         onPart: (p) => {
@@ -179,7 +182,7 @@ export default function AgentPanel({ symbol, initial }) {
           else patch(base + 1, (m) => ({ ...m, parts: [...m.parts, p] }))
         },
       })
-      funnel("AnswerSeen")
+      funnel("AnswerSeen"); answered = true
       const id = out.threadId || threadId
       if (id) {
         // Keep a copy in this browser as well, so a conversation survives a reload even without an account.
@@ -217,7 +220,7 @@ export default function AgentPanel({ symbol, initial }) {
           : e.message || "That request failed."
         setErr(msg)
       }
-    } finally { setBusy(false); abort.current = null; tourSignal("done") }
+    } finally { setBusy(false); abort.current = null; tourSignal(answered ? "done" : "fail") }
   }
 
   async function openThread(id) {
@@ -282,10 +285,11 @@ export default function AgentPanel({ symbol, initial }) {
         </div>
       </aside>
 
-      <div className="order-1 space-y-3 lg:order-2">
+      <div className="relative isolate order-1 space-y-3 lg:order-2">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10" style={{ background: "var(--fg)", opacity: 0.06, WebkitMaskImage: "url(/v3/brand/lekha-logo-white.png)", maskImage: "url(/v3/brand/lekha-logo-white.png)", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat", WebkitMaskPosition: "center 40%", maskPosition: "center 40%", WebkitMaskSize: "min(78%, 420px) auto", maskSize: "min(78%, 420px) auto" }} />
         <div className="min-h-[240px] space-y-4">
           {!msgs.length && (
-            <Card><CardContent className="flex items-start gap-3 py-6">
+            <Card className="bg-transparent"><CardContent className="flex items-start gap-3 py-6">
               <Bot className="mt-0.5 size-5 text-[var(--accent)]" />
               <div className="text-sm">
                 <p className="font-medium">Ask about a company, your portfolio, or the market.</p>
@@ -350,12 +354,16 @@ export default function AgentPanel({ symbol, initial }) {
               <input type="file" className="hidden" multiple accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,.csv,.tsv,.txt,.md,.json" onChange={(e) => { attach(e.target.files); e.target.value = "" }} disabled={busy} />
             </label>
             <div className="flex overflow-hidden rounded-md border border-[var(--line)] text-xs">
-              {["fast", "deep"].map((m) => (
+              {["fast", "deep"].map((m) => m === "deep" && demo ? (
+                <Tooltip key={m} content="Deep mode is not available in demo mode. Create a free account to unlock the account plans.">
+                  <button type="button" aria-disabled="true" onClick={() => setLockNote(true)} className="inline-flex cursor-not-allowed items-center gap-1 px-2.5 py-1 capitalize text-[var(--muted)] opacity-60"><Lock className="size-3" aria-hidden="true" />{m}</button>
+                </Tooltip>
+              ) : (
                 <button key={m} type="button" onClick={() => setMode(m)} disabled={busy}
-                  className={cn("px-2.5 py-1 capitalize", mode === m ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]")}>{m}</button>
+                  className={cn("px-2.5 py-1 capitalize", (demo ? "fast" : mode) === m ? "bg-[var(--accent)] text-[var(--accent-fg)]" : "text-[var(--muted)]")}>{m}</button>
               ))}
             </div>
-            <span className="text-[11px] text-[var(--muted)]">{mode === "deep" ? "Tools and thinking, slower" : "Direct answer"}</span>
+            <span className="text-[11px] text-[var(--muted)]">{demo && lockNote ? "Deep mode is not available in demo mode." : mode === "deep" && !demo ? "Tools and thinking, slower" : "Direct answer"}</span>
             <div className="ml-auto flex gap-1.5">
               {busy ? (
                 <Button size="sm" variant="outline" onClick={() => abort.current && abort.current.abort()}><Square className="size-3.5" /> Stop</Button>
