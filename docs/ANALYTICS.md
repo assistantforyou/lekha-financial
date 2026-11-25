@@ -65,7 +65,24 @@ ph.identify(userId, { plan: "paid" });
 PostHog data warehouse connections (Supabase Postgres, Stripe) are configured in PostHog, not in this repo. Use the PostHog wizard in an interactive terminal:
 
 ```bash
-npx -y @posthog/wizard@latest warehouse source
+npx -y @posthog/wizard@latest warehouse source --project-id 767236
 ```
 
-It asks for the project API key (`phx_...`, from PostHog personal settings) and then the source credentials. For Supabase use the direct Postgres connection (host `db.<project>.supabase.co`, port `5432`, database `postgres`, the database password) and a read-only role if possible. For Stripe use a restricted key with read access to charges, customers, subscriptions and invoices. The same connections can be added in the PostHog UI under Data pipeline -> Sources.
+It signs in with OAuth (or a personal API key, `phx_...`, from PostHog user settings) and then asks for the source credentials.
+
+Supabase (choose Postgres):
+
+| Field | Value |
+|---|---|
+| Host | `db.<project-ref>.supabase.co` (or the session-pooler host shown in the dashboard) |
+| Port | `5432` |
+| Database | `postgres` |
+| User | `postgres`, or a read-only role created for PostHog |
+| Password | the database password from Project settings -> Database |
+| SSL | required |
+
+Useful tables: `pt_profiles` (plan and subscription state), `pt_audit` (API usage and provider metadata), `pt_av_cache` (fundamentals and price cache), `pt_costs` (model token spend), `pt_state` (saved documents). Prefer a read-only role so the warehouse can never write to production.
+
+Stripe: use a restricted key with read access to charges, customers, subscriptions, invoices, products and prices; the account id is detected from the key. The same connections can be added in the PostHog UI under Data pipeline -> Sources.
+
+The project is "Lekha" on US Cloud, project id `767236`. The public ingestion key is set as `POSTHOG_KEY` in Vercel for production, preview and development; `/api/ph` serves it at runtime.
