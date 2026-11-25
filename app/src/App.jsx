@@ -22,6 +22,7 @@ import { BY_KEY, DEFAULT_ROUTE, parseHash } from "@/nav"
 import LockedFeature from "@/components/LockedFeature"
 import { allows, featureOfRoute } from "@/lib/entitlements"
 import { Skeleton } from "@/components/ui/skeleton"
+import LangPrompt from "@/components/LangPrompt"
 import { isDemo, reloadMe, useMe, useSession } from "@/lib/engine"
 import PAGES from "@/pages"
 
@@ -104,6 +105,7 @@ export default function App() {
       <div className="shell min-h-dvh bg-background text-foreground">
         <Banner onMenu={() => setMenu(true)} onSearch={() => setSearch(true)} onTheme={() => setTheme(true)} onLang={() => setLang(true)} navigate={navigate} navOpen={nav} onNavToggle={toggleNav} customizable={isPane && !gated && !gateLoading && !item.analyst && !["tab-sim", "tab-sim-proj", "tab-an-deep", "tab-an-council", "lekha-reports", "v3-ai-host"].some((p) => item.panes.includes(p))} />
         {demo && <div className="border-b border-[color-mix(in_srgb,var(--warn)_40%,var(--border))] bg-[color-mix(in_srgb,var(--warn)_10%,var(--background))] px-3 py-1 text-[12px]"><div className="mx-auto flex max-w-[1700px] flex-wrap items-center gap-x-3 gap-y-1"><FlaskConical className="size-3.5 text-[var(--warn)]" /><b className="font-mono text-[11px] tracking-wider text-[var(--warn)]">DEMO</b><span className="text-muted-foreground">{demoAsOf()}</span>{signedIn ? <a className="ml-auto text-primary hover:underline" href={location.pathname}>Exit demo</a> : <a className="ml-auto text-primary hover:underline" href="/login.html">Create a free account to save your own holdings</a>}</div></div>}
+        <LangPrompt />
         <div className="mx-auto flex max-w-[1700px]">
           <aside data-tour="nav" className={`sticky top-14 h-[calc(100dvh-3.5rem)] w-72 shrink-0 border-r border-border ${nav ? "hidden lg:block" : "hidden"}`}>{side}</aside>
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">

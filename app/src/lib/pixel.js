@@ -22,8 +22,8 @@ export const trackCustom = (name, params, onceKey) => { try { window.ptTrackCust
 export const planParams = (plan) => { try { return window.ptPlanValue ? window.ptPlanValue(plan) : null } catch (e) { return null } }
 
 /* The funnel: custom events from the tour, the tools and the signup wall. Only these names and these parameters can leave the browser. */
-const FUNNEL = new Set(["TourStart", "TourStep", "TourComplete", "TourSkip", "SimRun", "StressRun", "RotationScrub", "ValuationAdjust", "AnswerSeen", "WallShown", "WallClick", "PlansViewed"])
-const PARAMS = { step: /^[a-z]{1,16}$/, platform: /^(mobile|desktop)$/, action: /^[a-z]{1,16}$/, count: /^\d{1,3}$/, from: /^(tour|site)$/ }
+const FUNNEL = new Set(["TourStart", "TourStep", "TourComplete", "TourSkip", "SimRun", "StressRun", "RotationScrub", "ValuationAdjust", "AnswerSeen", "WallShown", "WallClick", "PlansViewed", "LangPromptShown", "LangPromptAccepted", "LangPromptDismissed"])
+const PARAMS = { step: /^[a-z]{1,16}$/, platform: /^(mobile|desktop)$/, action: /^[a-z]{1,16}$/, count: /^\d{1,3}$/, from: /^(tour|site)$/, lang: /^[a-zA-Z-]{2,8}$/ }
 export function funnel(name, params = {}, { session = false } = {}) {
   if (!FUNNEL.has(name)) return
   const p = {}; for (const k of Object.keys(PARAMS)) if (params[k] != null && PARAMS[k].test(String(params[k]))) p[k] = params[k]
