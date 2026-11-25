@@ -9,6 +9,7 @@ import { Input, Textarea } from "@/components/ui/input"
 import { PageHeader } from "@/components/common"
 import { api } from "@/lib/api"
 import { newReportId, saveReport } from "@/lib/reports"
+import { capturePostHog } from "@/lib/posthog"
 
 const LENSES = [
   ["investor", "Long-term investor"],
@@ -174,6 +175,7 @@ export default function CouncilPage({ navigate }) {
       const doc = { id: newReportId(), question: r.question, scope: r.scope, at: new Date().toISOString(), ceo: r.ceo, perspectives: r.perspectives, meta: r.meta }
       setRep(doc)
       await saveReport(doc)
+      capturePostHog("research_council_completed", { scope_type: doc.scope === "portfolio" ? "portfolio" : "ticker" })
       toast("Report saved to AI research reports")
     } catch (e) {
       if (e.code === "premium_required") setErr("The council is a Premium feature. Upgrade in Account, then run it again.")

@@ -7,3 +7,4 @@ node_modules
 
 # macOS AppleDouble files from external drives
 ._*
+.env

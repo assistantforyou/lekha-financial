@@ -5,6 +5,7 @@ const router = require("./router");
 const tools = require("./tools");
 const contextLib = require("./context");
 const ds = require("./ds");
+const { captureTool } = require("./observability");
 const { stripPictographs, scrub, STYLE } = require("./style");
 const { cleanText, fence, guard, neutralise, scanText } = require("../_ai_safe");
 
@@ -149,7 +150,7 @@ async function* run(opts) {
     if (mode === "fast") {
       steps = 1;
       let text = "";
-      for await (const ev of ds.stream({ messages, model: model, thinking: false, maxTokens: 1600, signal, job: "ai-chat", meta: { mode: "fast" }, timeoutMs: Math.min(budgetMs, 45000) })) {
+      for await (const ev of ds.stream({ messages, model: model, thinking: false, maxTokens: 1600, signal, job: "ai-chat", meta: { mode: "fast" }, posthog: opts.observability, timeoutMs: Math.min(budgetMs, 45000) })) {
         if (ev.type === "reasoning") continue;
         if (ev.type === "text") { const d = scrub(ev.text); text += d; spoken += d; yield { type: "text", text: d }; }
         if (ev.type === "done") { usage = ev.usage; model = ev.model; }
@@ -165,7 +166,7 @@ async function* run(opts) {
         steps++;
         let final = null;
         let spoke = false;
-        for await (const ev of ds.stream({ messages, model: model, tools: toolSchemas, thinking: true, effort: "high", maxTokens: 3200, signal, job: "ai-chat", meta: { mode: "deep", step: steps }, timeoutMs: Math.max(20000, budgetMs - (Date.now() - t0)) })) {
+        for await (const ev of ds.stream({ messages, model: model, tools: toolSchemas, thinking: true, effort: "high", maxTokens: 3200, signal, job: "ai-chat", meta: { mode: "deep", step: steps }, posthog: opts.observability, timeoutMs: Math.max(20000, budgetMs - (Date.now() - t0)) })) {
           if (ev.type === "reasoning") yield { type: "reasoning", text: scrub(ev.text) };
           else if (ev.type === "text") { spoke = true; const d = scrub(ev.text); spoken += d; yield { type: "text", text: d }; }
           else if (ev.type === "done") final = ev;
@@ -180,8 +181,11 @@ async function* run(opts) {
         for (const call of calls) {
           const name = call.function && call.function.name;
           const args = call.function && call.function.arguments;
-          yield { type: "tool", id: call.id, name, args: tools.parseArgs(args), status: "running" };
+          const toolInput = tools.parseArgs(args);
+          yield { type: "tool", id: call.id, name, args: toolInput, status: "running" };
+          const toolStartedAt = Date.now();
           const r = await tools.run(name, args);
+          await captureTool(opts.observability, { name, input: toolInput, output: r, latency: Date.now() - toolStartedAt, error: r.ok ? null : r.error });
           yield {
             type: "tool", id: call.id, name, status: r.ok ? "done" : "failed",
             label: r.label, source: r.source, asOf: r.asOf, url: r.url, lines: (r.lines || []).slice(0, 8), error: r.error || null,

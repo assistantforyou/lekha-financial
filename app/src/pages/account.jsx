@@ -21,6 +21,7 @@ import { isDemo, setCurrency, useCurrency, useSession, useMe, useTier } from "@/
 import { date, dateTime, num, pct } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
 import { QUOTAS } from "@/lib/entitlements"
+import { capturePostHog } from "@/lib/posthog"
 
 const Field = ({ label, id, children, hint }) => <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label>{children}{hint && <p className="text-[12px] text-muted-foreground">{hint}</p>}</div>
 const Seg = ({ value, onChange, options, label }) => <div role="group" aria-label={label} className="inline-flex rounded-md border border-border p-0.5">{options.map(([v, l]) => <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)} className={cn("rounded px-3 py-1.5 text-[13px] transition", value === v ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>{l}</button>)}</div>
@@ -226,8 +227,8 @@ function KnowledgeBase() {
 /* ---------------- Data, import, sync, sources ---------------- */
 export function DataPage({ item, navigate }) {
   const [, force] = useState(0), file = useRef(null), sync = window.PT_SYNC ? PT_SYNC.status : null, keys = window.PT_SYNC ? PT_SYNC.keys() : [], stamps = window.PT_SYNC ? PT_SYNC.stamps() : {}, signed = !!(useSession() || {}).access_token && !isDemo()
-  const doExport = () => { const blob = new Blob([JSON.stringify(A.exportAll(), null, 2)], { type: "application/json" }), a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `lekha-export-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href) }
-  const doImport = async (f) => { try { const n = A.importAll(JSON.parse(await f.text())); toast.success(`Restored ${n} items. Reloading…`); setTimeout(() => location.reload(), 800) } catch (e) { toast.error(errMsg(e)) } }
+  const doExport = () => { const blob = new Blob([JSON.stringify(A.exportAll(), null, 2)], { type: "application/json" }), a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `lekha-export-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(a.href); capturePostHog("data_exported") }
+  const doImport = async (f) => { try { const n = A.importAll(JSON.parse(await f.text())); capturePostHog("data_imported", { document_count: n }); toast.success(`Restored ${n} items. Reloading…`); setTimeout(() => location.reload(), 800) } catch (e) { toast.error(errMsg(e)) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
     <div className="grid gap-4 lg:grid-cols-2">
       <Card><CardHeader><CardTitle>Import holdings from a statement</CardTitle><CardDescription>Broker PDF, screenshot or CSV. An AI model reads it, you review every line, and only ticked lines are saved.</CardDescription></CardHeader><CardFooter><Button onClick={() => navigate("portfolio/holdings")}><Upload />Open holdings & import</Button></CardFooter></Card>

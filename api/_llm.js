@@ -155,7 +155,7 @@ async function extractVerified(input) {
 }
 
 // One JSON answer for a structured job (news briefing, council, agent plan/answer, expert analysis, chat helpers).
-async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", maxTokens, deadlineMs, info = {}, accept }) {
+async function generateJson({ system, user, schema, model, timeoutMs = 50000, job = "news", maxTokens, deadlineMs, info = {}, accept, posthog }) {
   if (!ready()) throw err("not_configured", 503);
   const budget = Math.min(deadlineMs || timeoutMs, setting("LLM_DEADLINE_MS", 50000, 55000));
   const m = model || process.env.NEWS_MODEL || ds.modelFor("fast");
@@ -168,6 +168,7 @@ async function generateJson({ system, user, schema, model, timeoutMs = 50000, jo
     temperature: 0.2,
     thinking: false,
     responseFormat: "json",
+    posthog,
     messages: [{ role: "system", content: cleanText(system, MAX_PROMPT) + PRO_STYLE + "\n\nReply with ONE JSON object only, no prose, matching this JSON Schema:\n" + JSON.stringify(toJsonSchema(schema)) }, { role: "user", content: cleanText(user, MAX_PROMPT) }],
   });
   info.requests = answer.attempts;
