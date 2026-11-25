@@ -24,12 +24,12 @@ function flags(question) {
   };
 }
 
-// Which tools to run before the model speaks. At most five so a fast turn stays fast.
+// Which tools to run before the model speaks. At most six so a fast turn stays fast.
 function callsFor(question, symbols, f) {
   const q = String(question || "");
   const calls = [];
   const push = (tool, args) => {
-    if (calls.length >= 5) return;
+    if (calls.length >= 6) return;
     if (calls.some((c) => c.tool === tool && JSON.stringify(c.args) === JSON.stringify(args))) return;
     calls.push({ tool, args });
   };
@@ -42,6 +42,10 @@ function callsFor(question, symbols, f) {
   if (first && /revenue|margin|earn|profit|growth|balance sheet|cash flow|debt/i.test(q)) push("get_financial_statements", { symbol: first, type: "annual" });
   if ((f.macro || !first) && f.macro) push("get_macro_data", { ids: ["FEDFUNDS", "DGS10", "T10Y2Y", "CPIAUCSL", "UNRATE"] });
   if (!first && (f.brief || f.macro)) push("get_news", { category: "macro" });
+  // Live data comes first on every turn: the market snapshot is fetched for every question, and a question
+  // about the book or the market also gets live headlines. Nothing is answered from memory.
+  if (!first || f.portfolio || f.macro || f.brief) push("get_market_pulse", {});
+  if (!first && (f.portfolio || f.risk)) push("get_news", { category: "macro" });
   if (!calls.length && first) push("get_company_profile", { symbol: first });
   return calls;
 }
@@ -50,7 +54,8 @@ function callsFor(question, symbols, f) {
 async function plan({ question, symbol, mode }) {
   const q = String(question || "").slice(0, 2000);
   const f = flags(q);
-  const symbols = await agent.resolveSymbols(q, symbol).catch(() => []);
+  // A question about "my portfolio" names no company: ordinary words in it ("outlook") must never be searched as company names.
+  const symbols = await agent.resolveSymbols(q, symbol, { names: !f.portfolio }).catch(() => []);
   const kind = symbols.length ? "company" : f.portfolio ? "portfolio" : f.macro ? "macro" : "general";
   const calls = callsFor(q, symbols, f);
   const guidance = [];
