@@ -19,9 +19,19 @@ const freshFor = (route) => FRESH[route] || FRESH_MS
 const keyOf = (route, params) => route + JSON.stringify(params || {})
 function load(route, params) {
   const k = keyOf(route, params); if (INFLIGHT.has(k)) return INFLIGHT.get(k)
-  const p = data(route, params).then((j) => { CACHE.set(k, { t: Date.now(), data: j.data, meta: j.meta }); if (CACHE.size > FRESH_MAX) CACHE.delete(CACHE.keys().next().value); return CACHE.get(k) }).finally(() => INFLIGHT.delete(k))
+  const p = data(route, params).then((j) => { CACHE.set(k, { t: Date.now(), data: j.data, meta: j.meta }); if (route === "quote") keepQuote(params && params.symbol, j.data); if (CACHE.size > FRESH_MAX) CACHE.delete(CACHE.keys().next().value); return CACHE.get(k) }).finally(() => INFLIGHT.delete(k))
   INFLIGHT.set(k, p); return p
 }
+/* The last quote seen for each symbol survives a reload (localStorage), so a company header paints a price the moment it opens
+   and the live quote replaces it a moment later. Only the few fields the header shows; the last 60 symbols. */
+const QK = "ptpub.v1.app.lastq"
+const readQ = () => { try { return JSON.parse(localStorage.getItem(QK) || "{}") } catch (e) { return {} } }
+function keepQuote(symbol, q) {
+  if (!symbol || !q || q.price == null) return
+  try { const m = readQ(); delete m[symbol]; m[symbol] = { price: q.price, change: q.change, changePercent: q.changePercent, currency: q.currency, name: q.name, t: Date.now() }
+    const ks = Object.keys(m); if (ks.length > 60) delete m[ks[0]]; localStorage.setItem(QK, JSON.stringify(m)) } catch (e) {}
+}
+export const lastQuote = (symbol) => { const q = readQ()[symbol]; return q && q.price != null ? q : null }
 export const prefetch = (route, params) => { const c = CACHE.get(keyOf(route, params)); if (c && Date.now() - c.t < freshFor(route)) return; load(route, params).catch(() => {}) }
 // state machine shared by every panel: {status: "loading"|"ok"|"error", data, meta, error}
 export function useData(route, params, { enabled = true, refresh = 0 } = {}) {

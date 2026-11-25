@@ -9,7 +9,7 @@ import Markdown from "@/components/Markdown"
 import { ChartCard } from "@/components/Charts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
-import { trackCustom } from "@/lib/pixel"
+import { trackCustom, funnel } from "@/lib/pixel"
 import { streamChat, readAttachment, localThreads, localThread, saveLocalThread, dropLocalThread } from "@/lib/chat"
 import { cn } from "@/lib/utils"
 
@@ -98,6 +98,8 @@ function Answer({ m, live }) {
   )
 }
 
+/* The Quick Tour listens for a question being sent and answered (it steps aside while the visitor asks, then returns beside the answer). */
+const tourSignal = (phase) => { try { window.dispatchEvent(new CustomEvent("lekha:ask", { detail: { phase } })) } catch (e) {} }
 export default function AgentPanel({ symbol, initial }) {
   const [threads, setThreads] = useState([])
   const [threadId, setThreadId] = useState(null)
@@ -152,6 +154,7 @@ export default function AgentPanel({ symbol, initial }) {
       { role: "user", content: q, at: Date.now(), attachments: attached.map((a) => a.name) },
       { role: "assistant", content: "", parts: [], at: Date.now() }])
     setBusy(true)
+    tourSignal("start")
     const ctl = new AbortController()
     abort.current = ctl
     let reply = ""
@@ -176,6 +179,7 @@ export default function AgentPanel({ symbol, initial }) {
           else patch(base + 1, (m) => ({ ...m, parts: [...m.parts, p] }))
         },
       })
+      funnel("AnswerSeen")
       const id = out.threadId || threadId
       if (id) {
         // Keep a copy in this browser as well, so a conversation survives a reload even without an account.
@@ -202,7 +206,7 @@ export default function AgentPanel({ symbol, initial }) {
         try { localStorage.setItem("ptpub.v1.pendingAsk", q) } catch (x) {}
         patch(base + 1, (m) => ({ ...m, content: "", parts: [] }))
         setMsgs((ms) => ms.slice(0, base + 1))
-        setWall(true)
+        setWall(true); funnel("WallShown")
       }
       else {
         const msg = e.code === "deep_unavailable" ? "Deep mode needs the Paid plan. Switch to Fast, or upgrade in Account."
@@ -213,7 +217,7 @@ export default function AgentPanel({ symbol, initial }) {
           : e.message || "That request failed."
         setErr(msg)
       }
-    } finally { setBusy(false); abort.current = null }
+    } finally { setBusy(false); abort.current = null; tourSignal("done") }
   }
 
   async function openThread(id) {
@@ -328,8 +332,8 @@ export default function AgentPanel({ symbol, initial }) {
                   Create a free account to keep asking, and the analyst answers about your own holdings instead of the sample portfolio.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <Button size="sm" asChild><a href={`/login.html?mode=signup&next=${wallNext}`}>Create a free account</a></Button>
-                  <Button size="sm" variant="outline" asChild><a href={`/login.html?next=${wallNext}`}>I already have one</a></Button>
+                  <Button size="sm" asChild><a href={`/login.html?mode=signup&next=${wallNext}`} onClick={() => funnel("WallClick", { action: "signup" })}>Create a free account</a></Button>
+                  <Button size="sm" variant="outline" asChild><a href={`/login.html?next=${wallNext}`} onClick={() => funnel("WallClick", { action: "login" })}>I already have one</a></Button>
                 </div>
                 <p className="mt-2 text-[11px] text-[var(--muted)]">Free plan, no card. Your question is saved and waiting for you.</p>
               </div>
@@ -337,7 +341,7 @@ export default function AgentPanel({ symbol, initial }) {
           </div>
         )}
 
-        <div className="rounded-lg border border-[var(--line)] p-2">
+        <div className="rounded-lg border border-[var(--line)] p-2" data-tour="ask-box">
           <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) ask(input) }}
             placeholder={symbol ? `Ask about ${symbol}…` : "Ask a question…"} rows={2} className="resize-none border-0 shadow-none focus-visible:ring-0" disabled={busy} />
           <div className="mt-1 flex flex-wrap items-center gap-1.5">

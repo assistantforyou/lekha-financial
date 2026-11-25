@@ -27,6 +27,9 @@ function score(q, r) {
   if (oneTypo(q, r.t) || r.words.some((w) => oneTypo(q, w))) return 5.5
   return null
 }
+const BY_SYMBOL = new Map(index.map((r) => [r.symbol, r]))
+/* name and type for a symbol from the built-in list, no network: lets a company page show its name immediately */
+export const lookupLocal = (symbol) => { const r = BY_SYMBOL.get(String(symbol || "").toUpperCase()); return r ? { symbol: r.symbol, name: r.name, type: r.type } : null }
 export function searchLocal(query, limit = 8) {
   const q = String(query || "").trim().toLowerCase().replace(/\s+/g, " "); if (!q) return []
   const out = []
