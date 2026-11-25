@@ -1,59 +1,72 @@
-/* The tour steps. Every target is an element the app really renders; nothing here is a mock-up.
-   target: functions tried in order; the first one that returns a visible element wins. A match after the first one
-   (a different layout at a narrower width, or an empty portfolio) switches the step to its alternative copy (`a`).
-   A step with no target is a centred card. A step whose targets are all missing is skipped, never shown broken.
+/* The tour: a short, hands-on showcase of the advanced tools, on the sample portfolio. Every target is an element the app really
+   renders; nothing here is a mock-up. The visitor does the thing and the tool answers.
 
-   Hands-on steps. act: true makes the step interactive: the app stays live inside the highlighted element (the visitor
-   does the thing), everything outside it is still blocked, and the tour moves on by itself when done() turns true
-   (it must be false when the step opens, so a step the visitor reaches with Back never fires on its own). act: "alt"
-   is interactive only when the second target matched (a phone, where the menu button stands in for the sidebar).
-   back() returns to the previous step when the visitor backs out (closes the search box without choosing).
-   retarget: true re-resolves the target on every measure (the highlight follows a link that appears after a click).
-   pill: the step shrinks to one line while the visitor asks (ask step only); skipTo: the step id its Next jumps to. quiet: no target, no dim.
-   hint: the ui string shown under the copy (default "act"). hash: route to open (functions allowed); none keeps the current page. */
+   Step fields
+     target     functions tried in order; the first that returns a visible element wins. A step whose targets are all missing is skipped.
+     hash       route to open (a function is allowed); none keeps the current page. A hash with ?tab= must match exactly.
+     act        true = hands-on: the app stays live, nothing is dimmed or blocked, a ring pulses on the real control and the step
+                moves on by itself when done() turns true. done() must be false when the step opens.
+     arm        optional: called when a hands-on step is ready; prepares the page (so the payoff is fast) and returns
+                { done, off } where done() reports that the visitor did the thing and off() removes any listeners.
+     settle     ms to linger on the payoff after the visitor acts, before the next step (default 700).
+     hint       the ui string shown under the title (default "act").
+     retarget   re-resolve the target on every measure (the ring follows a control that appears or moves).
+     pill/skipTo  the AI step shrinks to one line while the visitor asks; skipTo is the step id its Next jumps to.
+     quiet      no target, no dim: a small card beside the page.
+     back()     returns to the previous step when the visitor backs out. */
 const byId = (id) => document.getElementById(id)
 const sel = (s) => () => document.querySelector(s)
-const panelOf = (id) => () => { const e = byId(id); return e && e.closest("section") }
 export const EXAMPLE = "AAPL"
 
 export const currentPath = () => location.hash.replace(/^#\/?/, "").split("?")[0]
 export const fullPath = () => location.hash.replace(/^#\/?/, "")
-export const tabNow = () => { const m = location.hash.match(/[?&]tab=([^&]+)/); return m ? decodeURIComponent(m[1]) : "overview" }
 let LAST = EXAMPLE
-/* the company the visitor opened (or the example, until they open one) */
+/* the company the tour is on (the example, or the one the visitor opened) */
 export const lastSym = () => { const m = currentPath().match(/^company\/([^/]+)/); if (m) LAST = decodeURIComponent(m[1]).toUpperCase(); return LAST }
 export const hashOf = (step) => (typeof step.hash === "function" ? step.hash() : step.hash)
-
-const paletteOpen = () => !!document.querySelector("[cmdk-input]")
-const paletteBox = () => { const i = document.querySelector("[cmdk-input]"); return i && i.closest('[role="dialog"]') }
-const HOLD = 'a[href="#/portfolio/holdings"]'
-const holdLink = () => document.querySelector('[role="dialog"] ' + HOLD) || document.querySelector(".shell aside " + HOLD)
-/* the link when its group is open, otherwise the group heading that opens it */
-const holdTarget = () => holdLink() || [...document.querySelectorAll('.shell aside button, [role="dialog"] button')].find((b) => /my portfolio/i.test(b.textContent || ""))
-
-export const STEPS = [
-  { id: "welcome", hash: "portfolio/overview", ready: () => !!byId("kpis") },
-  { id: "summary", where: true, hash: "portfolio/overview", target: [() => byId("kpis")] },
-  { id: "performance", where: true, hash: "portfolio/overview", target: [panelOf("pf-chart")] },
-  { id: "search", hash: "portfolio/overview", target: [sel('[data-tour="search"]'), sel('[data-tour="search-icon"]')], act: true, done: paletteOpen },
-  { id: "pick", target: [paletteBox], act: true, done: () => /^company\//.test(currentPath()), back: () => !paletteOpen() && !/^company\//.test(currentPath()) },
-  { id: "company", where: true, hash: () => "company/" + lastSym(), target: [sel('[data-tour="company-head"]')] },
-  { id: "tabs", where: true, hash: () => "company/" + lastSym(), target: [sel('[data-tour="company-tabs"]')], act: true, done: () => tabNow() !== "overview" },
-  { id: "askai", hash: () => "company/" + lastSym(), target: [sel('[data-tour="ask-ai"]')], act: true, done: () => tabNow() === "ai" },
-  { id: "ask", hash: () => "company/" + lastSym() + "?tab=ai", target: [sel('[data-tour="ask-box"]')], act: true, hint: "tryit", pill: true, skipTo: "nav" },
-  { id: "answer", quiet: true },
-  { id: "nav", target: [sel('[data-tour="nav"]'), sel('[data-tour="menu"]')], prefer: ["right"], act: "alt", done: () => !!document.querySelector('[role="dialog"] nav[aria-label="Main navigation"]') },
-  { id: "gohold", target: [holdTarget], act: true, retarget: true, nav: true, done: () => currentPath() === "portfolio/holdings" },
-  { id: "holdings", where: true, hash: "portfolio/holdings", target: [panelOf("tbl"), panelOf("ph-form")] },
-  { id: "discover", where: true, hash: "sector/now", target: [() => byId("rot-sum"), sel('section[aria-labelledby="locked-title"]')] },   // Free and demo: the Paid lock screen
-  { id: "finish", hash: "portfolio/overview", ready: () => !!byId("kpis") },
-]
 
 export function visible(el) {
   if (!el || !el.isConnected) return false
   const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return false
   const s = getComputedStyle(el); return s.visibility !== "hidden" && s.display !== "none"
 }
+const seen = (s) => () => { const e = document.querySelector(s); return visible(e) ? e : null }
+
+/* "did the visitor do it" signals. Each listens in the capture phase so the app's own handlers cannot hide the event. */
+const listen = (types, within) => {
+  let hit = false; const on = (e) => { if (e.target && e.target.closest && e.target.closest(within)) hit = true }
+  types.forEach((t) => document.addEventListener(t, on, true))
+  return { done: () => hit, off: () => types.forEach((t) => document.removeEventListener(t, on, true)) }
+}
+const clicked = (within) => () => listen(["click"], within)
+const adjusted = (within) => () => listen(["input", "change", "pointerup"], within)
+
+/* Monte Carlo: the page auto-runs 100K paths (about 10 s on a phone), which would leave the visitor staring at a progress bar.
+   Stop that run and choose 10K paths (about a second), then ask the visitor to press Run and watch the fan chart and KPIs appear. */
+const armSim = () => {
+  const l = listen(["click"], "#sim-go"), kpi = () => { const e = document.querySelector("#sim-out .sim-kpis"); return e ? e.textContent : "" }
+  let base = kpi(), t0 = performance.now()
+  const prep = () => { const stop = byId("sim-stop"); if (stop && visible(stop)) stop.click(); const n = document.querySelector('#sim-n [data-n="10000"]'); if (n && !n.classList.contains("on") && n.getAttribute("aria-pressed") !== "true" && !l.done()) n.click() }
+  prep(); const i = setInterval(() => { if (performance.now() - t0 > 4000 || l.done()) return clearInterval(i); prep() }, 450)
+  return { done: () => l.done() && !!kpi() && kpi() !== base, off: () => { clearInterval(i); l.off() } }
+}
+
+const welcome = { id: "welcome", hash: "portfolio/overview", ready: () => !!byId("kpis") }
+const sim = { id: "sim", hash: "simulation/main", target: [seen("#sim-go"), seen("#sim-hz")], retarget: true, act: true, hint: "hintSim", settle: 2600, arm: armSim }
+const stress = { id: "stress", hash: "analysis/stress", target: [seen("#ai-sim-run")], act: true, hint: "hintStress", settle: 2600, arm: clicked("#ai-sim-run") }
+const rrg = { id: "rrg", hash: "sector/now", target: [seen("#rrg-asof")], act: true, hint: "hintRrg", settle: 1800, arm: adjusted("#rrg-asof") }
+const dcf = { id: "dcf", hash: "company/" + EXAMPLE + "?tab=valuation", target: [seen("#dcf-growth"), seen("#dcf-discount")], act: true, hint: "hintDcf", settle: 2200, arm: adjusted("#dcf-growth, #dcf-discount, #dcf-terminalGrowth") }
+const ask = { id: "ask", hash: () => "company/" + lastSym() + "?tab=ai", target: [sel('[data-tour="ask-box"]')], act: true, hint: "tryit", pill: true, skipTo: "finish" }
+const answer = { id: "answer", quiet: true }
+const finish = { id: "finish", hash: "portfolio/overview", ready: () => !!byId("kpis") }
+
+export const STEPS_DESKTOP = [welcome, sim, stress, rrg, dcf, ask, answer, finish]
+/* phones: the rotation graph and the 900 px fan chart are cramped at 390 px, so the phone tour keeps the tools that read well on a small screen */
+export const STEPS_MOBILE = [welcome, sim, stress, dcf, ask, answer, finish]
+export const STEPS = STEPS_DESKTOP.slice()
+/* chosen when the tour starts; the array is replaced in place so every importer keeps the same reference */
+export const setPlatform = () => { let m = false; try { m = matchMedia("(max-width: 640px)").matches } catch (e) {} STEPS.splice(0, STEPS.length, ...(m ? STEPS_MOBILE : STEPS_DESKTOP)) }
+
 /* -> { el, alt } | { el: null } for a targeted step; { el: null, none: true } when a target-less step is ready */
 export function resolve(step) {
   if (!step.target) return { el: null, none: true, ok: !step.ready || step.ready() }

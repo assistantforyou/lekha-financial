@@ -5,14 +5,13 @@ import { FLAT } from "@/nav"
 import "./tour.css"
 import { COPY, LANG_LABEL, LANG_NATIVE, setTourLang, stepCopy, tourLang, ui } from "./copy"
 import { M, MOBILE_MAX, place, scrollDelta } from "./layout"
-import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, modeOf, resolve, visible } from "./steps"
+import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, modeOf, resolve, setPlatform, visible } from "./steps"
 import { onStartTour, shouldAutoStart, writeStatus } from "./store"
 
 const WF_ICONS = [Search, Building2, Layers, LineChart]
 const reduced = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch (e) { return false } }
 const shortcut = () => (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || "") ? "⌘K" : "Ctrl\u00a0K")
 const touchOnly = () => { try { return matchMedia("(hover: none)").matches } catch (e) { return false } }
-const signedIn = () => { try { const s = window.PT_AUTH && window.PT_AUTH.session && window.PT_AUTH.session(); return !!(s && s.access_token) } catch (e) { return false } }
 const hashKey = (h) => (/^company\//.test(h) ? "research/company" : h)
 const where = (h) => { const i = FLAT.find((x) => x.key === hashKey(h)); return i ? [i.groupTitle, i.title] : null }
 /* the second highlight: where this page lives in the navigation (the active sidebar entry, or the breadcrumb where the sidebar is hidden) */
@@ -79,7 +78,7 @@ export default function Tour({ navigate }) {
 
   const begin = useCallback(() => {
     if (live.current.active) return
-    R.current.prevFocus = document.activeElement; writeStatus("in_progress")
+    R.current.prevFocus = document.activeElement; writeStatus("in_progress"); setPlatform()
     setSkipped([]); setCur(0); setAlt(false); setReady(false); setActive(true); goTo(0, 1)
   }, [goTo])
   useEffect(() => onStartTour(begin), [begin])
@@ -124,16 +123,17 @@ export default function Tour({ navigate }) {
     window.addEventListener("keydown", k, true); return () => window.removeEventListener("keydown", k, true)
   }, [active, skip, move, finish])
 
-  /* ---- hands-on steps: move on by itself when the visitor has done the thing (or back out when they undo it) ---- */
+  /* ---- hands-on steps: prepare the page, then move on by itself when the visitor has done the thing (or back out when they undo it) ---- */
   useEffect(() => {
     const step = STEPS[cur]; if (!active || !ready || busy || !isAct(step, alt)) return
-    let fired = false; const d0 = step.done ? !!step.done() : true, t0 = performance.now()
+    const armed = step.arm ? step.arm() : null, done = armed ? armed.done : step.done
+    let fired = false; const d0 = done ? !!done() : true, t0 = performance.now()
     const i = setInterval(() => {
       if (fired || live.current.busy || live.current.cur !== cur) return
-      if (step.done && !d0 && step.done()) { fired = true; setTimeout(() => { if (live.current.cur === cur && !live.current.busy) move(1) }, 380); return }
+      if (done && !d0 && done()) { fired = true; setTimeout(() => { if (live.current.cur === cur && !live.current.busy) move(1) }, step.settle || 700); return }
       if (step.back && performance.now() - t0 > 900 && step.back()) { fired = true; move(-1) }
     }, 150)
-    return () => clearInterval(i)
+    return () => { clearInterval(i); if (armed && armed.off) armed.off() }
   }, [active, ready, busy, cur, alt, move])
 
   /* ---- the AI step: the tour steps aside while the visitor asks, and comes back beside the answer a few seconds after it lands ---- */
@@ -199,7 +199,7 @@ export default function Tour({ navigate }) {
     ro.observe(c); return () => ro.disconnect()
   }, [ready, !!geo])
   useEffect(() => { if (ready) schedule(false) }, [size, ready, schedule])
-  useEffect(() => { if (ready && !busy && geo && primaryRef.current && !cardRef.current.contains(document.activeElement)) primaryRef.current.focus({ preventScroll: true }) }, [ready, busy, cur, !!geo])
+  useEffect(() => { if (ready && !busy && geo && modeOf(STEPS[cur], alt) === "card" && primaryRef.current && !cardRef.current.contains(document.activeElement)) primaryRef.current.focus({ preventScroll: true }) }, [ready, busy, cur, !!geo])   // hands-on steps leave focus with the app
 
   if (!active || !ready || !geo) return null
   const step = STEPS[cur], id = step.id, last = cur === STEPS.length - 1, first = cur === 0
@@ -241,12 +241,7 @@ export default function Tour({ navigate }) {
             {!last && <button type="button" className="tour-btn ghost" onClick={skip}>{ui("skip")}</button>}
             <span className="grow" />
             {!first && <button type="button" className="tour-btn" onClick={() => move(-1)} disabled={busy}>{ui("back")}</button>}
-            {last ? <>
-              {!signedIn() && <button type="button" className="tour-btn ghost" onClick={() => finish("completed")}>{ui("explore")}</button>}
-              {signedIn()
-                ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button>
-                : <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => { writeStatus("completed"); location.href = "/login.html?mode=signup" }}>{ui("account")}</button>}
-            </> : nextBtn}
+            {last ? <button type="button" className="tour-btn pri" ref={primaryRef} onClick={() => finish("completed")}>{ui("finish")}</button> : nextBtn}
           </div></>}
       </div>
     </div>, host)
