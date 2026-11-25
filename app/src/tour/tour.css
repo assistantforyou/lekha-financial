@@ -80,10 +80,24 @@
 .tour-card[data-mode="quiet"] { padding: 12px 14px 11px; }
 .tour-card[data-mode="quiet"] .tour-top { margin-bottom: 7px; }
 @media (max-width: 640px) {
-  .tour-foot.last { flex-wrap: wrap; }
   .tour-foot.last .tour-btn.pri { order: -1; flex: 1 1 100%; }
   .tour-foot.last .grow { display: none; }
   .tour-foot.last .tour-btn:not(.pri) { flex: 1; }
 }
 @keyframes tour-ripple { 0% { opacity: .65; inset: 0; } 100% { opacity: 0; inset: -11px; } }
 @media (prefers-reduced-motion: reduce) { .tour-root .tour-spot::after { animation: none !important; } .tour-pillrow { animation: none; } }
+
+/* ---- calm motion: between steps the card and the ring fade in at their new place, they do not travel across the page; geometry changes glide only once a step has settled ---- */
+.tour-root:not([data-settled="1"]) .tour-card, .tour-root:not([data-settled="1"]) .tour-spot { transition: opacity .25s ease; }
+.tour-root:not([data-settled="1"]) .tour-dim { transition: opacity .4s ease; }
+.tour-root[data-busy="1"] .tour-card, .tour-root[data-busy="1"] .tour-spot { opacity: 0 !important; transition: opacity .12s ease !important; pointer-events: none; }
+.tour-card[data-mode="coach"] .tour-try[data-tried="1"] { color: var(--fg); }
+
+/* ---- the closing call to action ---- */
+.tour-note { margin: 10px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+.tour-foot.last { flex-wrap: wrap; }
+.tour-link { flex: 1 1 100%; order: 3; margin-top: 2px; text-align: center; font-size: 12.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.tour-link:hover { color: var(--fg); }
+a.tour-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+@media (max-width: 640px) { .tour-link { order: 3; } }
+.tour-root:not([data-settled="1"]) .tour-card { transition: opacity .25s ease .08s; }   /* a beat after the step opens, so the card is measured before it shows */
