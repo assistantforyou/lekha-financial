@@ -33,7 +33,11 @@
 
   /* ---- trading calendar: weekdays only, strictly up to and including today ---- */
   var CALENDAR = 1700;
-  function tradingDays() {
+  /* The calendar is the same for every symbol on a given "today", and building it costs thousands of Date objects, so it is built once per date
+     (it used to be rebuilt for every symbol, about 4 s of main-thread time on a phone). Callers get a copy. */
+  var _days = {};
+  function tradingDays() { var k = todayIso(); return (_days[k] || (_days[k] = buildTradingDays())).slice(); }
+  function buildTradingDays() {
     var out = [], d = new Date(todayIso() + "T00:00:00Z"), end = new Date(todayIso() + "T00:00:00Z");
     d.setUTCDate(d.getUTCDate() - CALENDAR);
     while (d <= end) {
@@ -108,7 +112,8 @@
     SERIES[sym] = out;
     return out;
   }
-  function closesOf(sym) { return seriesOf(sym).map(function (p) { return p[1]; }); }
+  var CLOSES = {};
+  function closesOf(sym) { var ser = seriesOf(sym), c = CLOSES[sym]; if (c && c.ser === ser) return c.v; c = CLOSES[sym] = { ser: ser, v: ser.map(function (p) { return p[1]; }) }; return c.v; }
 
   /* ---- holdings doc (the demo portfolio a visitor can explore and edit) ---- */
   function holdingsDoc() {
@@ -175,9 +180,8 @@
   function weeklyFrom(rows) {
     var out = [], key = null;
     rows.forEach(function (p) {
-      var t = new Date(p[0] + "T00:00:00Z"), wk = new Date(t);
-      wk.setUTCDate(wk.getUTCDate() - ((t.getUTCDay() + 6) % 7));
-      var k = wk.toISOString().slice(0, 10);
+      /* week key = the day number of that week's Monday (no Date objects or strings per row; 1970-01-01 was a Thursday) */
+      var dn = Math.round(Date.parse(p[0] + "T00:00:00Z") / 864e5), k = dn - ((dn + 3) % 7);
       if (k === key) out[out.length - 1] = [p[0], p[1]]; else { out.push([p[0], p[1]]); key = k; }
     });
     return out;
@@ -691,11 +695,12 @@
   /* ---- the live-quote globals the holdings table reads ---- */
   function computeLive(text, syms, map) {
     var lines = String(text).split("\n"), head = lines[0].split(","), live = {}, newest = 0;
+    var rows = []; for (var ri = 2; ri < lines.length; ri++) rows.push(lines[ri].split(","));   // split once, not once per symbol
     for (var j = 0; j < head.length; j += 2) {
       var m = /^D\|(.+)$/.exec(head[j] || ""); if (!m || syms.indexOf(m[1]) < 0) continue;
       var pts = [];
-      for (var i = 2; i < lines.length; i++) {
-        var c = lines[i].split(","), d = parseFloat(c[j]), v = parseFloat(c[j + 1]);
+      for (var i = 0; i < rows.length; i++) {
+        var c = rows[i], d = parseFloat(c[j]), v = parseFloat(c[j + 1]);
         if (isFinite(d) && isFinite(v) && v > 0) pts.push([(Math.floor(d) - 25569) * 864e5, v]);
       }
       if (pts.length < 2) continue;

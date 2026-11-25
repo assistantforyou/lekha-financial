@@ -1,0 +1,1 @@
+import{S as e}from"./index-Cm-uQ6A5.js";import{t}from"./AgentPanel-DOeH5U90.js";import{t as n}from"./jsx-runtime-Bx6B53YL.js";var r=n();function i({item:n,route:i}){let a=i.query?i.query.get(`q`):null;return(0,r.jsxs)(`div`,{children:[(0,r.jsx)(e,{title:n.title,description:n.desc}),(0,r.jsx)(t,{initial:a},a||`blank`)]})}export{i as default};

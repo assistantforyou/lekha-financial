@@ -3,6 +3,7 @@
 // Usage: set -a; source ~/.config/portfolio-terminal/keys.env; set +a; node scripts/dev-server.mjs [port]
 import http from "node:http";
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { brotliCompressSync, gzipSync } from "node:zlib";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -54,6 +55,13 @@ http.createServer(async (req, res) => {
   if (/^\/v\d+\/?$/.test(rel)) rel = rel.replace(/\/?$/, "/index.html"); // same as the /v2 rewrite in vercel.json
   const f = join(ROOT, "public", rel);
   if (!f.startsWith(join(ROOT, "public")) || !existsSync(f) || statSync(f).isDirectory()) { res.writeHead(404); return res.end("not found"); }
-  res.writeHead(200, { "Content-Type": TYPES[extname(f)] || "application/octet-stream" });
-  res.end(readFileSync(f));
+  const type = TYPES[extname(f)] || "application/octet-stream", body = readFileSync(f), ae = String(req.headers["accept-encoding"] || "");
+  // DEV_COMPRESS=1 compresses text like the production CDN does, so load-time measurements are realistic
+  if (process.env.DEV_COMPRESS && /javascript|css|html|json|svg/.test(type) && body.length > 1024 && /br|gzip/.test(ae)) {
+    const br = /\bbr\b/.test(ae), key = f + ":" + statSync(f).mtimeMs + (br ? ":br" : ":gz"); (globalThis.__zc ||= new Map());
+    let z = globalThis.__zc.get(key); if (!z) { z = br ? brotliCompressSync(body) : gzipSync(body); globalThis.__zc.set(key, z); }
+    res.writeHead(200, { "Content-Type": type, "Content-Encoding": br ? "br" : "gzip", "Vary": "Accept-Encoding" }); return res.end(z);
+  }
+  res.writeHead(200, { "Content-Type": type });
+  res.end(body);
 }).listen(PORT, () => console.log("dev server on http://localhost:" + PORT));

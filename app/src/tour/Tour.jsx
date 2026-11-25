@@ -25,7 +25,7 @@ const revealInNav = (a) => {
   sc.scrollTop += (r.top - s.top) - (s.height - r.height) / 2
 }
 const platformNow = () => { try { return matchMedia("(max-width: 640px)").matches ? "mobile" : "desktop" } catch (e) { return "desktop" } }
-const WAIT = { company: 14000, tabs: 14000 }
+const WAIT = { sim: 14000, stress: 14000, rrg: 14000, dcf: 16000, ask: 16000 }   // pages load on demand now, and a company page also waits for its data
 const sameGeo = (a, b) => !!a && !!b && a.hidden === b.hidden && a.side === b.side && a.mobile === b.mobile && a.card.x === b.card.x && a.card.y === b.card.y && a.card.w === b.card.w && JSON.stringify(a.spot) === JSON.stringify(b.spot) && JSON.stringify(a.spot2) === JSON.stringify(b.spot2)
 const pinned = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const p = getComputedStyle(e).position; if (p === "sticky" || p === "fixed") return true } return false }
 const header = () => document.querySelector(".shell > header")
