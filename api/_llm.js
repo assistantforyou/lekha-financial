@@ -47,7 +47,9 @@ function readAnswer(text, schema) {
   const parsed = stripPictographs(parseJsonLoose(text));
   const coerced = coerceSchema(parsed, schema, { maxString: 20000, maxArray: 400 });
   const value = coerced.value;
-  if (!matches(value, schema) || !hasContent(value)) throw err("invalid_response", 502);
+  // coerceSchema already enforces the allow-list and field types. Do not reject the whole answer for one
+  // missing optional field: callers validate what they use and downgrade unverifiable claims.
+  if (value == null || !hasContent(value)) throw err("invalid_response", 502);
   return value;
 }
 
