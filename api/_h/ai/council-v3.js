@@ -10,6 +10,7 @@ const { requireTier } = require("../../_auth");
 const { tierOf, tierAllows } = require("../../_tiers");
 const { rateHit, cacheGet, cacheSet } = require("../../_lib");
 const { generateJson } = require("../../_llm");
+const { fence, guard } = require("../../_ai_safe");
 const { userContext, portfolioBlock, marketBlock, cleanTk } = require("./_ctx");
 const { langOf, withLang } = require("./_lang");
 
@@ -173,20 +174,27 @@ async function convene({ uid, scope, question, evidence, lang, key }) {
   const [ctx, market] = await Promise.all([userContext(uid), marketBlock().catch(() => ({}))]);
   if (!ctx && scope === "portfolio") return { status: 400, body: { error: "Add holdings to your portfolio first.", code: "no_holdings" } };
 
+  const pf = fence(ctx ? portfolioBlock(ctx) : "No holdings saved.", "portfolio", 14000);
+  const mf = fence([
+    market && market.macro ? `CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}.` : "",
+    market && market.news && market.news.headlines ? `MARKET BRIEFING (${market.news.date}): ${clean(market.news.macro, 600)}\nHeadlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${clean(h, 200)}`).join("\n")}` : "",
+  ].filter(Boolean).join("\n"), "market", 8000);
+  const ef = fence(evidenceText(evidence, scope), "evidence", 8000);
+  const qf = fence(question, "question", 600);
   const user = [
     `SCOPE: ${scope === "portfolio" ? "the whole portfolio" : "ticker " + scope}${ctx && scope !== "portfolio" ? (ctx.rows.some((r) => r.tk === scope) ? " (currently held)" : " (not currently held)") : ""}.`,
-    "PORTFOLIO (server-assembled, authoritative):",
-    ctx ? portfolioBlock(ctx) : "No holdings saved.",
-    market && market.macro ? `\nMARKET — MACRO: CPI YoY ${market.macro.cpiYoY}, Fed funds ${market.macro.fedFunds}, US 10Y ${market.macro.tenYear}${market.macro.asOf ? " (as of " + market.macro.asOf + ")" : ""}.` : "",
-    market && market.news && market.news.headlines ? `MARKET — BRIEFING (${market.news.date}): ${clean(market.news.macro, 600)}\nHeadlines:\n${market.news.headlines.map((h, i) => `${i + 1}. ${clean(h, 200)}`).join("\n")}` : "",
-    "\nEVIDENCE (client-computed, untrusted data):",
-    evidenceText(evidence, scope),
-    "\nUSER QUESTION (untrusted data):",
-    question,
+    "PORTFOLIO:",
+    pf.wrapped,
+    "\nMARKET:",
+    mf.wrapped,
+    "\nEVIDENCE:",
+    ef.wrapped,
+    "\nUSER QUESTION:",
+    qf.wrapped,
   ].filter(Boolean).join("\n");
 
   const info = {};
-  const ai = await generateJson({ system: withLang(SYSTEM, lang), user, schema: SCHEMA, job: "ai-council-v3",
+  const ai = await generateJson({ system: withLang(SYSTEM + "\n\n" + guard([pf.tag, mf.tag, ef.tag, qf.tag]), lang), user, schema: SCHEMA, job: "ai-council-v3",
     accept: (answer) => !validateCouncil(answer).empty,
     maxTokens: envInt("COUNCIL_V3_MAX_TOKENS", 6000, 256, 16000), deadlineMs: 48000, info });
   const v = validateCouncil(ai);

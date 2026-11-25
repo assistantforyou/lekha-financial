@@ -5,6 +5,7 @@
 const { requireFeature } = require("../../_auth");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
+const { fence, guard } = require("../../_ai_safe");
 const { userContext, marketBlock, cleanTk } = require("./_ctx");
 const { langOf, withLang } = require("./_lang");
 
@@ -63,7 +64,8 @@ module.exports = async (req, res) => {
     ];
     const m = await marketBlock().catch(() => ({}));
     if (m && m.macro) facts.push(`Macro backdrop: inflation ${m.macro.cpiYoY}% year on year, Fed funds ${m.macro.fedFunds}%, 10-year yield ${m.macro.tenYear}%.`);
-    const ai = await generateJson({ system: withLang(SYSTEM, lang), user: "FACTS:\n" + facts.filter(Boolean).join("\n"), schema: SCHEMA, job: "ai-council", timeoutMs: 40000 });
+    const ff = fence(facts.filter(Boolean).join("\n"), "facts", 12000);
+    const ai = await generateJson({ system: withLang(SYSTEM + "\n\n" + guard([ff.tag]), lang), user: "FACTS:\n" + ff.wrapped, schema: SCHEMA, job: "ai-council", timeoutMs: 40000 });
     const why = (Array.isArray(ai.why) ? ai.why : []).map((x) => clean(x, 320)).filter(Boolean).slice(0, 4);
     if (!why.length) throw new Error("empty");
     return res.status(200).json({ headline: clean(ai.headline, 240), why, risk: clean(ai.risk, 300), change: clean(ai.change, 300), generatedAt: new Date().toISOString() });
