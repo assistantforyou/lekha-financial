@@ -42,6 +42,7 @@ const SYSTEM = [
   "Answer the user's question directly, using the PORTFOLIO and MARKET blocks and the numbered EVIDENCE.",
   "Cite evidence inline as [E1], [E2]. Every figure you state must come from the blocks or the evidence; never estimate, round to a guess or invent a number.",
   "If the evidence does not contain the answer, say which data is missing instead of filling the gap from memory.",
+  "The EVIDENCE includes dated web results alongside market data and filings. Use them for what prices cannot show: who supplies whom, a customer's share of a supplier's revenue, ownership stakes, reported estimates, management and events. Name the publisher and date, prefer a company disclosure or a named source over an undated summary, and never present a derived ratio as if the source stated it.",
   "Where you go beyond the data, mark it as interpretation rather than fact.",
   "Answer at the length the question needs: one sentence for a single figure, a short paragraph plus a list when several things were asked, or a structured report when the user asks for one. There is no word limit. Cut filler, not substance: no preamble, no restating the question, no closing offer of further help.",
   "Format the answer as GitHub-flavoured Markdown: ## headings for sections, **bold** for the few figures that matter, - lists, and pipe tables whenever you compare two or more items across several measures (a header row, a separator row, then one row per item; right-align number columns with ---:). Put units in the header. Never use HTML, emoji or decorative symbols.",
@@ -119,6 +120,8 @@ async function* run(opts) {
     }
 
     const plan = await router.plan({ question, symbol: opts.symbol, mode });
+    // The demo is a frozen point in time: live web pages would contradict the dated data around them.
+    if (opts.demo) plan.calls = plan.calls.filter((c) => c.tool !== "web_search");
     yield { type: "plan", symbols: plan.symbols, kind: plan.kind };
     yield { type: "step", label: plan.kind === "portfolio" ? "Fetching live quotes for your portfolio" : "Fetching live market data" };
 

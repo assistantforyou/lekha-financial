@@ -37,6 +37,11 @@
   "quotas": {
     "analystQuestionsPerDay": { "paid": 20, "premium": 40 },
     "briefingGenerationsPerDay": { "paid": 1, "premium": 3 },
-    "expertQuestionsPerDay": { "paid": 30, "premium": 80 }
+    "expertQuestionsPerDay": { "paid": 30, "premium": 80 },
+    "researchQuestionsPerDay": { "demo": 15, "free": 30, "paid": 30, "premium": 80 },
+    "chatTurnsPerDay": { "free": 30, "paid": 150, "premium": 400 },
+    "chatDeepTurnsPerDay": { "paid": 20, "premium": 100 },
+    "serverSimulationsPerDay": { "premium": 10 },
+    "councilReportsPerDay": { "premium": 10 }
   }
 }

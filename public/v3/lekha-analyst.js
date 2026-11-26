@@ -565,12 +565,18 @@
     });
     var run = document.getElementById("ai-sim-run");
     if (run) run.onclick = function () {
-      if (demo) { out.innerHTML = '<div class="empty">Running the simulation…</div>'; demoCtx().then(function () { var d = demoSim(yrs); if (d) { lastSim = d; showSim(d, false); } else out.innerHTML = '<div class="empty">The demo price history is still loading.</div>'; }); return; }
+      if (demo) {
+        out.innerHTML = '<div class="empty">Running the simulation…</div>';
+        var go = function () { demoCtx().then(function () { var d = demoSim(yrs); if (d) { d.at = new Date().toISOString(); lastSim = d; showSim(d, false); } else out.innerHTML = '<div class="empty">The demo price history is still loading.</div>'; }); };
+        /* let the running state paint before the synchronous demo calculation */
+        if (window.requestAnimationFrame) requestAnimationFrame(function () { setTimeout(go, 0); }); else go();
+        return;
+      }
       out.innerHTML = '<div class="empty">Simulating…</div>';
       PT_AUTH.fetch("/api/ai/simulate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ years: yrs, lang: uiLang() }) })
         .then(function (r) { return jget(r).then(function (j) { return { s: r.status, j: j }; }); })
         .then(function (x) {
-          if (x.s === 200 && x.j && x.j.percentiles) { lastSim = x.j; showSim(x.j, false); return; }
+          if (x.s === 200 && x.j && x.j.percentiles) { x.j.at = new Date().toISOString(); lastSim = x.j; showSim(x.j, false); return; }
           if (x.s === 429) { out.innerHTML = '<div class="empty">Simulation limit reached for today (10/day).</div>'; return; }
           if (x.s === 400 && x.j && x.j.code === "no_holdings") { out.innerHTML = '<div class="empty">Add some holdings first — the simulation runs on your actual positions.</div>'; return; }
           if (x.s === 503) { out.innerHTML = '<div class="empty">The AI service is not configured on this deployment.</div>'; return; }
@@ -578,8 +584,10 @@
         })
         .catch(function () { out.innerHTML = '<div class="empty">Network error running the simulation.</div>'; });
     };
-    /* auto-run once on entering the tab */
-    if (demo) { demoCtx().then(function () { var d = demoSim(yrs); if (d) { lastSim = d; showSim(d, false); } }); }
+    /* auto-run once on entering the tab, except while the Quick Tour is asking the visitor to run it */
+    if (window.LEKHA_TOUR_ACTIVE) {
+      out.innerHTML = '<div class="empty">Choose a horizon and press Run simulation.</div>';
+    } else if (demo) { demoCtx().then(function () { var d = demoSim(yrs); if (d) { d.at = new Date().toISOString(); lastSim = d; showSim(d, false); } }); }
     else if (lastSim) showSim(lastSim, false);
   }
 
@@ -602,7 +610,7 @@
         '<span class="ai-bv' + (up ? " up" : " dn") + '">' + (b[1] * 100).toFixed(0) + "%</span></div>";
     });
     h += "</div>";
-    h += "<p><b>Probability of a loss over the horizon: " + esc(sim.probLoss) + "%</b> <span class='note'>(" + esc(sim.paths) + " Monte Carlo paths from your holdings' own daily return history)</span></p>";
+    h += "<p><b>Probability of a loss over the horizon: " + esc(sim.probLoss) + "%</b> <span class='note'>(" + esc(sim.paths) + " Monte Carlo paths from your holdings' own daily return history · computed " + esc(new Date(sim.at || Date.now()).toLocaleTimeString()) + ")</span></p>";
     if (sim.stress && sim.stress.length) {
       h += "<h4>Stress scenarios</h4><div class='tablebox'><table class='kv'><thead><tr><th class='l'>Scenario</th><th>Market move</th><th>Est. portfolio impact</th><th class='l'>Why</th></tr></thead><tbody>";
       sim.stress.forEach(function (s) {

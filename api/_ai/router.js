@@ -25,6 +25,8 @@ function flags(question) {
 }
 
 // Which tools to run before the model speaks. At most six so a fast turn stays fast.
+const WEB = /\b(tied|tie|exposure|exposed|supplier|suppliers|customer|customers|supply chain|depend|depends|dependence|relationship|partner|partnership|stake|owns|owner|ownership|share of|revenue from|net worth|market cap|competitor|competitors|history|founded|ceo|management|explain|how does|why does|who is|what is)\b/i;
+
 function callsFor(question, symbols, f) {
   const q = String(question || "");
   const calls = [];
@@ -35,6 +37,10 @@ function callsFor(question, symbols, f) {
   };
   const first = symbols[0];
   if (first) push("get_quote", { symbol: first });
+  // Every company question, and any question about a relationship or an exposure, consults the open
+  // web: market feeds do not know who supplies whom or how much of a supplier's revenue one customer is.
+  if (!(f.portfolio && !first) && (first || WEB.test(q))) push("web_search", { query: agent.webQuery(q, symbols), limit: 6 });
+  if (WEB.test(q) && symbols.length >= 2) push("web_search", { query: `${symbols.slice(0, 2).map((x) => agent.companyName(x)).join(" ")} largest customer share of revenue`, limit: 4 });
   if (first && (f.why || f.brief)) push("get_historical_prices", { symbol: first, days: 60 });
   if (first && f.why) push("get_news", { symbol: first });
   if (first && f.compare) push("get_peer_companies", { symbol: first });
@@ -62,6 +68,7 @@ async function plan({ question, symbol, mode }) {
   if (kind === "portfolio") guidance.push("The user is asking about their own portfolio: use the PORTFOLIO block, quote its weights and values, and never invent a position that is not listed.");
   if (kind === "company" && symbols.length) guidance.push(`The question is about ${symbols.join(", ")}. Use the evidence for those tickers before general knowledge.`);
   if (kind === "macro") guidance.push("The question is about markets or macro: prefer the MARKET block and macro evidence over general commentary.");
+  if (WEB.test(q)) guidance.push("The WEB EVIDENCE items are dated public reporting: use them for relationships, supply chains, ownership, management or a share of revenue, name the publisher, and mark a figure you derive from two sources as a calculation rather than a reported fact.");
   if (mode === "deep") guidance.push("You may call tools for anything the retrieved evidence does not cover. Stop calling tools once the question can be answered.");
   return { question: q, flags: f, symbols, kind, calls, mode: mode === "deep" ? "deep" : "fast", guidance };
 }

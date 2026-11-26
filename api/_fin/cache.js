@@ -9,6 +9,7 @@ const H = 36e5, M = 6e4;
 const TTL = {
   quote: 5e3, intraday: 60e3, crypto: 30e3, fx: H, history: H, profile: 12 * H, fundamentals: 6 * H, statements: 24 * 7 * H, facts: 12 * H, filings: 30 * M,
   news: 20 * M, earnings: 6 * H, estimates: 12 * H, macro: 6 * H, peers: 24 * H, search: 24 * H, concept: 24 * H,
+  web: 10 * M, page: 6 * H,
 };
 const SHARED = new Set(["profile", "statements", "facts", "filings", "macro", "earnings", "estimates", "peers", "history", "fx", "news"]);
 const MAX = 600;

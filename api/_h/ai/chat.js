@@ -1,9 +1,9 @@
 // Chat turn, streamed over SSE. One endpoint for every AI surface: the mode decides depth,
 // the router decides tools. Threads are stored per user in pt_user_state.
 const { requireTier } = require("../../_auth");
-const { tierOf } = require("../../_tiers");
-const { rateHit } = require("../../_lib");
-const { clientId } = require("../../_history");
+const { tierOf, quota } = require("../../_tiers");
+const { rateHit, rateUndo } = require("../../_lib");
+const { demoId } = require("../../_history");
 const { listState, putState } = require("../../_state");
 const { langOf, withLang } = require("../ai/_lang");
 const loop = require("../../_ai/loop");
@@ -13,14 +13,9 @@ const { createAIContext } = require("../../_ai/observability");
 const DAY = 86400000;
 const MAX_MESSAGES = 40;
 
-const LIMITS = {
-  // One question before an account is the hook: an anonymous visitor gets to see the analyst answer from real
-  // evidence, then the next one asks for a free signup. Keyed per client per day, so clearing cookies resets it.
-  demo: { turns: 1, deep: 0 },
-  free: { turns: 30, deep: 0 },
-  paid: { turns: 150, deep: 20 },
-  premium: { turns: 400, deep: 100 },
-};
+// One question before an account is the hook: an anonymous visitor gets to see the analyst answer from real
+// evidence, then the next one asks for a free signup. Accounts use the plan quotas in entitlements.json.
+const DEMO_LIMIT = { turns: 1, deep: 0 };
 
 function send(res, obj) {
   try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch (e) { /* client gone */ }
@@ -70,16 +65,19 @@ module.exports = async function handler(req, res) {
   // tierOf() maps a demo profile to "free" (it only knows the subscription plans), so the anonymous
   // case has to be named first or the demo quota would silently become the free quota.
   const tier = p.demo ? "demo" : tierOf(p) || "free";
-  const lim = LIMITS[tier] || LIMITS.free;
+  const lim = p.demo ? DEMO_LIMIT : { turns: quota("chatTurnsPerDay", tier), deep: quota("chatDeepTurnsPerDay", tier) };
   const mode = b.mode === "deep" ? "deep" : "fast";
   if (mode === "deep" && !lim.deep) {
     return res.status(402).json({ error: "Deep thinking is part of the paid plans.", code: "deep_unavailable", need: ["paid", "premium"] });
   }
   if (!ds.ready()) return res.status(503).json({ error: "The AI provider is not configured.", code: "not_configured" });
 
-  const who = p.demo ? "d-" + clientId(req) : p.user_id;
+  // A demo question belongs to the browser, not the network: one visitor behind a shared IP must not
+  // spend another visitor's question. Accounts keep the user id.
+  const who = p.demo ? "d-" + demoId(req, b) : p.user_id;
   const day = Math.floor(Date.now() / DAY);
-  const under = await rateHit(`ai/chat/${who}/${day}`, lim.turns).catch(() => false);
+  const key = `ai/chat/${who}/${day}`;
+  const under = await rateHit(key, lim.turns).catch(() => false);
   if (!under) {
     if (p.demo) return res.status(429).json({ error: "That was your free question. Create a free account to keep asking.", code: "signup_required", need_signup: true });
     return res.status(429).json({ error: "Daily AI limit reached. It resets at midnight UTC.", code: "ai_limit" });
@@ -135,6 +133,10 @@ module.exports = async function handler(req, res) {
       message: budget ? "The AI daily budget has been reached. It resets at midnight UTC." : "The answer stopped early.",
     });
   }
+
+  // An empty demo attempt is not the free question: give it back so a provider failure, an empty
+  // response or a closed tab does not spend the hook. Once any text exists the question stays used.
+  if (p.demo && !answer) await rateUndo(key).catch(() => false);
 
   if (persisted && !aborted) {
     try {

@@ -7,6 +7,12 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, "..", "app", "src"
 
 (async () => {
   const { COPY, PTS, LANG_LABEL, LANG_NATIVE } = await load("copy.js"), { place, scrollDelta } = await load("layout.js");
+  const { STEPS, modeOf } = await load("steps.js");
+  assert.deepStrictEqual(STEPS.map((s) => s.id), ["welcome", "search", "nav", "summary", "sim", "stress", "dcf", "ask", "answer", "finish"], "tour step order");
+  const by = Object.fromEntries(STEPS.map((s) => [s.id, s]));
+  for (const id of ["search", "nav", "sim", "stress", "dcf", "ask"]) assert.strictEqual(modeOf(by[id]), "coach", `${id} must stay live so the visitor can use the control`);
+  assert.strictEqual(modeOf(by.summary), "card", "summary is an explanatory step");
+  assert.strictEqual(modeOf(by.answer), "quiet", "answer is beside the page");
   const I = require("../public/v2/pt-i18n.js");
   const codes = I.LANGS.map((l) => l.code);
   assert.deepStrictEqual(Object.keys(COPY).sort(), codes.slice().sort(), "tour copy must cover exactly the languages the app ships");

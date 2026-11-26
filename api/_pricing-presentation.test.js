@@ -17,6 +17,19 @@ assert.deepStrictEqual([...plansBlock.matchAll(/^\s{4}id: "([a-z]+)"/gm)].map((m
 assert.ok(/const PRICE = \{ free: "฿0\/mo", paid: "฿399\/mo", premium: "฿599\/mo" \}/.test(acct), "React prices");
 assert.ok(/data-plan-cards="3"/.test(acct) && /data-demo-preview/.test(acct), "three cards and a separate demo preview");
 assert.ok(!/id: "demo"/.test(acct), "no Demo plan card");
+// Quotas come from the one entitlements file, never from literals that can drift from what the server enforces.
+assert.ok(/Q\("researchQuestionsPerDay", "free"\)/.test(plansBlock), "Free research quota is read from entitlements");
+assert.ok(/Q\("chatTurnsPerDay", "free"\)/.test(plansBlock), "Free chat quota is read from entitlements");
+for (const tier of ["paid", "premium"]) {
+  assert.ok(new RegExp(`Q\\("analystQuestionsPerDay", "${tier}"\\)`).test(plansBlock), tier + " analyst quota");
+  assert.ok(new RegExp(`Q\\("chatTurnsPerDay", "${tier}"\\)`).test(plansBlock), tier + " chat quota");
+  assert.ok(new RegExp(`Q\\("researchQuestionsPerDay", "${tier}"\\)`).test(plansBlock), tier + " research quota");
+  assert.ok(new RegExp(`Q\\("briefingGenerationsPerDay", "${tier}"\\)`).test(plansBlock), tier + " briefing quota");
+}
+assert.ok(!/\b(30|80) cited research questions/.test(plansBlock), "no hardcoded research quota");
+assert.ok(/opens every screen on a simulated sample portfolio/.test(acct), "demo copy says every screen is open");
+assert.ok(/plays pre-written sample reports/.test(acct), "demo Council is described honestly");
+assert.ok(!/features stay locked in the demo/.test(acct), "demo copy no longer contradicts the open preview");
 
 // classic card source and every generated copy of it
 for (const f of ["public/v2/pt-ui.js", "public/v3/lekha-ui.js", "public/app/lekha-ui.js"]) {

@@ -12,6 +12,7 @@ const P = {
   sec: require("./providers/sec"), fred: require("./providers/fred"), alpaca: require("./providers/alpaca"), yahoo: require("./providers/yahoo"), twelvedata: require("./providers/twelvedata"),
   finnhub: require("./providers/finnhub"), fmp: require("./providers/fmp"), alphavantage: require("./providers/alphavantage"), fx: require("./providers/fx"), coingecko: require("./providers/coingecko"), news: require("./providers/news"),
   wiki: require("./providers/wiki"),
+  web: require("./providers/web"),
 };
 const S = require("./schemas");
 const C = require("./calc");
@@ -290,6 +291,21 @@ async function search(query, { limit = 12 } = {}) {
   return { data: { query: q, results: results.slice(0, limit), concepts, intents }, meta: { source: "merged", attempts } };
 }
 
+// ---------------- web research: search the open web, then read the page when the snippet is not enough ----------------
+async function searchWeb(query, { limit = 8 } = {}) {
+  const q = String(query || "").trim().slice(0, 300);
+  if (q.length < 2) throw Object.assign(new Error("bad_query"), { status: 400 });
+  // The web payload is already the normalised result, so it bypasses chain()/cached() (which wrap provider attempts).
+  const c = await cacheFetch("web", `${q.toLowerCase()}|${limit}`, () => P.web.search(q, { limit }), { ttl: 10 * 60e3, shared: false });
+  return { data: c.value, meta: { source: (c.value && c.value.via) || "web", cache: c.cache, stale: !!c.stale, ageMs: c.ageMs } };
+}
+async function readWeb(url) {
+  const u = String(url || "").trim();
+  if (!/^https?:\/\//i.test(u)) throw Object.assign(new Error("bad_url"), { status: 400 });
+  const c = await cacheFetch("page", u, () => P.web.read(u), { ttl: 6 * 36e5, shared: false });
+  return { data: c.value, meta: { source: (c.value && c.value.via) || "web", cache: c.cache, stale: !!c.stale, ageMs: c.ageMs } };
+}
+
 // ---------------- derived: ratios, growth, valuation (all deterministic, via calc.js) ----------------
 const m = (id, label, value, unit, formula, inputs, extra = {}) => ({ id, label, ...C.result(label, value, unit, formula, inputs), ...extra });
 async function getRatios(symbol, { asOf } = {}) {
@@ -384,5 +400,5 @@ function status() {
   return Object.values(P).map((p) => ({ name: p.name, configured: p.configured(), license: p.license || null }));
 }
 
-module.exports = { getQuote, getQuotes, getHistoricalPrices, getIntradayPrices, getMovers, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, getRatios, getValuation, getCompanyBundle,
+module.exports = { getQuote, getQuotes, getHistoricalPrices, getIntradayPrices, getMovers, getCompanyProfile, getFinancialStatements, getCompanyFacts, getSecFilings, getNews, getEarnings, getEstimates, getPeers, getMacroSeries, getMacroDashboard, getFX, search, searchWeb, readWeb, getRatios, getValuation, getCompanyBundle,
   status, providers: P, dedupe, norm, chain, sym, CONCEPTS };

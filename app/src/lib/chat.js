@@ -6,6 +6,19 @@ const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/";
 
 const send = (path, init) => (window.PT_AUTH && window.PT_AUTH.fetch ? window.PT_AUTH.fetch(path, init) : fetch(path, init));
 
+// The demo's one free question belongs to this browser. The id is random, local to the origin and never
+// sent for a signed-in account; the server falls back to the network address when it is missing.
+function demoId() {
+  try {
+    let id = localStorage.getItem("ptpub.v1.demoId");
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(id || "")) {
+      id = window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : Array.from({ length: 4 }, () => Math.random().toString(36).slice(2)).join("");
+      localStorage.setItem("ptpub.v1.demoId", id);
+    }
+    return id;
+  } catch (e) { return ""; }
+}
+
 // One SSE frame per blank line; each frame is a JSON object after "data: ".
 function frame(block) {
   const line = block.split("\n").find((l) => l.startsWith("data:"));
@@ -17,9 +30,11 @@ function frame(block) {
 
 export async function streamChat({ message, threadId, mode = "fast", symbol, lang, attachments, signal, onPart }) {
   const body = { message, mode, threadId: threadId || undefined, symbol: symbol || undefined, lang: lang || undefined, attachments: attachments && attachments.length ? attachments : undefined };
+  const headers = { "Content-Type": "application/json", Accept: "text/event-stream" };
+  if (window.PT_DEMO_MODE) { const id = demoId(); if (id) headers["X-Demo-Id"] = id; }
   const r = await send("/api/ai/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers,
     body: JSON.stringify(body),
     signal,
   });

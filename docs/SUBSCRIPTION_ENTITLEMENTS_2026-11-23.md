@@ -9,6 +9,20 @@ were left untouched; the work was done in a separate worktree.
 **Status: NOT READY for paying customers.** The code, the mocked tests and a localhost browser check pass. The
 Stripe price, the staging journey and protected simulation execution are not verified (see Blockers).
 
+## Update, 26 November 2026
+
+The demo behaviour described in the 23 November audit below has changed. The demo reports tier `demo`
+and opens every screen on a simulated sample portfolio. Server endpoints stay closed: `/api/free/demo`
+serves only HISTORY, quotes and street, and every restricted `/api/h/*` route still refuses `demo`.
+The analyst is real and answers on the sample data; the demo Council plays pre-written sample reports
+and does not call a model. The one demo chat question is keyed to a random per-browser `X-Demo-Id`
+(hashed server-side), not the visitor's IP, and `pt_rate_undo` returns it when a failed or aborted
+request produced no answer. Chat, research, expert, Council and simulation limits now come from
+`api/_data/entitlements.json` through `quota()`; see `docs/TIERS.md` for the current table. Routed
+pages, the React root and the login page have error boundaries, so a failed lazy chunk shows a
+recoverable message instead of a blank screen. Where the audit below says the demo reported `premium`
+or that modules were not mounted for demo, read this update.
+
 ## 1. Access paths found before the change
 
 | Path | Executed | Protection before | Now |
@@ -25,7 +39,7 @@ Stripe price, the staging journey and protected simulation execution are not ver
 | `/api/ai/simulate`, `/api/ai/council`, `/api/ai/council-v3` | server + LLM | Premium | unchanged (Premium) via the shared matrix |
 | `/api/state` `reports/*` (saved Council reports) | server | any signed-in owner | withheld from `GET` without `councilReports`; not deleted |
 | `/api/rag` ingest `kind:"report"`; agent retrieval | server | any owner | needs `councilReports`; agent drops report passages without it |
-| Demo (`PT_DEMO_MODE`, `?demo=1`) | browser | **reported `PT_TIER="premium"`**: analyst, sim, Council, Projection Lab open | reports `demo`; `pt-demo.js` serves no data for locked features; modules not mounted |
+| Demo (`PT_DEMO_MODE`, `?demo=1`) | browser | **reported `PT_TIER="premium"`**: analyst, sim, Council, Projection Lab open | reports `demo`; every screen opens on simulated sample data; restricted server endpoints stay closed; nothing is saved |
 | Monte Carlo engine `public/v3/lekha-sim.js`, `sim-runner.js`, `sim-stream.worker.js`, `public/core/engine.js` | browser | Premium check in the browser | not imported or mounted without Premium; **static files remain public** (see 4) |
 | Projection Lab `public/v2/pt-projection.js` + `pt-projection-data.json` | browser | open to demo and Premium | Premium only; the JSON is a labelled illustration and stays a public static file |
 

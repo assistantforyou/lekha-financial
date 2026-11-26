@@ -21,6 +21,7 @@ const idle = (f) => { try { window.requestIdleCallback ? window.requestIdleCallb
 import { PageHeader } from "@/components/common"
 import { BY_KEY, DEFAULT_ROUTE, parseHash } from "@/nav"
 import LockedFeature from "@/components/LockedFeature"
+import ErrorBoundary from "@/components/ErrorBoundary"
 import { allows, featureOfRoute } from "@/lib/entitlements"
 import { Skeleton } from "@/components/ui/skeleton"
 import LangPrompt from "@/components/LangPrompt"
@@ -117,7 +118,9 @@ export default function App() {
           <main className="min-w-0 flex-1 px-3 pb-16 pt-4 sm:px-6" id="main">
             <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1 text-[12px] text-muted-foreground"><span>{group}</span><ChevronRight className="size-3" /><span className="text-foreground">{item.title}{route.param ? ` · ${route.param}` : ""}</span></nav>
             <Suspense fallback={null}><PageHelp routeKey={route.key} /></Suspense>
-            {gated ? <><PageHeader title={item.title} description={item.desc} /><LockedFeature feature={feature} title={item.title} tier={tier} me={me} signedIn={signedIn} demo={demo} navigate={navigate} confirming={confirming} /></> : gateLoading ? <><PageHeader title={item.title} description={item.desc} /><div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div></> : isPane ? <><PageHeader title={item.title} description={item.desc} /><PanelHost ids={item.panes} analyst={item.analyst} route={r} /></> : Page ? <Suspense fallback={<><PageHeader title={item.title} description={item.desc} /><div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div></>}><Page route={r} item={item} navigate={navigate} me={me} /></Suspense> : null}
+            <ErrorBoundary key={route.key} where="route">
+              {gated ? <><PageHeader title={item.title} description={item.desc} /><LockedFeature feature={feature} title={item.title} tier={tier} me={me} signedIn={signedIn} demo={demo} navigate={navigate} confirming={confirming} /></> : gateLoading ? <><PageHeader title={item.title} description={item.desc} /><div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div></> : isPane ? <><PageHeader title={item.title} description={item.desc} /><PanelHost ids={item.panes} analyst={item.analyst} route={r} /></> : Page ? <Suspense fallback={<><PageHeader title={item.title} description={item.desc} /><div className="space-y-2" aria-busy="true"><Skeleton className="h-16" /><Skeleton className="h-40" /></div></>}><Page route={r} item={item} navigate={navigate} me={me} /></Suspense> : null}
+            </ErrorBoundary>
             <footer className="mt-12 border-t border-border pt-4 text-[11.5px] leading-relaxed text-muted-foreground">
               <p>LEKHA Financials is analysis software, not investment advice.</p>
               <div id="app-foot-slot" />

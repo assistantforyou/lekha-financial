@@ -7,7 +7,7 @@
 // Env: COUNCIL_V3_DAILY (default 10 fresh runs per user per day), COUNCIL_V3_MAX_TOKENS (default 6000).
 const crypto = require("crypto");
 const { requireTier } = require("../../_auth");
-const { tierOf, tierAllows } = require("../../_tiers");
+const { tierOf, tierAllows, quota } = require("../../_tiers");
 const { rateHit, cacheGet, cacheSet } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { fence, guard } = require("../../_ai_safe");
@@ -166,8 +166,9 @@ function evidenceText(ev, scope) {
 
 const pending = new Map();
 
-async function convene({ uid, scope, question, evidence, lang, key }) {
-  if (!(await rateHit(`ai/council3/${uid}/${Math.floor(Date.now() / DAY)}`, envInt("COUNCIL_V3_DAILY", 10, 1, 1000)))) {
+async function convene({ uid, tier, scope, question, evidence, lang, key }) {
+  const limit = envInt("COUNCIL_V3_DAILY", quota("councilReportsPerDay", tier), 1, 1000);
+  if (!(await rateHit(`ai/council3/${uid}/${Math.floor(Date.now() / DAY)}`, limit))) {
     return { status: 429, body: { error: "Daily council limit reached.", code: "ai_limit" } };
   }
 
@@ -244,7 +245,7 @@ module.exports = async (req, res) => {
 
     const shared = pending.has(key);
     if (!shared) {
-      const task = convene({ uid, scope, question, evidence, lang, key }).finally(() => pending.delete(key));
+      const task = convene({ uid, tier, scope, question, evidence, lang, key }).finally(() => pending.delete(key));
       pending.set(key, task);
     }
     const { status, body } = await pending.get(key);

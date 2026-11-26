@@ -122,7 +122,7 @@ const PLANS = [
       ["Up to 20 holdings", "Every lot, cost basis, weight, unrealized P&L, the risk screen and the performance chart."],
       ["5 years of history", "Enough for drawdowns and rolling returns on your own portfolio."],
       ["Macro dashboard and regime", "Rates, inflation, the yield curve, the regime model and CNN Fear & Greed."],
-      ["30 AI research questions a day", "The cited research agent that retrieves filings and news before answering. The portfolio analyst, Council and simulations are not included."],
+      [`${Q("researchQuestionsPerDay", "free")} cited research questions a day`, `The research agent retrieves filings and news before answering, with ${Q("chatTurnsPerDay", "free")} analyst chat turns a day. The portfolio-aware analyst, Council and simulations are not included.`],
     ],
   },
   {
@@ -132,7 +132,7 @@ const PLANS = [
       ["Market rotation, intelligence and risk appetite", "Relative strength across sectors and styles, the daily AI-labelled market briefing, XLY/XLP, VIX and VIXEQ."],
       ["Intrinsic value and deep analysis", "DCF and residual-income models with margin of safety for every holding, plus the one-holding-at-a-time deep analysis."],
       ["Sector rotation", "Relative rotation graph, leadership quality with earnings revisions, and sector breadth."],
-      ["AI analyst and daily briefing", `Ask about your own positions: ${Q("analystQuestionsPerDay", "paid")} analyst questions and ${Q("briefingGenerationsPerDay", "paid")} new briefing a day, plus 30 cited research questions a day.`],
+      ["AI analyst and daily briefing", `Ask about your own positions: ${Q("analystQuestionsPerDay", "paid")} portfolio analyst requests, ${Q("chatTurnsPerDay", "paid")} analyst chat turns and ${Q("briefingGenerationsPerDay", "paid")} new briefing a day, plus ${Q("researchQuestionsPerDay", "paid")} cited research questions.`],
       ["Unlimited holdings and full history", "Track every account and position with the full daily series each source serves."],
     ],
   },
@@ -143,7 +143,7 @@ const PLANS = [
       ["Simulation engine", "Monte Carlo on your holdings: up to 1,000,000 requested paths per run for up to 25 invested holdings. The completed path count is shown on every result."],
       ["Stress tests and Projection Lab", "Rate-shock, tech-drawdown and recession scenarios on your weights, and the illustrative Projection Lab."],
       ["LLM council and saved reports", "One model writes five role-based perspectives and a CEO synthesis in a single structured response, saved as a report you can reread. 10 new reports a day."],
-      ["Higher AI allowances", `${Q("analystQuestionsPerDay", "premium")} analyst questions and ${Q("briefingGenerationsPerDay", "premium")} new briefings a day, and 80 cited research questions a day.`],
+      ["Higher AI allowances", `${Q("analystQuestionsPerDay", "premium")} portfolio analyst requests, ${Q("chatTurnsPerDay", "premium")} analyst chat turns and ${Q("briefingGenerationsPerDay", "premium")} new briefings a day, and ${Q("researchQuestionsPerDay", "premium")} cited research questions.`],
       ["Everything in Paid", "Every market, sector, valuation and analyst feature."],
     ],
   },
@@ -168,7 +168,7 @@ export function Plans({ item, navigate, me }) {
       </CardContent>
       <CardFooter className="pt-0">{t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => cur === "paid" ? manage() : go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
     <Card className="mt-4" data-demo-preview><CardContent className="flex flex-wrap items-center gap-3 pt-5">
-      <div className="min-w-0 flex-1 text-sm"><div className="font-semibold">Not ready to sign up? Try the demo.</div><p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">The demo is a free preview, not a plan. It shows the Free screens on a sample portfolio with simulated data, needs no account and saves nothing to the service. Paid and Premium features stay locked in the demo.</p></div>
+      <div className="min-w-0 flex-1 text-sm"><div className="font-semibold">Not ready to sign up? Try the demo.</div><p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">The demo is a free preview, not a plan. It opens every screen on a simulated sample portfolio, needs no account and saves nothing to the service. The analyst answers real questions on that sample data. The demo Council plays pre-written sample reports rather than calling a model.</p></div>
       {demo ? <span className="text-[12.5px] text-muted-foreground">You are in the demo.</span> : <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button>}
     </CardContent></Card>
     {signedIn && me?.can_manage_billing && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · period ends {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button>{["past_due", "unpaid", "incomplete"].includes(me.sub_status) && <Alert className="basis-full"><AlertTriangle className="size-4" /><AlertTitle>Payment not received</AlertTitle><AlertDescription>The latest charge for your subscription failed, so paid features are paused. Update the card in Manage subscription; access returns as soon as Stripe confirms the payment.</AlertDescription></Alert>}</CardContent></Card>}

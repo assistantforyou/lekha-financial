@@ -5,7 +5,7 @@ const { tierOf, tierAllows, canUse, quota } = require("../../_tiers");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { knowledgeOwner } = require("../../_demo-owner");
-const { clientId } = require("../../_history");
+const { demoId } = require("../../_history");
 const agent = require("../../_fin/agent");
 const { DEMO_ASOF } = require("../../_fin/asof");
 const { langOf, withLang } = require("../ai/_lang");
@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
   if (b.mode === "expert" && !tierAllows(tier, "analyst")) {
     return res.status(p.demo ? 401 : 402).json({ error: "Paid or Premium plan required for the analyst.", tier, need: ["paid", "premium"], feature: "analyst", plan: "paid" });
   }
-  const who = p.demo ? "d-" + clientId(req) : p.user_id, limit = p.demo ? 15 : tierOf(p) === "premium" ? 80 : 30;
+  const who = p.demo ? "d-" + demoId(req, b) : p.user_id, limit = quota("researchQuestionsPerDay", tier);
   if (!(await rateHit(`ai/agent/${who}/${Math.floor(Date.now() / DAY)}`, limit).catch(() => false))) return res.status(429).json({ error: `Daily research limit reached (${limit}/day).`, code: "ai_limit" });
   const lang = langOf(b.lang), hasLlm = !!process.env.DEEPSEEK_API_KEY;
   const llm = hasLlm ? { json: (o) => generateJson(o) } : null;

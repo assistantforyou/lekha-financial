@@ -73,7 +73,7 @@ export function buildSimInput() {
 }
 
 /* ---------- rendering ---------- */
-let host, st = { hz: "1Y", paths: 100000, job: null, res: null, prog: null, meta: null, input: null, err: null, auto: false, sample: null, showPaths: true };
+let host, st = { hz: "1Y", paths: 100000, job: null, res: null, prog: null, meta: null, input: null, err: null, auto: false, sample: null, showPaths: true, runId: 0 };
 /* Re-run a small number of paths through the same engine and keep their daily values. Cheap: 120 paths is 30,240 daily steps. */
 function samplePaths(inp) {
   if (!inp) return null;
@@ -112,14 +112,27 @@ function seg() {
 function start() {
   if (st.job) return;
   const b = buildSimInput(); if (b.err) { st.err = b.err; paint(); return; }
+  const rid = ++st.runId;
   st.input = b.input; st.meta = b.meta; st.err = null; st.prog = { completedPaths: 0, simulatedPaths: 0, requestedPaths: st.paths, fraction: 0 };
   const seed = b.input.seed;
-  try { st.job = run({ input: b.input, paths: Math.min(st.paths, MAX_PATHS), seed, onProgress: (p) => { st.prog = p; progress(); } }); }
+  try { st.job = run({ input: b.input, paths: Math.min(st.paths, MAX_PATHS), seed, onProgress: (p) => { if (rid === st.runId) { st.prog = p; progress(); } } }); }
   catch (e) { st.err = "The simulation could not start: " + e.message; st.job = null; paint(); return; }
   seg(); progress(); host.querySelector("#sim-go").hidden = true; host.querySelector("#sim-stop").hidden = false;
-  st.job.promise.then((r) => { st.res = { ...r, at: new Date().toISOString() }; st.sample = samplePaths(b.input); window.LEKHA_SIM_LAST = simSummary(); })
-    .catch((e) => { st.err = "Simulation failed: " + (e && e.message || e); })
-    .finally(() => { st.job = null; seg(); host.querySelector("#sim-go").hidden = false; host.querySelector("#sim-stop").hidden = true; host.querySelector("#sim-prog").hidden = true; paint(); });
+  st.job.promise.then((r) => { if (rid !== st.runId) return; st.res = { ...r, at: new Date().toISOString() }; st.sample = samplePaths(b.input); window.LEKHA_SIM_LAST = simSummary(); })
+    .catch((e) => { if (rid !== st.runId) return; st.err = "Simulation failed: " + (e && e.message || e); })
+    .finally(() => { if (rid !== st.runId) return; st.job = null; seg(); host.querySelector("#sim-go").hidden = false; host.querySelector("#sim-stop").hidden = true; host.querySelector("#sim-prog").hidden = true; paint(); });
+}
+/* The Quick Tour clears a finished or running projection and leaves the tool ready for the visitor's own run. */
+export function resetForTour({ hz = "1Y", paths = 10000 } = {}) {
+  st.runId++;
+  if (st.job && typeof st.job.stop === "function") { try { st.job.stop(); } catch (e) {} }
+  st.job = null; st.res = null; st.prog = null; st.meta = null; st.input = null; st.err = null; st.sample = null; st.auto = true;
+  st.hz = HZ.includes(hz) ? hz : "1Y"; st.paths = paths;
+  if (host) {
+    const go = host.querySelector("#sim-go"), stop = host.querySelector("#sim-stop"), prog = host.querySelector("#sim-prog");
+    if (go) go.hidden = false; if (stop) stop.hidden = true; if (prog) prog.hidden = true;
+    seg(); paint();
+  }
 }
 function progress() {
   const el = host.querySelector("#sim-prog"), p = st.prog; if (!el || !p) return; el.hidden = false;
@@ -262,8 +275,10 @@ export async function mount(el) {
   }
   shell(); paint();
   /* first visit: one 100K run once the portfolio is priced (local computation only, no network) */
-  const tryAuto = () => { if (st.auto || st.job || st.res) return; const r = window.LEKHA_SHELL && LEKHA_SHELL.route(); if (!r || r.t !== "simulation") return;
+  const tryAuto = () => { if (window.LEKHA_TOUR_ACTIVE || st.auto || st.job || st.res) return; const r = window.LEKHA_SHELL && LEKHA_SHELL.route(); if (!r || r.t !== "simulation") return;
     const b = buildSimInput(); if (b.err) { st.err = b.err; paint(); if (b.retryable !== false) setTimeout(tryAuto, 1500); return; } st.auto = true; start(); };
   if (window.LEKHA_SHELL) LEKHA_SHELL.onRoute((r) => { if (r.t === "simulation") tryAuto(); });
   tryAuto();
 }
+
+if (typeof window !== "undefined") window.LEKHA_SIM = Object.assign(window.LEKHA_SIM || {}, { resetForTour });

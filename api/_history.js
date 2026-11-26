@@ -40,6 +40,15 @@ function clientId(req) {
   const ip = String((req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "").split(",")[0]).trim() || "unknown";
   return crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
 }
+
+// Demo quota identity: a random id the browser keeps (not a cookie, not the IP), so one free question
+// belongs to one browser instead of everyone behind the same NAT. The IP remains the fallback.
+const DEMO_ID = /^[A-Za-z0-9_-]{16,64}$/;
+function demoId(req, body) {
+  const raw = String((req && req.headers && req.headers["x-demo-id"]) || (body && body.demoId) || "").trim();
+  const id = DEMO_ID.test(raw) ? raw : String((req && req.headers && (req.headers["x-forwarded-for"] || req.headers["x-real-ip"])) || "").split(",")[0].trim() || "unknown";
+  return crypto.createHash("sha256").update("demo:" + id).digest("hex").slice(0, 16);
+}
 async function rateLimited(req) {
   const key = `rl/hist/${clientId(req)}/${Math.floor(Date.now() / RATE.windowMs)}`;
   return !(await rateHit(key, RATE.max));
@@ -83,4 +92,4 @@ async function history(req, res, opts = {}) {
   return res.status(200).send(csv);
 }
 
-module.exports = { history, cleanSymbols, MAX_SYMBOLS, seriesFor, rateLimited, clientId };
+module.exports = { history, cleanSymbols, MAX_SYMBOLS, seriesFor, rateLimited, clientId, demoId };

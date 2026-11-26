@@ -49,9 +49,7 @@ const armSim = () => {
   }
   reset()
   const base = kpi()
-  let tries = 0
-  const i = setInterval(() => { if (l.done() || ++tries > 20) return clearInterval(i); reset() }, 250)
-  return { done: () => l.done() && !!kpi() && kpi() !== base, off: () => { clearInterval(i); l.off() } }
+  return { done: () => l.done() && !!kpi() && kpi() !== base, off: () => l.off() }
 }
 /* Stress test: the visitor presses Run simulation; done when the scenario table has been drawn after the press. */
 const armStress = () => {

@@ -8,19 +8,19 @@ const serial = (iso) => Math.round(Date.parse(iso + "T00:00:00Z") / 864e5) + 255
 const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
 
 (async () => {
-  D._today("2026-11-18"); // pin the clock: the demo always ends "today", whatever today is
+  D._today("2026-08-18"); // pin the clock: the demo always ends "today", whatever today is
 
   // 1. Determinism: two builds are byte-identical (fixed seed, no Math.random, no Date.now() drift).
   const a = JSON.stringify(D.build());
-  D._today("2026-11-18"); // repinning clears the series cache -> a true second build
+  D._today("2026-08-18"); // repinning clears the series cache -> a true second build
   const b = JSON.stringify(D.build());
   assert.strictEqual(a, b);
 
   // 2. The demo never serves the same day twice for a different date pin (freshness without drift).
-  D._today("2026-11-19");
+  D._today("2026-08-19");
   const c = D.build();
   assert.notStrictEqual(a, JSON.stringify(c));
-  D._today("2026-11-18");
+  D._today("2026-08-18");
 
   const src = D.source();
 
@@ -56,7 +56,7 @@ const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
   // HISTORY: paired D|/W| columns, live 10Y, and the last trading day is exactly "today"
   assert.ok(/^D\|NVDA,,W\|NVDA,,/.test(csv.HISTORY.split("\n")[0]));
   assert.ok(/LIVE\|TNX10Y/.test(csv.HISTORY));
-  const todaySerial = String(serial("2026-11-18"));
+  const todaySerial = String(serial("2026-08-18"));
   assert.ok(csv.HISTORY.split("\n").some((l) => l.startsWith(todaySerial + ",")), "history must end at pinned today");
 
   // VALIN: header + NVDA row with a market-consistent beta
@@ -81,7 +81,7 @@ const pairs = (s) => String(s || "").split(";").filter(Boolean).length;
 
   // Extras: all-time highs + FX for every non-cash holding.
   const ex = D.extras();
-  assert.strictEqual(ex.fx.usdthb, 34.25);
+  assert.strictEqual(ex.fx.usdthb, 33.06);
   assert.strictEqual(ex.fx.hkdusd, 0.1282);
   const hold = D.holdingsDoc();
   assert.strictEqual(hold.items.length, 18);

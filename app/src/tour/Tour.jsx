@@ -202,7 +202,7 @@ export default function Tour({ navigate }) {
     if (step.target && (step.retarget || !el || !el.isConnected || !visible(el))) { const r = resolve(step); if (r.el) { if (r.el !== R.current.el) { R.current.el = el = r.el; if (step.nav && r.el.closest("aside, [role=\"dialog\"]")) revealInNav(r.el) } else el = r.el } else if (b) return; else el = null }
     let rect = null, top = 0
     if (el) { const bb = el.getBoundingClientRect(), h = header(); rect = { left: bb.left, top: bb.top, right: bb.right, bottom: bb.bottom, height: bb.height }; top = h && !h.contains(el) ? h.getBoundingClientRect().bottom : 0 }
-    const mode = modeOf(step, live.current.alt), hidden = (!!step.pill && live.current.askPhase !== "idle") || (live.current.typing && !step.pill && mode !== "card")
+    const mode = modeOf(step, live.current.alt), hidden = (!!step.pill && live.current.askPhase !== "idle") || (mobile && live.current.typing && !step.pill && mode !== "card")
     let g
     if (mode === "quiet" || mode === "coach") {
       /* docked: above the keyboard (visual viewport) at the bottom, or under the header when the target sits in the lower half, so the card never covers what the visitor is using */

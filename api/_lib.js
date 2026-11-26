@@ -47,6 +47,14 @@ async function rateHit(key, limit) {
   } catch (e) { return false; }
 }
 
+// Give a demo question back when no answer text was produced (provider error, abort). Paid quotas never undo.
+async function rateUndo(key) {
+  try {
+    const r = await sb("rpc/pt_rate_undo", { method: "POST", body: JSON.stringify({ p_key: key }) });
+    return r.ok;
+  } catch (e) { return false; }
+}
+
 async function spend() {
   const r = await sb("rpc/pt_av_spend", { method: "POST", body: JSON.stringify({ p_limit: DAILY_LIMIT }) });
   return r.ok && (await r.json()) === true;
@@ -95,4 +103,4 @@ async function cached(key, ttlMs, build) {
   return hit ? hit.payload : null;
 }
 
-module.exports = { persistJobData, sb, av, avCsv, cached, rateHit, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };
+module.exports = { persistJobData, sb, av, avCsv, cached, rateHit, rateUndo, cacheGet, cacheGetMany, cacheSet, DAILY_LIMIT };

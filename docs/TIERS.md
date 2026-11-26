@@ -32,16 +32,22 @@ watchlist, company workspace, research agent, news search, macro dashboard, macr
 |---|---|---|---|---|
 | Holdings | 14 sample | 20 | unlimited | unlimited |
 | Own-portfolio history | sample | 5 years | full depth served | full depth served |
-| Portfolio analyst questions / day | — | — | 20 | 40 |
+| Portfolio analyst requests / day | — | — | 20 | 40 |
+| Analyst chat turns / day | 1 | 30 | 150 | 400 |
+| Deep analyst chat turns / day | — | — | 20 | 100 |
 | New daily briefings / day | — | — | 1 | 3 |
 | Cited research agent questions / day | 15 | 30 | 30 | 80 |
 | Expert-mode analyst questions / day | — | — | 30 | 80 |
-| New Council reports / day | — | — | — | 10 (`COUNCIL_V3_DAILY`) |
+| New Council reports / day | — | — | — | 10 |
 | Server simulations / day | — | — | — | 10 |
 | Monte Carlo per run (browser) | — | — | — | up to 1,000,000 requested paths, 25 invested holdings; the completed count is shown |
 
 The Paid AI quotas are new with this change. They are finite and counted server-side through the
-atomic `pt_rate_hit` RPC; review them against real usage before a commercial launch.
+atomic `pt_rate_hit` RPC; review them against real usage before a commercial launch. Every number
+above is read from `api/_data/entitlements.json` through `quota()`; there are no literal plan limits
+in the endpoints. The demo chat question is keyed to a random per-browser id (`X-Demo-Id`, hashed
+server-side), not the visitor's IP, and `pt_rate_undo` gives it back when a failed or aborted request
+produced no answer.
 
 ## Where the numbers live
 
@@ -94,6 +100,9 @@ is not `active`/`trialing` or is past its `period_end` (+1 day grace) → free;
 - `public/v3/lekha-modules.js` imports and mounts Simulation, Council and Deep Analysis only when
   `/api/auth/me` includes the feature. `/v2` and `/v3` use the same data source, so locked panels
   there show "included in the Paid and Premium plans" instead of data.
+- `app/src/App.jsx` and `app/src/main.jsx` wrap routed pages and the root in an error boundary, and
+  `/login.html` has its own. A failed lazy chunk or a render error shows a recoverable message with
+  Reload and Back to portfolio instead of a blank screen and a dead Back button.
 
 **Limitation:** the Monte Carlo engine (`public/v3/lekha-sim.js`, `sim-runner.js`,
 `sim-stream.worker.js`, `public/core/engine.js`) and the Projection Lab illustration
@@ -118,11 +127,14 @@ protected. See `docs/SUBSCRIPTION_ENTITLEMENTS_2026-11-23.md`.
 ## Demo architecture
 
 Anonymous visitors enter demo mode. The browser seeds sample holdings and uses a separate storage
-namespace. Account document sync is disabled. Every route is open: the data comes from `public/pt-demo.js`,
-which simulates each dataset locally for the sample portfolio, and the analyst, Council and Monte Carlo run
-in the browser on that data (the Council plays its pre-written sample reports; no model is called). The
-server-side `/api/free/demo` endpoint still serves only HISTORY, quotes and street for the sample tickers.
-The cited research agent keeps its demo allowance (15 questions per day per browser).
+namespace. Account document sync is disabled. Every screen is open on that simulated sample data:
+`public/pt-demo.js` builds each dataset locally for the sample portfolio, and the analyst and Monte
+Carlo run in the browser. The analyst calls the real model with the sample portfolio as context. The
+Council plays pre-written sample reports; no model is called for it in the demo. The demo reports tier
+`demo` and no server endpoint opens a restricted feature: `/api/free/demo` serves only HISTORY, quotes
+and street for the sample tickers, and the gated `/api/h/*` routes stay closed. The cited research
+agent keeps its demo allowance (15 questions per day per browser, `X-Demo-Id`); the one free chat
+question is also per browser, not per IP.
 
 ## Stripe
 

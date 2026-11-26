@@ -4,6 +4,7 @@
 // user + day + symbols so the same request always returns the same paths. Math is free; the
 // short narrative is one budgeted LLM call and is optional.
 const { requireFeature } = require("../../_auth");
+const { tierOf, quota } = require("../../_tiers");
 const { rateHit } = require("../../_lib");
 const { generateJson } = require("../../_llm");
 const { fence, guard } = require("../../_ai_safe");
@@ -76,8 +77,9 @@ module.exports = async (req, res) => {
     const lang = langOf(body.lang);
 
     const uid = p.user_id;
-    const ok = await rateHit(`ai/sim/${uid}/${Math.floor(Date.now() / DAY)}`, 10);
-    if (!ok) return res.status(429).json({ error: "Daily simulation limit reached (10/day on Premium).", code: "ai_limit" });
+    const limit = quota("serverSimulationsPerDay", tierOf(p));
+    const ok = limit > 0 && await rateHit(`ai/sim/${uid}/${Math.floor(Date.now() / DAY)}`, limit);
+    if (!ok) return res.status(429).json({ error: `Daily simulation limit reached (${limit}/day on Premium).`, code: "ai_limit" });
 
     const ctx = await userContext(uid);
     if (!ctx) return res.status(400).json({ error: "Add holdings to your portfolio first.", code: "no_holdings" });

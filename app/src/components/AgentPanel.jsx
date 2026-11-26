@@ -79,6 +79,8 @@ function Answer({ m, live }) {
   const reasoning = (m.parts || []).filter((p) => p.type === "reasoning").map((p) => p.text).join("")
   const tools = (m.parts || []).filter((p) => p.type === "tool")
   const evidence = (m.parts || []).filter((p) => p.type === "evidence").flatMap((p) => p.items || [])
+  // the same lookup the citation chips use, so [E1] can show which source it points at
+  const cites = Object.fromEntries(evidence.map((e) => [e.id, e]))
   const error = (m.parts || []).find((p) => p.type === "error")
   // Charts arrive as their own parts, drawn server-side from the same live feed the evidence quotes.
   const charts = (m.parts || []).filter((p) => p.type === "chart")
@@ -89,7 +91,7 @@ function Answer({ m, live }) {
       <Reasoning text={reasoning} live={live && !m.content} />
       {tools.map((p, i) => <ToolCard key={p.id || i} p={p} />)}
       {m.content ? (
-        <Markdown text={m.content} />
+        <Markdown text={m.content} cites={cites} />
       ) : live ? (
         <div className="flex items-center gap-2 text-sm text-[var(--muted)]"><Loader2 className="size-4 animate-spin" /> {step ? step.label : "Working"}</div>
       ) : null}
@@ -163,7 +165,7 @@ export default function AgentPanel({ symbol, initial }) {
     tourSignal("start")
     const ctl = new AbortController()
     abort.current = ctl
-    let reply = "", answered = false
+    let reply = "", answered = false, walled = false
     try {
       const out = await streamChat({
         message: q, threadId, mode: demo ? "fast" : mode, symbol, signal: ctl.signal,
@@ -214,7 +216,7 @@ export default function AgentPanel({ symbol, initial }) {
         try { localStorage.setItem("ptpub.v1.pendingAsk", q) } catch (x) {}
         patch(base + 1, (m) => ({ ...m, content: "", parts: [] }))
         setMsgs((ms) => ms.slice(0, base + 1))
-        setWall(true); funnel("WallShown")
+        setWall(true); walled = true; funnel("WallShown")
       }
       else {
         capture("agent_question_failed", { mode, reason: e.code || (e.status ? "http_" + e.status : "error") })
@@ -226,7 +228,7 @@ export default function AgentPanel({ symbol, initial }) {
           : e.message || "That request failed."
         setErr(msg)
       }
-    } finally { setBusy(false); abort.current = null; tourSignal(answered ? "done" : "fail") }
+    } finally { setBusy(false); abort.current = null; tourSignal(walled ? "wall" : answered ? "done" : "fail") }
   }
 
   async function openThread(id) {
@@ -340,7 +342,7 @@ export default function AgentPanel({ symbol, initial }) {
               <div className="min-w-0">
                 <p className="text-sm font-medium">That was your free question.</p>
                 <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--muted)]">
-                  You saw it work: every figure cited from filings, live quotes and news, with no arithmetic left to the model.
+                  You saw it work: every figure cited from filings, live quotes and news.
                   Create a free account to keep asking, and the analyst answers about your own holdings instead of the sample portfolio.
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
