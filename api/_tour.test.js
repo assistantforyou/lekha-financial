@@ -45,5 +45,15 @@ const load = (f) => import(pathToFileURL(path.join(__dirname, "..", "app", "src"
   }
   assert.strictEqual(scrollDelta({ rect: { top: 100, bottom: 200, height: 100 }, top: 72, bottom: 800 }), null, "already visible: no scroll");
   assert.ok(scrollDelta({ rect: { top: 1500, bottom: 1600, height: 100 }, top: 72, bottom: 800 }) > 1000, "scrolls down to a target below the fold");
+  // A new visitor who opens Plans & billing stays there: the first step is pinned to Overview, so starting would move them.
+  const store = new Map(); globalThis.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) };
+  const S = await load("store.js");
+  for (const h of ["#/account/plans", "#account/plans", "#/account/plans/", "#/account/plans?plan=paid"]) assert.strictEqual(S.autoStartOn(h), false, `no auto-start on ${h}`);
+  for (const h of ["", "#/", "#/portfolio/overview", "#/account/profile", "#/account/plansx", "#/company/AAPL?tab=ai"]) assert.strictEqual(S.autoStartOn(h), true, `auto-start on ${h || "(no hash)"}`);
+  S.writeStatus("in_progress");
+  assert.strictEqual(S.autoStartOn("#/account/plans"), false, "an interrupted tour does not resume over Plans either");
+  assert.strictEqual(S.autoStartOn("#/portfolio/overview"), true, "and resumes elsewhere");
+  for (const status of ["completed", "skipped"]) { S.writeStatus(status); assert.strictEqual(S.autoStartOn("#/portfolio/overview"), false, `${status} stays finished`) }
+  delete globalThis.localStorage;
   console.log("tour tests passed");
 })().catch((e) => { console.error(e); process.exit(1); });

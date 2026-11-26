@@ -6,7 +6,7 @@ import "./tour.css"
 import { COPY, LANG_LABEL, LANG_NATIVE, setTourLang, stepCopy, tourLang, ui } from "./copy"
 import { M, MOBILE_MAX, place, scrollDelta } from "./layout"
 import { STEPS, currentPath, fullPath, hashOf, isAct, lastSym, modeOf, resolve, setPlatform, visible } from "./steps"
-import { onStartTour, shouldAutoStart, writeStatus } from "./store"
+import { autoStartOn, onStartTour, shouldAutoStart, writeStatus } from "./store"
 import { funnel } from "@/lib/pixel"
 import { isDemo, useSession, useTier } from "@/lib/engine"
 import { DONE as LANG_DONE, pending as langPending } from "@/lib/langprompt"
@@ -101,7 +101,7 @@ export default function Tour({ navigate }) {
   useEffect(() => () => { window.LEKHA_TOUR_ACTIVE = false }, [])
   /* The Quick Tour starts by itself, but not over the language prompt: when the prompt is up it waits for the answer (or 8 s), then starts. */
   useEffect(() => {
-    const due = () => shouldAutoStart() && !arrivedForPlan && !planInProgress(location.hash)   // never over, or away from, a sign-up or checkout for a picked plan
+    const due = () => autoStartOn(location.hash) && !arrivedForPlan && !planInProgress(location.hash)   // never over, or away from, Plans & billing or a checkout for a picked plan
     if (!due()) return
     const go = () => { if (due()) begin() }
     if (!langPending()) { const t = setTimeout(go, 1600); return () => clearTimeout(t) }

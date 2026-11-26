@@ -15,5 +15,7 @@ export function writeStatus(status) {
 }
 /* The tour starts on its own for anyone who has not finished it yet (new or existing users), and resumes if interrupted; once completed or skipped it only replays on request. */
 export const shouldAutoStart = () => { const s = readStatus(); return s === "in_progress" || s === "not_started" }
+/* ... but never by itself on Plans & billing: someone there is deciding what to buy, and the first step is pinned to Overview, so starting would move them. */
+export const autoStartOn = (hash) => shouldAutoStart() && !/^#\/?account\/plans(?:[/?]|$)/.test(String(hash || ""))
 export const startTour = (delay = 0) => setTimeout(() => window.dispatchEvent(new CustomEvent(EVT)), delay)
 export const onStartTour = (fn) => { window.addEventListener(EVT, fn); return () => window.removeEventListener(EVT, fn) }
