@@ -93,7 +93,7 @@ const TOOLS = {
     const pubs = [...new Set(rows.map((r) => r.domain).filter(Boolean))].slice(0, 4);
     // Google News links are long opaque redirects that would swamp the snippet; the publisher and date
     // already identify the source, so they are kept in data but not written into the evidence line.
-    const line = (r) => `${r.publishedAt ? String(r.publishedAt).slice(0, 10) : "undated"} [${r.domain || "web"}] ${r.title}${r.snippet && r.snippet !== r.title ? `: ${r.snippet}` : ""}${r.excerpt ? ` | ${r.excerpt}` : ""}${r.url && !/^https:\/\/news\.google\.com\//.test(r.url) && r.url.length < 180 ? ` <${r.url}>` : ""}`;
+    const line = (r) => `${r.publishedAt ? String(r.publishedAt).slice(0, 10) + " " : ""}[${r.domain || "web"}] ${r.title}${r.snippet && r.snippet !== r.title ? `: ${r.snippet}` : ""}${r.excerpt ? ` | ${r.excerpt}` : ""}${r.url && !/^https:\/\/news\.google\.com\//.test(r.url) && r.url.length < 180 ? ` <${r.url}>` : ""}`;
     return { label: `Web search: ${data.query}`, source: `web (${data.via})${pubs.length ? " · " + pubs.join(", ") : ""}`, asOf: rows.map((r) => r.publishedAt).filter(Boolean).sort().pop() || null, kind: "fact", url: (rows.find((r) => r.url && !/^https:\/\/news\.google\.com\//.test(r.url)) || {}).url || null,
       lines: rows.map(line),
       data: rows.map((r) => ({ title: r.title, url: r.url, domain: r.domain, at: r.publishedAt })) }; } },

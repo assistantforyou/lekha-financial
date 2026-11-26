@@ -144,6 +144,21 @@ async function enrich(rows) {
   return rows;
 }
 
+/* A search API often returns no publication date. The first two pages are read for their own
+   article:published_time so the evidence can say when a figure was published, not just who said it. */
+async function fillDates(rows) {
+  const picks = rows.filter((r) => r.url && !r.publishedAt && !/^https:\/\/news\.google\.com\//.test(r.url)).slice(0, 2);
+  await Promise.all(picks.map(async (r) => {
+    try {
+      const html = await request("web", r.url, { headers: HEAD, text: true, timeoutMs: 4000 });
+      const m = /"datePublished"\s*:\s*"([^"]+)"/i.exec(html) || /<meta[^>]+property="article:published_time"[^>]+content="([^"]+)"/i.exec(html);
+      const d = m ? iso(m[1]) : null;
+      if (d) r.publishedAt = d;
+    } catch (e) { /* an undated source is still usable; the publisher is named in the evidence */ }
+  }));
+  return rows;
+}
+
 // ---------------------------------------------------------------- public API
 async function search(query, { limit = 8 } = {}) {
   const q = String(query || "").trim().slice(0, 300);
@@ -169,6 +184,7 @@ async function search(query, { limit = 8 } = {}) {
   }
   if (!out.length) throw Object.assign(new Error("web_no_results"), { status: 502 });
   if (via === "keyless") await enrich(out);
+  await fillDates(out);
   return { query: q, via, results: out };
 }
 
