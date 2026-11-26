@@ -105,5 +105,14 @@ const T = 1_800_000_000_000, MIN = 60e3;
   assert.strictEqual(again.arrivedForPlan, true, "still true after the choice is used");
   delete globalThis.window; delete globalThis.location;
 
+  // all of the above only works if the app calls it: rewriting one of these files from an older copy must fail here
+  const src = (file) => require("fs").readFileSync(path.join(__dirname, "..", "app", "src", file), "utf8");
+  const wiring = {
+    "pages/account.jsx": [/<PlanSignup\b/, /\bplanFromQuery\(/, /\btakePlan\(/],
+    "App.jsx": [/\bpendingPlan\(/],
+    "tour/Tour.jsx": [/!arrivedForPlan\b/, /\bplanInProgress\(location\.hash\)/],
+  };
+  for (const [file, uses] of Object.entries(wiring)) for (const use of uses) assert.ok(use.test(src(file)), `app/src/${file} no longer uses ${use.source}`);
+
   console.log("plan intent tests passed");
 })().catch((e) => { console.error(e); process.exit(1); });

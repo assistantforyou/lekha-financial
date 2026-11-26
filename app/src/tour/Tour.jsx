@@ -11,6 +11,7 @@ import { funnel } from "@/lib/pixel"
 import { isDemo, useSession, useTier } from "@/lib/engine"
 import { DONE as LANG_DONE, pending as langPending } from "@/lib/langprompt"
 import { capture } from "@/lib/analytics"
+import { arrivedForPlan, planInProgress } from "@/lib/planIntent"
 
 const WF_ICONS = [Search, Building2, Layers, LineChart]
 const reduced = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches } catch (e) { return false } }
@@ -100,8 +101,9 @@ export default function Tour({ navigate }) {
   useEffect(() => () => { window.LEKHA_TOUR_ACTIVE = false }, [])
   /* The Quick Tour starts by itself, but not over the language prompt: when the prompt is up it waits for the answer (or 8 s), then starts. */
   useEffect(() => {
-    if (!shouldAutoStart()) return
-    const go = () => { if (shouldAutoStart()) begin() }
+    const due = () => shouldAutoStart() && !arrivedForPlan && !planInProgress(location.hash)   // never over, or away from, a sign-up or checkout for a picked plan
+    if (!due()) return
+    const go = () => { if (due()) begin() }
     if (!langPending()) { const t = setTimeout(go, 1600); return () => clearTimeout(t) }
     let t2 = 0; const cap = setTimeout(go, 8000), done = () => { clearTimeout(cap); t2 = setTimeout(go, 600) }
     window.addEventListener(LANG_DONE, done, { once: true })

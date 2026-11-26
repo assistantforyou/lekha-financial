@@ -26,6 +26,7 @@ import { allows, featureOfRoute } from "@/lib/entitlements"
 import { Skeleton } from "@/components/ui/skeleton"
 import LangPrompt from "@/components/LangPrompt"
 import { isDemo, reloadMe, useMe, useSession } from "@/lib/engine"
+import { pendingPlan, planPath } from "@/lib/planIntent"
 import PAGES from "@/pages"
 
 const START = "ptpub.v1.v3.start"
@@ -76,6 +77,8 @@ export default function App() {
      every module re-check the subscription. */
   const feature = featureOfRoute(route.key), tier = demo || !signedIn ? "demo" : me && me.tier ? me.tier : null
   const gateLoading = !!feature && tier === null, gated = !!feature && tier !== null && !allows(tier, feature)
+  /* Signed in somewhere else (the sign-in page, after a confirmation or password e-mail) with a plan still picked: back to it. The Plans page carries on. */
+  useEffect(() => { const p = signedIn && !demo ? pendingPlan() : null; if (p) navigate(planPath(p)) }, [signedIn, demo])
   /* Account identity and plan for PostHog. The id is the Supabase user id; no e-mail or name leaves the browser. */
   useEffect(() => { if (sess && sess.user_id) identify(sess.user_id, { plan: me && me.tier ? me.tier : undefined, admin: !!(me && me.is_admin), surface: "app" }) }, [sess && sess.user_id, me && me.tier, me && me.is_admin])
   useEffect(() => { if (gated) capture("paywall_viewed", { screen: route.key, feature, plan: tier }) }, [gated, route.key, feature, tier])
