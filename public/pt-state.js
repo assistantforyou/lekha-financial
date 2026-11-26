@@ -135,5 +135,6 @@
   window.addEventListener("pagehide", function () { flush(); });
 
   // Kick off the pull as soon as the DOM is parseable but before the app's first render pass uses it.
-  hydrate();
+  // `first` resolves with its result, so the app can wait out the reload it may trigger (before resuming a checkout).
+  window.PT_SYNC.first = hydrate();
 })();

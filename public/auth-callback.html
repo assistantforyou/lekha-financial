@@ -81,7 +81,9 @@
     return;
   }
   if (type === "email_change") { show("Email address updated", "Sign in with your new email address.", toLogin); return; }
-  show("Email confirmed", "Your account is ready. Sign in to continue.", toLogin);
+  // a plan picked before sign-up is still waiting (app/src/lib/planIntent.js): the page it was picked on carries on by itself
+  var plan = false; try { var w = JSON.parse(localStorage.getItem("ptpub.v1.app.planIntent") || "null"); plan = !!w && Date.now() - w.at <= 36e5; } catch (e) {}
+  show("Email confirmed", plan ? "Your account is ready. Go back to the page where you chose your plan, or sign in here to continue with it." : "Your account is ready. Sign in to continue.", toLogin);
 })();
 </script>
 </body>
