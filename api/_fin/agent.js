@@ -34,9 +34,17 @@ const TOOLS = {
     const { data: q, meta } = await svc.getQuote(symbol);
     /* IEX quotes carry no market cap. Price x latest SEC share count is the ordinary definition of
        market value, so it is computed here rather than left missing on a "what is X worth" question. */
-    let cap = q.marketCap || null, capBasis = q.marketCap ? "reported" : null;
-    if (!cap) { try { const { data: f } = await svc.getCompanyFacts(symbol); if (f.sharesOutstanding && f.sharesOutstanding.value) { cap = q.price * f.sharesOutstanding.value; capBasis = `price x ${big(f.sharesOutstanding.value)} shares outstanding as of ${f.sharesOutstanding.asOf}`; } } catch (e) { /* no share count, no market value */ } }
-    return { label: `Quote ${q.symbol}`, source: q.source, asOf: q.timestamp, kind: "fact", lines: [`${q.symbol} (${q.name || q.symbol}) last price ${r2(q.price)} ${q.currency}; change ${r2(q.change)} (${pct(q.changePercent)}%) vs previous close ${r2(q.previousClose)}; volume ${q.volume != null ? q.volume : "n/a"}; ${q.meta.freshness}${q.delay != null ? ` (${q.delay}s old)` : ""}${cap ? `; market capitalisation ${big(cap)} ${q.currency}${capBasis && capBasis !== "reported" ? ` (calculated: ${capBasis})` : ""}` : ""}`], data: { name: q.name, price: q.price, change: q.change, changePercent: q.changePercent, previousClose: q.previousClose, volume: q.volume, marketCap: cap, timestamp: q.timestamp, freshness: q.meta.freshness, cache: meta.cache } }; } },
+    let cap = q.marketCap || null, capBasis = q.marketCap ? "reported" : null, capNote = "";
+    if (!cap) { try {
+      const { data: f } = await svc.getCompanyFacts(symbol);
+      /* A foreign private issuer files 20-F/40-F, and its US line is often an ADR priced per receipt
+         while the SEC share count is ordinary shares. Multiplying the two overstates the company by
+         the ADR ratio, so those caps are left unstated rather than published wrong. */
+      const foreign = await svc.getSecFilings(symbol, { forms: ["20-F", "40-F"], limit: 1 }).then((r) => (r.data || []).length > 0).catch(() => false);
+      if (f.sharesOutstanding && f.sharesOutstanding.value && foreign) capNote = "market capitalisation is not stated for this foreign private issuer: the US line may be an ADR and the ADR ratio is not in the filing data";
+      else if (f.sharesOutstanding && f.sharesOutstanding.value) { cap = q.price * f.sharesOutstanding.value; capBasis = `price x ${big(f.sharesOutstanding.value)} shares outstanding as of ${f.sharesOutstanding.asOf}`; }
+    } catch (e) { /* no share count, no market value */ } }
+    return { label: `Quote ${q.symbol}`, source: q.source, asOf: q.timestamp, kind: "fact", lines: [`${q.symbol} (${q.name || q.symbol}) last price ${r2(q.price)} ${q.currency}; change ${r2(q.change)} (${pct(q.changePercent)}%) vs previous close ${r2(q.previousClose)}; volume ${q.volume != null ? q.volume : "n/a"}; ${q.meta.freshness}${q.delay != null ? ` (${q.delay}s old)` : ""}${cap ? `; market capitalisation ${big(cap)} ${q.currency}${capBasis && capBasis !== "reported" ? ` (calculated: ${capBasis})` : ""}` : ""}${capNote ? `; ${capNote}` : ""}`], data: { name: q.name, price: q.price, change: q.change, changePercent: q.changePercent, previousClose: q.previousClose, volume: q.volume, marketCap: cap, timestamp: q.timestamp, freshness: q.meta.freshness, cache: meta.cache } }; } },
   get_historical_prices: { desc: "Price history summary (returns, range, volatility, drawdown) for one symbol over N days.", args: { symbol: "string", days: "number" }, run: async ({ symbol, days = 252 }) => {
     const { data: bars } = await svc.getHistoricalPrices(symbol, { days }), cl = bars.map((b) => b[4]).filter((x) => x > 0), n = cl.length; if (n < 5) throw new Error("not_enough_history");
     const at = (k) => (n > k ? cl[n - 1 - k] : null), ret = (k) => C.totalReturn(at(k), cl[n - 1]), vol = C.volatility(C.returnsFrom(cl)), dd = C.drawdown(cl);
@@ -45,7 +53,7 @@ const TOOLS = {
   get_company_profile: { desc: "Company name, exchange, sector, industry, CIK.", args: { symbol: "string" }, run: async ({ symbol }) => { const { data: p } = await svc.getCompanyProfile(symbol); return { label: `Profile ${p.symbol}`, source: p.source, asOf: p.meta.asOf, kind: "fact", lines: [`${p.symbol}: ${p.name}; exchange ${p.exchange || "n/a"}; sector ${p.sector || "n/a"}; industry ${p.industry || "n/a"}; CIK ${p.cik || "n/a"}`], data: { name: p.name, sector: p.sector, industry: p.industry } }; } },
   get_financial_statements: { desc: "Reported annual or quarterly statement lines (revenue, margins, net income, EPS, free cash flow, debt) from SEC filings.", args: { symbol: "string", type: "annual|quarterly" }, run: async ({ symbol, type = "annual" }) => {
     const { data: rows, meta } = await svc.getFinancialStatements(symbol, { type }), top = rows.slice(0, type === "annual" ? 4 : 5); if (!top.length) throw new Error("no_statements");
-    const lines = top.map((r) => `${r.periodType} ${r.fiscalYear || ""} ${r.fiscalPeriod || ""} ending ${r.periodEnd} (filed ${r.filingDate || "n/a"}, form ${r.form || "n/a"}): revenue ${big(r.revenue)}; gross profit ${big(r.grossProfit)}; operating income ${big(r.operatingIncome)}; net income ${big(r.netIncome)}; diluted EPS ${r2(r.eps)}; free cash flow ${big(r.freeCashFlow)}; total debt ${big(r.totalDebt)}; cash ${big(r.cash)} (USD)`);
+    const lines = top.map((r) => `${r.periodType} ${r.fiscalYear || ""} ${r.fiscalPeriod || ""} ending ${r.periodEnd} (filed ${r.filingDate || "n/a"}, form ${r.form || "n/a"}): revenue ${big(r.revenue)}; gross profit ${big(r.grossProfit)}; operating income ${big(r.operatingIncome)}; net income ${big(r.netIncome)}; diluted EPS ${r2(r.eps)}; free cash flow ${big(r.freeCashFlow)}; total debt ${big(r.totalDebt)}; cash ${big(r.cash)} (${r.currency || "USD"})`);
     return { label: `${type} statements ${symbol}`, source: meta.source === "sec" ? "SEC EDGAR (XBRL)" : meta.source, asOf: top[0].filingDate || top[0].periodEnd, kind: "fact", url: top[0].accession ? undefined : undefined, lines, data: top.map((r) => ({ period: r.periodEnd, revenue: r.revenue, grossProfit: r.grossProfit, operatingIncome: r.operatingIncome, netIncome: r.netIncome, eps: r.eps, fcf: r.freeCashFlow })) }; } },
   get_company_facts: { desc: "SEC company facts: shares outstanding and public float.", args: { symbol: "string" }, run: async ({ symbol }) => { const { data: f } = await svc.getCompanyFacts(symbol); return { label: `SEC facts ${symbol}`, source: "SEC EDGAR", asOf: f.sharesOutstanding && f.sharesOutstanding.asOf, kind: "fact", lines: [`${f.entityName}: shares outstanding ${f.sharesOutstanding ? big(f.sharesOutstanding.value) : "n/a"} as of ${f.sharesOutstanding ? f.sharesOutstanding.asOf : "n/a"}; public float USD ${f.publicFloat ? big(f.publicFloat.value) : "n/a"}`], data: f }; } },
   get_sec_filings: { desc: "Recent SEC filings (10-K, 10-Q, 8-K, ...) with links.", args: { symbol: "string", forms: "string[]" }, run: async ({ symbol, forms }) => {
@@ -100,6 +108,46 @@ const TOOLS = {
       if (chunks.length >= 22) break;
     }
     return { label: `Page: ${data.title || data.domain}`, source: data.domain || "web page", asOf: data.publishedAt || null, kind: "fact", url: data.url, lines: [`${data.title || data.domain} (${data.url})`, ...chunks], data: { title: data.title, url: data.url, chars: body.length } }; } },
+  get_insider_activity: { desc: "Insider open-market purchases at S&P 500 companies from SEC Form 4 (transaction code P), clustered when two or more insiders bought within seven days, with single purchases when no cluster exists. Covers the last 60 days. Keyless SEC data.", args: { symbol: "string?" }, run: async ({ symbol }) => {
+    const ins = require("../_insiders"), sym = symbol ? String(symbol).toUpperCase() : null;
+    let days = await ins.insiderCollection();
+    if (!days.length) { await ins.runInsiders({ budgetMs: 10000, days: 10 }).catch(() => null); days = await ins.insiderCollection(); }
+    const asOf = (days[0] && days[0].data.date) || new Date().toISOString().slice(0, 10);
+    const all = (days[0] && days[0].data.cluster) || [];
+    let rows = sym ? all.filter((r) => r.ticker === sym) : all.slice(0, 18), singles = [];
+    // The daily cache may not hold this symbol yet: read its Form 4 filings directly from EDGAR.
+    if (!rows.length && sym) {
+      const buys = await ins.recentForSymbol(sym, { days: 60 }).catch(() => []);
+      const cl = ins.clusters(buys).filter((r) => r.ticker === sym);
+      if (cl.length) rows = cl; else singles = buys.slice(0, 8);
+    }
+    const meta = { symbol: sym, clusters: all.length, days: days[0] ? days[0].data.days : 0, coverFrom: days[0] ? days[0].data.coverFrom : null };
+    if (rows.length) return { label: sym ? `Insider purchases ${sym}` : "Insider cluster purchases", source: "SEC EDGAR Form 4 (S&P 500 issuers, open-market purchases only)", asOf, kind: "fact", lines: rows.map((r) => `${r.ticker}: ${r.ins} different insiders bought ${big(r.value)} USD in the week to ${r.trade} (latest filing ${r.filing})`), data: { ...meta, rows } };
+    if (singles.length) return { label: `Insider purchases ${sym}`, source: "SEC EDGAR Form 4 (open-market purchases only)", asOf, kind: "fact", lines: [`No cluster of two or more insiders, but these single-insider purchases were filed in the last 60 days:`, ...singles.map((b) => `${b.owner} bought securities worth ${big(b.value)} USD on ${b.trade} (filing ${b.filing})`)], data: { ...meta, buys: singles } };
+    return { label: sym ? `Insider purchases ${sym}` : "Insider cluster purchases", source: "SEC EDGAR Form 4 (S&P 500 issuers)", asOf, kind: "fact", lines: [`No open-market insider purchase by ${sym || "an S&P 500 insider"} was filed in the last 60 days.`], data: { ...meta, rows: [] } }; } },
+  get_transcript: { desc: "Find and read an earnings call transcript on the web. Returns a dated excerpt from the publisher with its URL, not a licensed full transcript; treat it as a quoted web source.", args: { symbol: "string", quarter: "string?" }, run: async ({ symbol, quarter }) => {
+    if (scope.getStore() && scope.getStore().asOf) throw new Error("web_not_available_in_demo");
+    const sym = String(symbol).toUpperCase(), name = (typeof SYM_NAME !== "undefined" && SYM_NAME[sym]) || sym, year = new Date().getUTCFullYear();
+    const q = `${name} ${quarter ? String(quarter) : "most recent"} earnings call transcript ${year}`.replace(/\s+/g, " ");
+    const { data } = await svc.searchWeb(q, { limit: 8 });
+    const rows = (data.results || []).filter((r) => r.url && /transcript|fool|seekingalpha|motley|insider|investing|reuters|cnbc/i.test(`${r.url} ${r.title} ${r.domain}`));
+    if (!rows.length) throw new Error("transcript_not_found");
+    // A transcript from two years ago answers the wrong question. Prefer pages published in the last 18 months,
+    // then length, because publishers truncate older pages behind a paywall.
+    const fresh = (r) => { const t = Date.parse(r.publishedAt || ""); return Number.isFinite(t) && Date.now() - t < 550 * 864e5; };
+    const ranked = rows.slice(0, 5).sort((a, b) => (fresh(b) - fresh(a)) || String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")));
+    let best = null;
+    for (const r of ranked.slice(0, 3)) {
+      const page = await svc.readWeb(r.url).then((x) => x.data).catch(() => null);
+      if (!page || String(page.text || "").length <= 800) continue;
+      const score = (fresh({ publishedAt: page.publishedAt || r.publishedAt }) ? 1e9 : 0) + page.text.length;
+      if (!best || score > best.score) best = { ...page, search: r, score };
+    }
+    if (!best) throw new Error("transcript_unreadable");
+    const body = String(best.text).replace(/\s+/g, " ").replace(/\*{1,3}/g, "").replace(/#{1,6}\s*/g, "").trim().slice(0, 6000), chunks = [];
+    for (let i = 0; i < body.length && chunks.length < 10; i += 560) chunks.push(body.slice(i, i + 560));
+    return { label: `Earnings call extract ${sym}`, source: `${best.domain || best.search.domain || "web"} (quoted extract)`, asOf: best.publishedAt || best.search.publishedAt || null, kind: "fact", url: best.url || best.search.url,
+      lines: [`${best.title || best.search.title} (${best.url || best.search.url})`, "Quoted extract from a published transcript page; speakers and figures are as the page prints them.", ...chunks], data: { title: best.title || best.search.title, url: best.url || best.search.url, chars: body.length } }; } },
 };
 
 const toolList = () => Object.entries(TOOLS).map(([name, t]) => `${name}(${Object.entries(t.args).map(([k, v]) => `${k}: ${v}`).join(", ")}) - ${t.desc}`).join("\n");
@@ -153,7 +201,7 @@ async function resolveSymbols(question, hint, { names = true } = {}) {
     // (and "general" alone matches GENERAL ...). Pairs come first, built from the raw tokens, then
     // single words filtered against STOP.
     const raw = question.replace(/[^A-Za-z0-9 .&-]/g, " ").split(/\s+/).filter((w) => w.length > 2).slice(0, 8);
-    const NOT_A_NAME = new Set(["WHAT", "WHATS", "HOW", "WHY", "WHEN", "WHICH", "WHO", "IS", "ARE", "WAS", "WERE", "THE", "OF", "FOR", "AND", "SHOULD", "COULD", "WOULD", "CAN", "DOES", "DID", "GIVE", "TELL", "SHOW", "PLEASE", "ABOUT", "TODAY", "MUCH", "MANY", "TIED", "WORTH", "NET", "MOST", "MORE", "LESS"]);
+    const NOT_A_NAME = new Set(["WHAT", "WHATS", "HOW", "WHY", "WHEN", "WHICH", "WHO", "IS", "ARE", "WAS", "WERE", "THE", "OF", "FOR", "AND", "SHOULD", "COULD", "WOULD", "CAN", "DOES", "DID", "GIVE", "TELL", "SHOW", "PLEASE", "ABOUT", "TODAY", "MUCH", "MANY", "TIED", "WORTH", "NET", "MOST", "MORE", "LESS", "ADD", "PUT", "REMOVE", "DELETE", "TRACK", "WATCHLIST", "ALERT", "NOTIFY", "SAVE", "NOTE", "REMEMBER", "WARN", "BELOW", "ABOVE", "DROP", "DROPS", "FALLS", "UNDER", "OVER", "INCLUDE", "TAKE", "OFF", "SET", "THIS", "THAT", "IT", "ME", "MY", "OUR", "WE", "INTO", "ONTO", "WHEN", "TELL"]);
     const pairs = [];
     for (let i = 0; i + 1 < raw.length; i++) if (!NOT_A_NAME.has(raw[i].toUpperCase()) && !NOT_A_NAME.has(raw[i + 1].toUpperCase())) pairs.push(`${raw[i]} ${raw[i + 1]}`);
     const singles = raw.filter((w) => !STOP.has(w.toUpperCase()));
@@ -167,9 +215,13 @@ async function resolveSymbols(question, hint, { names = true } = {}) {
         // Require a real tie to the words: the symbol itself, a symbol starting with them, or a name
         // that begins with them. A name that merely contains a word ("CURRENT INFRAPROJECTS" for
         // "current") is not what the user meant.
-        const top = rows.find((x) => String(x.symbol).split(".")[0].toLowerCase() === one)
-          || rows.find((x) => String(x.symbol).toLowerCase().startsWith(one))
-          || rows.find((x) => String(x.name || "").toLowerCase().startsWith(want));
+        // Only a US-listed security or an S&P 500 member: "add" must not become ADDTF and "save"
+        // must not become SAVE.ST just because a foreign listing starts with those letters.
+        const listed = (x) => !String(x.symbol).includes(".") && (SP[String(x.symbol).toUpperCase()] || /nasdaq|new york stock|nyse|amex|arca/i.test(String(x.exchange || "")));
+        const pool = rows.filter(listed);
+        const top = pool.find((x) => String(x.symbol).toLowerCase() === one)
+          || pool.find((x) => String(x.symbol).toLowerCase().startsWith(one))
+          || pool.find((x) => String(x.name || "").toLowerCase().startsWith(want));
         if (top && !out.includes(top.symbol)) { out.push(top.symbol); added++; }
       } catch (e) { /* ignore */ }
     }
@@ -195,7 +247,7 @@ function webQuery(question, symbols = []) {
   }
   let out = keep.join(" ");
   if (!out && symbols.length) out = symbols.map((s) => SYM_NAME[s] || s).join(" ");
-  if (/\b(tied|tie|share|exposure|exposed|depend|revenue|net worth|market cap)\b/.test(q)) out += " revenue share";
+  if (/\b(tied|tie|share|exposure|exposed|depend|net worth|market cap)\b/.test(q)) { if (!/\brevenue\b/.test(out)) out += " revenue share"; }
   else if (/\b(suppl(?:y|ies|ied|ier)|customer|partner|stake|owns|ownership)\b/.test(q)) out += " supplier customer";
   return out.replace(/\s+/g, " ").trim().slice(0, 180) || String(question || "").slice(0, 180);
 }
@@ -223,12 +275,14 @@ function heuristicPlan(q, symbols) {
     if (has(/\b(revenue|margin|profit|cash flow|debt|balance|growth|roe|roic|fundamental|financial)\b/)) calls.push(["get_financial_statements", { symbol: s, type: "annual" }], ["calculate_financial_ratios", { symbol: s }]);
     if (has(/\b(peer|compar|competitor|versus|vs)\b/)) calls.push(["get_peer_companies", { symbol: s }]);
     if (has(/\b(analyst|target|estimate|consensus|rating)\b/)) calls.push(["get_estimates", { symbol: s }]);
+    if (has(/\b(insider|insiders|director|directors|executive|bought|buying|purchase|purchases|form 4)\b/)) calls.push(["get_insider_activity", { symbol: s }]);
+    if (has(/\b(transcript|earnings call|conference call|management said|on the call|guidance)\b/)) calls.push(["get_transcript", { symbol: s }]);
     if (calls.length < 3) calls.push(["get_news", { symbol: s }], ["calculate_financial_ratios", { symbol: s }], ["get_sec_filings", { symbol: s }]);
   }
   if (has(/\b(rate|fed|inflation|cpi|ppi|yield|treasury|unemployment|jobs|gdp|recession|macro|economy|sentiment|money supply|m2)\b/) || !s) calls.push(["get_macro_data", { ids: ["FEDFUNDS", "DGS10", "T10Y2Y", "CPIAUCSL", "UNRATE"] }], ["get_news", { category: "macro" }]);
   const seen = new Set(); return calls.filter(([n, a]) => { const k = n + JSON.stringify(a); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 7).map(([tool, args]) => ({ tool, args }));
 }
-const PLAN_SCHEMA = { type: "OBJECT", properties: { calls: { type: "ARRAY", maxItems: 7, items: { type: "OBJECT", properties: { tool: { type: "STRING" }, args: { type: "OBJECT", properties: { symbol: { type: "STRING" }, type: { type: "STRING" }, days: { type: "NUMBER" }, category: { type: "STRING" }, query: { type: "STRING" }, growth: { type: "NUMBER" }, discount: { type: "NUMBER" }, terminalGrowth: { type: "NUMBER" } } } }, required: ["tool"] } } }, required: ["calls"] };
+const PLAN_SCHEMA = { type: "OBJECT", properties: { calls: { type: "ARRAY", maxItems: 7, items: { type: "OBJECT", properties: { tool: { type: "STRING" }, args: { type: "OBJECT", properties: { symbol: { type: "STRING" }, type: { type: "STRING" }, days: { type: "NUMBER" }, category: { type: "STRING" }, query: { type: "STRING" }, growth: { type: "NUMBER" }, discount: { type: "NUMBER" }, terminalGrowth: { type: "NUMBER" }, quarter: { type: "STRING" } } } }, required: ["tool"] } } }, required: ["calls"] };
 
 async function plan(question, symbols, llm) {
   const fallback = heuristicPlan(question, symbols);

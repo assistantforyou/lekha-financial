@@ -148,4 +148,27 @@ async function insiderCollection() {
   return [{ id: today, data: { date: today, cluster: cl, check: { n: cl.length, value: cl.reduce((s, r) => s + (r.value || 0), 0) }, src: "SEC EDGAR Form 4 (S&P 500 issuers)", days: got.length, coverFrom: got[got.length - 1], purchases: rows.length } }];
 }
 
-module.exports = { parseIndex, parseForm4, clusters, processDay, runInsiders, insiderCollection, lastDays };
+// Per-symbol lookups do not have to wait for the daily cache: EDGAR full-text search returns the
+// issuer's Form 4 filings for a date range, and each hit is parsed directly.
+async function recentForSymbol(ticker, { days = 60, limit = 20 } = {}) {
+  const t = String(ticker || "").toUpperCase(), cik = CIK[t];
+  if (!cik) return [];
+  const end = new Date(), start = new Date(Date.now() - days * 864e5);
+  const url = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${t}"`)}&forms=4&startdt=${ymd(start)}&enddt=${ymd(end)}`;
+  let j;
+  try { j = JSON.parse(await sec(url)); } catch { return []; }
+  const pad = String(cik).padStart(10, "0"), rows = [];
+  for (const h of ((j.hits && j.hits.hits) || []).slice(0, limit)) {
+    if (!((h._source && h._source.ciks) || []).includes(pad)) continue;
+    const [accn, file] = String(h._id || "").split(":");
+    if (!accn || !file) continue;
+    let txt;
+    try { txt = await sec(`https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${accn.replace(/-/g, "")}/${file}`); } catch { continue; }
+    const { issuer, buys } = parseForm4(txt || "");
+    if (issuer !== cik) continue;
+    for (const b of buys) rows.push({ t, owner: b.owner, value: b.value, trade: b.trade, filing: accn });
+  }
+  return rows;
+}
+
+module.exports = { parseIndex, parseForm4, clusters, processDay, runInsiders, insiderCollection, recentForSymbol, lastDays };

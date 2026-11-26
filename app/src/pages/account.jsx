@@ -17,12 +17,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { DataState, ErrorBox, PageHeader } from "@/components/common"
 import { api, useData } from "@/lib/api"
 import * as A from "@/lib/account"
-import { isDemo, session, setCurrency, useCurrency, useSession, useMe, useTier } from "@/lib/engine"
+import { isDemo, setCurrency, useCurrency, useSession, useMe, useTier } from "@/lib/engine"
 import { date, dateTime, num, pct } from "@/lib/fmt"
 import { cn } from "@/lib/utils"
 import { QUOTAS } from "@/lib/entitlements"
-import PlanSignup from "@/components/PlanSignup"
-import { abandonPlan, forgetPlan, isPicked, nextStep, pendingPlan, planFromQuery, planPath, rememberPlan, takePlan } from "@/lib/planIntent"
 
 const Field = ({ label, id, children, hint }) => <div className="space-y-1.5"><Label htmlFor={id}>{label}</Label>{children}{hint && <p className="text-[12px] text-muted-foreground">{hint}</p>}</div>
 const Seg = ({ value, onChange, options, label }) => <div role="group" aria-label={label} className="inline-flex rounded-md border border-border p-0.5">{options.map(([v, l]) => <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)} className={cn("rounded px-3 py-1.5 text-[13px] transition", value === v ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:text-foreground")}>{l}</button>)}</div>
@@ -115,7 +113,6 @@ export function Preferences({ item, navigate }) {
    card. Copy mirrors api/_data/entitlements.json and the quotas the server enforces; the server is the authority. */
 const PRICE = { free: "฿0/mo", paid: "฿399/mo", premium: "฿599/mo" }
 const Q = (name, tier) => (QUOTAS[name] || {})[tier]
-const NAME = { free: "Free", paid: "Paid", premium: "Premium" }
 const PLANS = [
   {
     id: "free", name: "Free", tagline: "Real market data, your own portfolio.",
@@ -151,45 +148,10 @@ const PLANS = [
     ],
   },
 ]
-export function Plans({ item, navigate, me, route }) {
-  const sess = useSession(), demo = isDemo(), guest = !(sess && sess.access_token), signedIn = !guest && !demo, cur = signedIn ? (me ? me.tier : "free") : null, [busy, setBusy] = useState(null)
-  /* `claim` runs just before leaving for Stripe: a button press drops any picked plan; a resumed one must still own it */
-  const leave = async (open, claim) => { try { const j = await open(); if (claim() === false) return setBusy(null); location.href = j.url } catch (e) { forgetPlan(); toast.error(errMsg(e)); setBusy(null) } }
-  const checkout = (plan, claim = forgetPlan) => { setBusy(plan); const pp = planParams(plan); if (pp) track("InitiateCheckout", { ...pp, num_items: 1 }); return leave(() => A.checkout(plan), claim) }
-  const manage = (claim = forgetPlan) => { setBusy("portal"); return leave(A.portal, claim) }
-
-  /* Picking a plan without being ready to pay for it (lib/planIntent.js). The plan travels in the route (?plan=):
-     - no session          -> the sign-up dialog opens over this page; closing it stays here
-     - signed in, in demo  -> leave the demo and carry on
-     then the app reloads as the account (the engine reads the session once, at load) and goes on to that plan's next step. */
-  const wanted = planFromQuery(route && route.query)
-  const clearWanted = () => { history.replaceState(null, "", location.pathname + location.search + "#/account/plans"); window.dispatchEvent(new HashChangeEvent("hashchange")) }
-  const enter = (plan, email) => { rememberPlan(plan, { email }); history.replaceState(null, "", location.pathname + "#/" + planPath(plan)); setTimeout(() => location.reload(), 300) }
-  const pick = (plan) => { if (guest) return navigate(planPath(plan)); if (demo) { setBusy(plan); return enter(plan, sess.email) } return checkout(plan) }
-  useEffect(() => { if (!guest || !wanted) return; rememberPlan(wanted); return () => { if (!session()) abandonPlan() } }, [guest, wanted])
-  const resuming = useRef(false)
-  useEffect(() => {
-    if (!signedIn || !wanted || pendingPlan() !== wanted) return
-    const resume = async () => {
-      if (document.visibilityState !== "visible" || resuming.current) return   // two tabs can wake up signed in: the one being looked at carries on
-      resuming.current = true; setBusy(wanted)
-      try {
-        // a first sign-in on this browser pulls the account's saved data and may reload the page: let that happen first
-        const pulled = await Promise.race([window.PT_SYNC && window.PT_SYNC.first, new Promise((r) => setTimeout(r, 8000))])
-        if (pulled && pulled.reloading) return
-        const who = await api("/api/auth/me", { auth: true }), email = (session() || {}).email
-        const claim = () => { const mine = takePlan(wanted, email); if (mine) clearWanted(); return mine }
-        if (!isPicked(wanted, email)) { claim(); return setBusy(null) }
-        const step = nextStep(wanted, who)
-        if (step === "checkout") return checkout(wanted, claim)
-        if (step === "portal") return manage(claim)
-        setBusy(null)
-        if (claim()) toast.success(step === "current" ? `Your account is already on the ${NAME[wanted]} plan.` : step === "covered" ? "Your Premium plan already includes everything in Paid." : "You are signed in. Everything in Free is included with your account.")
-      } catch (e) { resuming.current = false; setBusy(null); toast.error(errMsg(e)) }
-    }
-    resume(); document.addEventListener("visibilitychange", resume); return () => document.removeEventListener("visibilitychange", resume)
-  }, [signedIn, wanted])
-  useEffect(() => { const f = (e) => { if (e.persisted) setBusy(null) }; window.addEventListener("pageshow", f); return () => window.removeEventListener("pageshow", f) }, [])   // back from Stripe with the browser's Back button
+export function Plans({ item, navigate, me }) {
+  const sess = useSession(), demo = isDemo(), signedIn = !!(sess && sess.access_token) && !demo, cur = signedIn ? (me ? me.tier : "free") : null, [busy, setBusy] = useState(null)
+  const go = async (plan) => { if (!signedIn) { toast.error("Create a free account first, then pick a plan."); return navigate("account/profile") } setBusy(plan); try { const pp = planParams(plan); if (pp) track("InitiateCheckout", { ...pp, num_items: 1 }); const j = await A.checkout(plan); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
+  const manage = async () => { setBusy("portal"); try { const j = await A.portal(); location.href = j.url } catch (e) { toast.error(errMsg(e)); setBusy(null) } }
   return (<div><PageHeader title={item.title} description={item.desc} />
     <div className="grid gap-4 lg:grid-cols-3" data-plan-cards="3">{PLANS.map((t) => <Card key={t.id} data-plan={t.id} className={cn("flex flex-col", cur === t.id && "border-primary", t.id === "premium" && "shadow-[0_0_0_1px_var(--accent)]")}>
       <CardHeader className="gap-2 pb-3">
@@ -204,14 +166,13 @@ export function Plans({ item, navigate, me, route }) {
           <p className="ml-6 mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{detail}</p>
         </div>)}
       </CardContent>
-      <CardFooter className="pt-0">{t.id === "free" ? (!signedIn ? <Button variant="outline" disabled={!!busy} onClick={() => pick("free")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => pick("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => cur === "paid" ? manage() : pick("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
+      <CardFooter className="pt-0">{t.id === "free" ? (!signedIn ? <Button variant="outline" onClick={() => navigate("account/profile")}>Create a free account</Button> : <span className="text-[12.5px] text-muted-foreground">Included with every account.</span>) : cur === t.id ? <span className="text-[12.5px] text-muted-foreground">Your current plan.</span> : t.id === "paid" ? (cur !== "premium" && <Button disabled={!!busy} onClick={() => go("paid")}>{busy === "paid" ? "Opening checkout…" : "Choose Paid"}</Button>) : <Button disabled={!!busy} onClick={() => cur === "paid" ? manage() : go("premium")}>{busy === "premium" ? "Opening checkout…" : cur === "paid" ? "Upgrade to Premium" : "Go Premium"}</Button>}</CardFooter></Card>)}</div>
     <Card className="mt-4" data-demo-preview><CardContent className="flex flex-wrap items-center gap-3 pt-5">
       <div className="min-w-0 flex-1 text-sm"><div className="font-semibold">Not ready to sign up? Try the demo.</div><p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">The demo is a free preview, not a plan. It opens every screen on a simulated sample portfolio, needs no account and saves nothing to the service. The analyst answers real questions on that sample data. The demo Council plays pre-written sample reports rather than calling a model.</p></div>
       {demo ? <span className="text-[12.5px] text-muted-foreground">You are in the demo.</span> : <Button variant="outline" asChild><a href="?demo=1">Open the demo</a></Button>}
     </CardContent></Card>
-    {signedIn && me?.can_manage_billing && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · period ends {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={() => manage()} disabled={busy === "portal"}>Manage subscription</Button>{["past_due", "unpaid", "incomplete"].includes(me.sub_status) && <Alert className="basis-full"><AlertTriangle className="size-4" /><AlertTitle>Payment not received</AlertTitle><AlertDescription>The latest charge for your subscription failed, so paid features are paused. Update the card in Manage subscription; access returns as soon as Stripe confirms the payment.</AlertDescription></Alert>}</CardContent></Card>}
-    <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. Investment values can fall. Data may be delayed, and projections are hypothetical.</p><ReleasePolicies />
-    {guest && wanted && <PlanSignup key={wanted} plan={wanted} onClose={clearWanted} onSignedIn={(email) => enter(wanted, email)} />}</div>)
+    {signedIn && me?.can_manage_billing && <Card className="mt-4"><CardContent className="flex flex-wrap items-center gap-3 pt-5"><div className="text-sm">Plan <b className="capitalize">{me.tier}</b>{me.period_end ? <> · period ends {date(me.period_end)}</> : null}{me.sub_status ? <> · status {me.sub_status}</> : null}</div><Button className="ml-auto" variant="outline" onClick={manage} disabled={busy === "portal"}>Manage subscription</Button>{["past_due", "unpaid", "incomplete"].includes(me.sub_status) && <Alert className="basis-full"><AlertTriangle className="size-4" /><AlertTitle>Payment not received</AlertTitle><AlertDescription>The latest charge for your subscription failed, so paid features are paused. Update the card in Manage subscription; access returns as soon as Stripe confirms the payment.</AlertDescription></Alert>}</CardContent></Card>}
+    <p className="mt-4 text-[12px] text-muted-foreground">Prices are in Thai baht, billed through Stripe and renew until cancelled in the billing portal. Investment values can fall. Data may be delayed, and projections are hypothetical.</p><ReleasePolicies /></div>)
 }
 
 /* ---------------- Dashboard layout (the classic layout editor, framed) ---------------- */

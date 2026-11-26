@@ -1,5 +1,5 @@
 // SEC EDGAR: the authoritative source for reported fundamentals and filings. Keyless, official, public domain.
-// Needs a declared User-Agent (SEC_USER_AGENT) and stays under 10 requests/second. US-GAAP filers only (20-F/IFRS filers return no statements).
+// Needs a declared User-Agent (SEC_USER_AGENT) and stays under 10 requests/second. US-GAAP (10-K/10-Q) and IFRS (20-F/40-F) filers: the IFRS tag set is mapped and the reporting currency is detected from the facts, so a foreign private issuer returns annual statements in its own currency.
 const { request, SEC_UA, notConfigured } = require("../http");
 const S = require("../schemas");
 const obs = require("../obs");
@@ -61,42 +61,52 @@ async function filings(symbol, { forms, limit = 40 } = {}) {
 
 // ---- XBRL -> normalized statements ----
 const FLOW = {
-  revenue: [["us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax"], ["us-gaap", "Revenues"], ["us-gaap", "SalesRevenueNet"], ["us-gaap", "RevenueFromContractWithCustomerIncludingAssessedTax"]],
-  costOfRevenue: [["us-gaap", "CostOfRevenue"], ["us-gaap", "CostOfGoodsAndServicesSold"], ["us-gaap", "CostOfGoodsSold"]],
-  grossProfit: [["us-gaap", "GrossProfit"]],
-  operatingIncome: [["us-gaap", "OperatingIncomeLoss"]],
-  netIncome: [["us-gaap", "NetIncomeLoss"], ["us-gaap", "ProfitLoss"]],
-  interestExpense: [["us-gaap", "InterestExpense"], ["us-gaap", "InterestExpenseNonoperating"]],
-  incomeTax: [["us-gaap", "IncomeTaxExpenseBenefit"]],
-  rAndD: [["us-gaap", "ResearchAndDevelopmentExpense"]],
-  sgAndA: [["us-gaap", "SellingGeneralAndAdministrativeExpense"]],
-  da: [["us-gaap", "DepreciationDepletionAndAmortization"], ["us-gaap", "DepreciationAndAmortization"], ["us-gaap", "DepreciationAmortizationAndAccretionNet"]],
-  operatingCashFlow: [["us-gaap", "NetCashProvidedByUsedInOperatingActivities"]],
-  capex: [["us-gaap", "PaymentsToAcquirePropertyPlantAndEquipment"], ["us-gaap", "PaymentsToAcquireProductiveAssets"]],
-  dividendsPaid: [["us-gaap", "PaymentsOfDividends"], ["us-gaap", "PaymentsOfDividendsCommonStock"]],
-  buybacks: [["us-gaap", "PaymentsForRepurchaseOfCommonStock"]],
+  revenue: [["us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax"], ["us-gaap", "Revenues"], ["us-gaap", "SalesRevenueNet"], ["us-gaap", "RevenueFromContractWithCustomerIncludingAssessedTax"], ["ifrs-full", "Revenue"], ["ifrs-full", "RevenueFromContractsWithCustomers"]],
+  costOfRevenue: [["us-gaap", "CostOfRevenue"], ["us-gaap", "CostOfGoodsAndServicesSold"], ["us-gaap", "CostOfGoodsSold"], ["ifrs-full", "CostOfSales"]],
+  grossProfit: [["us-gaap", "GrossProfit"], ["ifrs-full", "GrossProfit"]],
+  operatingIncome: [["us-gaap", "OperatingIncomeLoss"], ["ifrs-full", "ProfitLossFromOperatingActivities"]],
+  netIncome: [["us-gaap", "NetIncomeLoss"], ["us-gaap", "ProfitLoss"], ["ifrs-full", "ProfitLoss"], ["ifrs-full", "ProfitLossAttributableToOwnersOfParent"]],
+  interestExpense: [["us-gaap", "InterestExpense"], ["us-gaap", "InterestExpenseNonoperating"], ["ifrs-full", "FinanceCosts"], ["ifrs-full", "InterestExpense"]],
+  incomeTax: [["us-gaap", "IncomeTaxExpenseBenefit"], ["ifrs-full", "IncomeTaxExpenseContinuingOperations"]],
+  rAndD: [["us-gaap", "ResearchAndDevelopmentExpense"], ["ifrs-full", "ResearchAndDevelopmentExpense"]],
+  sgAndA: [["us-gaap", "SellingGeneralAndAdministrativeExpense"], ["ifrs-full", "SellingGeneralAndAdministrativeExpense"]],
+  da: [["us-gaap", "DepreciationDepletionAndAmortization"], ["us-gaap", "DepreciationAndAmortization"], ["us-gaap", "DepreciationAmortizationAndAccretionNet"], ["ifrs-full", "DepreciationAndAmortisationExpense"], ["ifrs-full", "DepreciationAmortisationAndImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss"]],
+  operatingCashFlow: [["us-gaap", "NetCashProvidedByUsedInOperatingActivities"], ["ifrs-full", "CashFlowsFromUsedInOperatingActivities"], ["ifrs-full", "NetCashFlowsFromUsedInOperatingActivities"]],
+  capex: [["us-gaap", "PaymentsToAcquirePropertyPlantAndEquipment"], ["us-gaap", "PaymentsToAcquireProductiveAssets"], ["ifrs-full", "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"], ["ifrs-full", "PurchaseOfPropertyPlantAndEquipmentIntangibleAssetsOtherThanGoodwillInvestmentPropertyAndOtherNoncurrentAssetsClassifiedAsInvestingActivities"]],
+  dividendsPaid: [["us-gaap", "PaymentsOfDividends"], ["us-gaap", "PaymentsOfDividendsCommonStock"], ["ifrs-full", "DividendsPaidClassifiedAsFinancingActivities"], ["ifrs-full", "DividendsPaid"]],
+  buybacks: [["us-gaap", "PaymentsForRepurchaseOfCommonStock"], ["ifrs-full", "PaymentsForRepurchaseOfEquity"]],
   // valuation inputs (v4): stock compensation is an expense the cash-flow statement adds back, pre-tax income gives the effective tax rate, acquisitions are reinvestment
-  sbc: [["us-gaap", "ShareBasedCompensation"], ["us-gaap", "AllocatedShareBasedCompensationExpense"]],
-  pretaxIncome: [["us-gaap", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"], ["us-gaap", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"]],
-  acquisitions: [["us-gaap", "PaymentsToAcquireBusinessesNetOfCashAcquired"]],
+  sbc: [["us-gaap", "ShareBasedCompensation"], ["us-gaap", "AllocatedShareBasedCompensationExpense"], ["ifrs-full", "ShareBasedCompensation"]],
+  pretaxIncome: [["us-gaap", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest"], ["us-gaap", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments"], ["ifrs-full", "ProfitLossBeforeTax"]],
+  acquisitions: [["us-gaap", "PaymentsToAcquireBusinessesNetOfCashAcquired"], ["ifrs-full", "AcquisitionOfSubsidiariesNetOfCashAcquired"]],
 };
-const PERSHARE = { eps: [["us-gaap", "EarningsPerShareDiluted"], ["us-gaap", "EarningsPerShareBasicAndDiluted"], ["us-gaap", "EarningsPerShareBasic"]] };
-const SHARES = { dilutedShares: [["us-gaap", "WeightedAverageNumberOfDilutedSharesOutstanding"], ["us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"]], basicShares: [["us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"]] };
+const PERSHARE = { eps: [["us-gaap", "EarningsPerShareDiluted"], ["us-gaap", "EarningsPerShareBasicAndDiluted"], ["us-gaap", "EarningsPerShareBasic"], ["ifrs-full", "EarningsPerShareBasicAndDiluted"], ["ifrs-full", "EarningsPerShareBasic"]] };
+const SHARES = { dilutedShares: [["us-gaap", "WeightedAverageNumberOfDilutedSharesOutstanding"], ["us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"], ["ifrs-full", "WeightedAverageNumberOfDilutedSharesOutstanding"], ["ifrs-full", "WeightedAverageNumberOfOrdinarySharesOutstanding"]], basicShares: [["us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"], ["ifrs-full", "WeightedAverageNumberOfOrdinarySharesOutstanding"]] };
 const INSTANT = {
-  cash: [["us-gaap", "CashAndCashEquivalentsAtCarryingValue"], ["us-gaap", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"]],
-  shortTermInvestments: [["us-gaap", "MarketableSecuritiesCurrent"], ["us-gaap", "ShortTermInvestments"], ["us-gaap", "AvailableForSaleSecuritiesDebtSecuritiesCurrent"]],
-  totalCurrentAssets: [["us-gaap", "AssetsCurrent"]], totalAssets: [["us-gaap", "Assets"]], totalCurrentLiabilities: [["us-gaap", "LiabilitiesCurrent"]], totalLiabilities: [["us-gaap", "Liabilities"]],
-  shareholdersEquity: [["us-gaap", "StockholdersEquity"], ["us-gaap", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"]],
-  inventory: [["us-gaap", "InventoryNet"]], receivables: [["us-gaap", "AccountsReceivableNetCurrent"]],
-  debtLT: [["us-gaap", "LongTermDebtNoncurrent"], ["us-gaap", "LongTermDebt"]], debtCur: [["us-gaap", "LongTermDebtCurrent"], ["us-gaap", "ShortTermBorrowings"]],
+  cash: [["us-gaap", "CashAndCashEquivalentsAtCarryingValue"], ["us-gaap", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"], ["ifrs-full", "CashAndCashEquivalents"]],
+  shortTermInvestments: [["us-gaap", "MarketableSecuritiesCurrent"], ["us-gaap", "ShortTermInvestments"], ["us-gaap", "AvailableForSaleSecuritiesDebtSecuritiesCurrent"], ["ifrs-full", "CurrentInvestments"]],
+  totalCurrentAssets: [["us-gaap", "AssetsCurrent"], ["ifrs-full", "CurrentAssets"]], totalAssets: [["us-gaap", "Assets"], ["ifrs-full", "Assets"]], totalCurrentLiabilities: [["us-gaap", "LiabilitiesCurrent"], ["ifrs-full", "CurrentLiabilities"]], totalLiabilities: [["us-gaap", "Liabilities"], ["ifrs-full", "Liabilities"]],
+  shareholdersEquity: [["us-gaap", "StockholdersEquity"], ["us-gaap", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], ["ifrs-full", "Equity"], ["ifrs-full", "EquityAttributableToOwnersOfParent"]],
+  inventory: [["us-gaap", "InventoryNet"], ["ifrs-full", "Inventories"]], receivables: [["us-gaap", "AccountsReceivableNetCurrent"], ["ifrs-full", "CurrentTradeReceivables"]],
+  debtLT: [["us-gaap", "LongTermDebtNoncurrent"], ["us-gaap", "LongTermDebt"], ["ifrs-full", "NoncurrentBorrowings"], ["ifrs-full", "Borrowings"]], debtCur: [["us-gaap", "LongTermDebtCurrent"], ["us-gaap", "ShortTermBorrowings"], ["ifrs-full", "CurrentBorrowings"]],
   // valuation inputs (v4): everything the equity bridge needs beyond debt and cash
-  longTermInvestments: [["us-gaap", "MarketableSecuritiesNoncurrent"], ["us-gaap", "LongTermInvestments"], ["us-gaap", "AvailableForSaleSecuritiesDebtSecuritiesNoncurrent"]],
-  leaseOp: [["us-gaap", "OperatingLeaseLiability"]], leaseOpCur: [["us-gaap", "OperatingLeaseLiabilityCurrent"]], leaseOpNon: [["us-gaap", "OperatingLeaseLiabilityNoncurrent"]],
+  longTermInvestments: [["us-gaap", "MarketableSecuritiesNoncurrent"], ["us-gaap", "LongTermInvestments"], ["us-gaap", "AvailableForSaleSecuritiesDebtSecuritiesNoncurrent"], ["ifrs-full", "NoncurrentInvestments"]],
+  leaseOp: [["us-gaap", "OperatingLeaseLiability"], ["ifrs-full", "LeaseLiabilities"]], leaseOpCur: [["us-gaap", "OperatingLeaseLiabilityCurrent"], ["ifrs-full", "CurrentLeaseLiabilities"]], leaseOpNon: [["us-gaap", "OperatingLeaseLiabilityNoncurrent"], ["ifrs-full", "NoncurrentLeaseLiabilities"]],
   leaseFin: [["us-gaap", "FinanceLeaseLiability"]], leaseFinCur: [["us-gaap", "FinanceLeaseLiabilityCurrent"]], leaseFinNon: [["us-gaap", "FinanceLeaseLiabilityNoncurrent"]],
-  minorityInterest: [["us-gaap", "MinorityInterest"]],
+  minorityInterest: [["us-gaap", "MinorityInterest"], ["ifrs-full", "NoncontrollingInterests"]],
   preferredEquity: [["us-gaap", "PreferredStockValue"]],
 };
 const DAY = 864e5, dur = (f) => (Date.parse(f.end) - Date.parse(f.start)) / DAY;
+// Reporting currency: us-gaap filers report in USD, foreign private issuers (20-F/40-F, ifrs-full) in their own
+// currency, commonly TWD, EUR, JPY or HKD. The unit key of the revenue concept is the reliable signal.
+const CUR = ["USD", "TWD", "EUR", "JPY", "HKD", "GBP", "CNY", "KRW", "CHF", "CAD", "AUD", "SGD", "INR", "BRL", "SEK", "NOK", "DKK", "ZAR", "MXN"];
+function curOf(facts) {
+  const units = new Set();
+  for (const [tax, concept] of FLOW.revenue) { const c = facts.facts && facts.facts[tax] && facts.facts[tax][concept]; if (c && c.units) for (const u of Object.keys(c.units)) units.add(u); }
+  for (const c of CUR) if (units.has(c)) return c;
+  for (const u of units) if (/^[A-Z]{3}$/.test(u)) return u;
+  return "USD";
+}
 
 // Filers switch concepts over time (NVDA: RevenueFromContractWithCustomerExcludingAssessedTax up to FY2022, Revenues
 // after), so concepts are merged: a period keeps the facts of the first concept in `defs` that reports it, and later
@@ -119,20 +129,25 @@ function pick(rows, keyOf) { const m = new Map(); for (const f of rows) { const 
 function pickFirst(rows, keyOf) { const m = new Map(); for (const f of rows) { const k = keyOf(f); if (k == null) continue; const o = m.get(k); if (!o || f.filed < o.filed) m.set(k, f); } return m; }
 
 function buildStatements(facts, symbol, type, asOf) {
-  const annual = type === "annual", lo = annual ? 340 : 80, hi = annual ? 390 : 100, forms = annual ? /^(10-K|10-K\/A)$/ : /^(10-Q|10-Q\/A)$/;
+  // 20-F and 40-F are the annual reports of foreign private issuers; their facts live under ifrs-full (or us-gaap for
+  // Canadian 40-F filers) and are reported in the issuer's own currency. 6-K rarely carries tagged quarterly facts, so
+  // the quarterly series stays on 10-Q only rather than mixing six-month figures into a quarter.
+  const annual = type === "annual", lo = annual ? 340 : 80, hi = annual ? 390 : 100,
+    forms = annual ? /^(10-K|10-K\/A|20-F|20-F\/A|40-F|40-F\/A)$/ : /^(10-Q|10-Q\/A)$/;
+  const cur = curOf(facts);
   const flows = {}, ps = {}, sh = {};
-  for (const [k, d] of Object.entries(FLOW)) flows[k] = pick(series(facts, d, "USD", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
-  for (const [k, d] of Object.entries(PERSHARE)) ps[k] = pick(series(facts, d, "USD/shares", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(FLOW)) flows[k] = pick(series(facts, d, cur, asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(PERSHARE)) ps[k] = pick(series(facts, d, cur + "/shares", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   for (const [k, d] of Object.entries(SHARES)) sh[k] = pick(series(facts, d, "shares", asOf).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   const inst = {};
-  for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, "USD", asOf).filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
+  for (const [k, d] of Object.entries(INSTANT)) inst[k] = pick(series(facts, d, cur, asOf).filter((f) => !f.start && forms.test(f.form || "")), (f) => f.end);
   const anchor = flows.revenue.size ? flows.revenue : flows.netIncome;
   const anchorDef = flows.revenue.size ? FLOW.revenue : FLOW.netIncome;
-  const labels = pickFirst(series(facts, anchorDef, "USD", asOf, true).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
+  const labels = pickFirst(series(facts, anchorDef, cur, asOf, true).filter((f) => f.start && dur(f) > lo && dur(f) < hi && forms.test(f.form || "")), (f) => f.end);
   const ends = [...anchor.keys()].sort().reverse().slice(0, annual ? 12 : 16), name = facts.entityName || null, cik = facts.cik ? String(facts.cik) : null, out = [];
   for (const end of ends) {
     const a = anchor.get(end), lb = labels.get(end) || a, row = { symbol, name, cik, period: end, periodType: annual ? "annual" : "quarterly", fiscalYear: lb.fy || null, fiscalPeriod: lb.fp || null, periodStart: a.start, periodEnd: end,
-      filingDate: a.filed, form: a.form, accession: a.accn, source: "SEC EDGAR" };
+      filingDate: a.filed, form: a.form, accession: a.accn, currency: cur, source: "SEC EDGAR" };
     for (const k of Object.keys(flows)) { const f = flows[k].get(end); if (f) row[k] = f.val; }
     for (const k of Object.keys(ps)) { const f = ps[k].get(end); if (f) row[k] = f.val; }
     for (const k of Object.keys(sh)) { const f = sh[k].get(end); if (f) row[k] = f.val; }
@@ -151,7 +166,7 @@ function buildStatements(facts, symbol, type, asOf) {
 }
 
 // Bump when buildStatements output changes, so rows normalized by older code (up to 7 days in the shared cache) are ignored.
-const STATEMENT_SCHEMA = "v4-valuation-fields";
+const STATEMENT_SCHEMA = "v5-ifrs";
 // Statements are cached by the latest accession number, so they live until a new filing appears.
 async function statements(symbol, { type = "annual", asOf } = {}) {
   const cik = await cikFor(symbol); if (!cik) return [];

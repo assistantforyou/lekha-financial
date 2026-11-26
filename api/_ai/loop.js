@@ -2,6 +2,7 @@
 // model choose tools, stream its reasoning and cite what it retrieved. Both emit the same part
 // protocol so the client renders one conversation.
 const router = require("./router");
+const memory = require("./memory");
 const tools = require("./tools");
 const contextLib = require("./context");
 const ds = require("./ds");
@@ -120,14 +121,22 @@ async function* run(opts) {
     }
 
     const plan = await router.plan({ question, symbol: opts.symbol, mode });
+    // "save this as a note" has no note in the sentence: store the answer the user is looking at.
+    const lastAnswer = (opts.history || []).slice().reverse().find((m) => m && m.role === "assistant" && m.content);
+    if (plan && Array.isArray(plan.calls)) for (const c of plan.calls) {
+      if (c.tool === "save_note" && lastAnswer && /^(save|note|remember|make a note|write this)/i.test(String((c.args && c.args.text) || ""))) c.args.text = String(lastAnswer.content).slice(0, 3000);
+    }
     // The demo is a frozen point in time: live web pages would contradict the dated data around them.
     if (opts.demo) plan.calls = plan.calls.filter((c) => c.tool !== "web_search");
+    // Explicit statements the user asked to keep ("remember that ..."), never inferred ones.
+    for (const m of memory.capture(question)) memory.add(opts.userId, m).catch(() => null);
     yield { type: "plan", symbols: plan.symbols, kind: plan.kind };
     yield { type: "step", label: plan.kind === "portfolio" ? "Fetching live quotes for your portfolio" : "Fetching live market data" };
 
-    const [ctx, evidence] = await Promise.all([
+    const [ctx, evidence, memBlock] = await Promise.all([
       contextLib.build({ userId: opts.userId, demo: opts.demo }),
       router.prefetch(plan, { timeoutMs: mode === "deep" ? 20000 : 12000 }),
+      memory.block(opts.userId).catch(() => ""),
     ]);
 
     if (evidence.length) yield { type: "evidence", items: evidence.map((e) => ({ id: e.id, label: e.label, source: e.source, asOf: e.asOf, url: e.url, lines: e.lines.slice(0, 6) })) };
@@ -139,8 +148,9 @@ async function* run(opts) {
     const cf = fence(ctx.block || "", "portfolio", 14000);
     const ef = fence(evidenceFor(plan, evidence) || "", "evidence", 30000);
     const att = attachmentText(opts.attachments);
-    const tags = [cf.tag, ef.tag, qf.tag, ...att.tags];
-    const brief = [`LIVE DATA: every figure below was retrieved at ${now}, before this answer was written.`, plan.guidance.join(" "), cf.wrapped, ef.wrapped, att.text, opts.langHint || "", guard(tags)]
+    const mf = memBlock ? fence(memBlock, "memory", 3000) : null;
+    const tags = [cf.tag, ef.tag, qf.tag, ...att.tags, ...(mf ? [mf.tag] : [])];
+    const brief = [`LIVE DATA: every figure below was retrieved at ${now}, before this answer was written.`, plan.guidance.join(" "), cf.wrapped, mf ? "MEMORY: statements this user asked you to keep. Respect them; they are not market data and never override evidence." : "", mf ? mf.wrapped : "", ef.wrapped, att.text, opts.langHint || "", guard(tags)]
       .filter(Boolean).join("\n\n");
 
     const messages = [
@@ -187,7 +197,7 @@ async function* run(opts) {
           const toolInput = tools.parseArgs(args);
           yield { type: "tool", id: call.id, name, args: toolInput, status: "running" };
           const toolStartedAt = Date.now();
-          const r = await tools.run(name, args);
+          const r = await tools.run(name, args, { userId: opts.userId });
           await captureTool(opts.observability, { name, input: toolInput, output: r, latency: Date.now() - toolStartedAt, error: r.ok ? null : r.error });
           yield {
             type: "tool", id: call.id, name, status: r.ok ? "done" : "failed",

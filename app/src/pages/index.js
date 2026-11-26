@@ -5,7 +5,7 @@ const page = (load, name) => lazy(() => load().then((m) => ({ default: name ? m[
 const account = () => import("./account"), system = () => import("./system")
 export default {
   company: page(() => import("./company")), agent: page(() => import("./agent")), news: page(() => import("./news")), macro: page(() => import("./macro")),
-  watchlist: page(() => import("./watchlist")), council: page(() => import("./council")), reports: page(() => import("./reports")),
+  watchlist: page(() => import("./watchlist")), inbox: page(() => import("./inbox")), council: page(() => import("./council")), reports: page(() => import("./reports")),
   profile: page(account, "Profile"), preferences: page(account, "Preferences"), plans: page(account, "Plans"), layout: page(account, "Layout"), data: page(account, "DataPage"),
   diagnostics: page(system, "Diagnostics"), audit: page(system, "Audit"),
 }

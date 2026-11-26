@@ -3,6 +3,7 @@ const ROUTES = {
   "flows": () => require("./_h/cron/flows"),
   "insiders": () => require("./_h/cron/insiders"),
   "prune": () => require("./_h/cron/prune"),
+  "alerts": () => require("./_h/cron/alerts"),
 };
 const h = require("./_router").group("cron", ROUTES);
 module.exports = h;

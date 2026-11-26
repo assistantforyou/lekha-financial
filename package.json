@@ -40,6 +40,7 @@
   "scripts": {
     "build:app": "node scripts/build-app.mjs && rm -rf public/assets && vite build --config login/vite.config.mjs && vite build --config app/vite.config.mjs",
     "build:login": "npm run build:app",
-    "test": "for f in api/*.test.js; do node $f || exit 1; done"
+    "test": "for f in api/*.test.js; do node $f || exit 1; done",
+    "eval:agent": "node api/_fin/eval/run.js"
   }
 }

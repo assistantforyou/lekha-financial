@@ -33,7 +33,10 @@ function inline(text, k = "i", cites = null) {
       const ids = s.slice(1, -1).split(",").map((x) => x.trim()).filter(Boolean), ev = cites || {}
       const one = ids.length === 1 ? shortSrc(ev[ids[0]]) : ""
       const title = ids.map((id) => { const e = ev[id]; return e ? `${id}: ${e.label || e.tool || ""}${e.source ? " — " + e.source : ""}${e.asOf ? " — " + e.asOf : ""}` : id }).join("\n")
-      out.push(<sup key={key} title={title} className="mx-0.5 rounded bg-[var(--accent-soft)] px-1 text-[0.68em] font-medium text-[var(--accent)]">{ids.join(", ")}{one && <span className="opacity-75"> · {one}</span>}</sup>)
+      const chip = <sup title={title} className="mx-0.5 rounded bg-[var(--accent-soft)] px-1 text-[0.68em] font-medium text-[var(--accent)]">{ids.join(", ")}{one && <span className="opacity-75"> · {one}</span>}</sup>
+      const src = ids.length === 1 ? (ev[ids[0]] || null) : null
+      // A single citation with a page behind it opens that page: the number is the way to the passage.
+      out.push(src && src.url ? <a key={key} href={src.url} target="_blank" rel="noopener noreferrer" className="no-underline">{chip}</a> : <span key={key}>{chip}</span>)
     }
     else if (m[8] || m[9]) out.push(<em key={key}>{inline(s.slice(1, -1), key, cites)}</em>)
     else out.push(<a key={key} href={s} target="_blank" rel="noopener noreferrer" className="break-all text-[var(--accent)] underline underline-offset-2">{s}</a>)

@@ -1,4 +1,4 @@
-import { Activity, BarChart3, BookOpen, Bot, Brain, Building2, CircleUser, Compass, Cpu, Gauge, Globe, LayoutDashboard, LayoutGrid, LineChart, Newspaper, PieChart, Radar, Scale, Settings2, Shield, Sparkles, Star, Stethoscope, Swords, TrendingUp, Upload, Users, Wallet, CreditCard, Layers, FlaskConical, ScrollText } from "lucide-react"
+import { Activity, BarChart3, BookOpen, Bot, Brain, Building2, CircleUser, Compass, Cpu, Gauge, Globe, LayoutDashboard, LayoutGrid, LineChart, Newspaper, PieChart, Radar, Scale, Settings2, Shield, Sparkles, Star, Stethoscope, Swords, TrendingUp, Upload, Users, Wallet, CreditCard, Layers, FlaskConical, ScrollText, Inbox } from "lucide-react"
 
 /* The whole app as one tree. `panes` = classic V2/V3 panels moved into view; `page` = a React screen.
    Route keys keep the V3 spelling (portfolio/overview, sector/rrg ...) because the classic modules navigate by them. */
@@ -8,6 +8,7 @@ export const TREE = [
     { id: "holdings", title: "Holdings & ledger", icon: Layers, panes: ["tab-pf-holdings"], desc: "Add, edit and import positions. Every lot with cost, value and weight; import broker statements (PDF, screenshot, CSV)." },
     { id: "risk", title: "Risk", icon: Shield, panes: ["tab-pf-risk"], desc: "Largest positions, themes, drawdown alerts, top movers and biggest losers." },
     { id: "watchlist", title: "Watchlist", icon: Star, page: "watchlist", desc: "Symbols you follow, with live prices and a jump to each company workspace. Synced to your account when signed in." },
+    { id: "inbox", title: "Inbox", icon: Inbox, page: "inbox", desc: "Alerts you set, earnings reminders and the daily move digest, written by the scheduled run." },
   ] },
   { id: "research", title: "Research", icon: Compass, items: [
     { id: "company", title: "Company workspace", icon: Building2, page: "company", desc: "Search any company, ETF, index or crypto. One workspace for price, financials, valuation, growth, news, filings, earnings, peers and the AI analyst." },

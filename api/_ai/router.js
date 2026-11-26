@@ -27,6 +27,28 @@ function flags(question) {
 // Which tools to run before the model speaks. At most six so a fast turn stays fast.
 const WEB = /\b(tied|tie|exposure|exposed|supplier|suppliers|customer|customers|supply chain|depend|depends|dependence|relationship|partner|partnership|stake|owns|owner|ownership|share of|revenue from|net worth|market cap|competitor|competitors|history|founded|ceo|management|explain|how does|why does|who is|what is)\b/i;
 
+// Explicit actions the user asks for ("add NVDA to my watchlist", "alert me at 400").
+// These run before the market tools so a request to change something is never crowded out.
+const ACT = {
+  watch_add: /\b(add|put|include|track)\b[^.]{0,40}\bwatchlist\b/i,
+  watch_remove: /\b(remove|delete|drop|take off)\b[^.]{0,40}\bwatchlist\b/i,
+  alert: /\b(alert me|set an alert|notify me|tell me when|warn me|let me know when)\b/i,
+  note: /\b(save (this|that|it) as (a )?note|save a note|make a note|note this|remember this|write this down)\b/i,
+  position: /\b(my|our) (position|holding|stake|exposure) in\b|\bhow much (of my (portfolio|book) is in|do (i|we) (own|hold))\b|\bdo (i|we) (own|hold)\b/i,
+};
+function actionCalls(question, first) {
+  const out = [];
+  if (ACT.watch_add.test(question) && first) out.push(["add_to_watchlist", { symbol: first }]);
+  if (ACT.watch_remove.test(question) && first) out.push(["remove_from_watchlist", { symbol: first }]);
+  if (ACT.alert.test(question)) {
+    const m = question.match(/(?:above|over|below|under|at)\s*\$?([0-9][0-9,.]*)/i);
+    out.push(["create_alert", { symbol: first || "", kind: /below|under|drops?|falls?/i.test(question) ? "price_below" : /news|headline/i.test(question) ? "news" : "price_above", value: m ? Number(m[1].replace(/,/g, "")) : undefined }]);
+  }
+  if (ACT.note.test(question)) out.push(["save_note", { text: question.slice(0, 380) }]);
+  if (ACT.position.test(question) && first) out.push(["compare_to_portfolio", { symbol: first }]);
+  return out;
+}
+
 function callsFor(question, symbols, f) {
   const q = String(question || "");
   const calls = [];
@@ -36,10 +58,11 @@ function callsFor(question, symbols, f) {
     calls.push({ tool, args });
   };
   const first = symbols[0];
+  for (const [tool, args] of actionCalls(q, first)) calls.push({ tool, args });
   if (first) push("get_quote", { symbol: first });
   // Every company question, and any question about a relationship or an exposure, consults the open
   // web: market feeds do not know who supplies whom or how much of a supplier's revenue one customer is.
-  if (!(f.portfolio && !first) && (first || WEB.test(q))) push("web_search", { query: agent.webQuery(q, symbols), limit: 6 });
+  if (!actionCalls(q, first).length && !(f.portfolio && !first) && (first || WEB.test(q))) push("web_search", { query: agent.webQuery(q, symbols), limit: 6 });
   if (WEB.test(q) && symbols.length >= 2) push("web_search", { query: `${symbols.slice(0, 2).map((x) => agent.companyName(x)).join(" ")} largest customer share of revenue`, limit: 4 });
   if (first && (f.why || f.brief)) push("get_historical_prices", { symbol: first, days: 60 });
   if (first && f.why) push("get_news", { symbol: first });
@@ -61,7 +84,9 @@ async function plan({ question, symbol, mode }) {
   const q = String(question || "").slice(0, 2000);
   const f = flags(q);
   // A question about "my portfolio" names no company: ordinary words in it ("outlook") must never be searched as company names.
-  const symbols = await agent.resolveSymbols(q, symbol, { names: !f.portfolio }).catch(() => []);
+  // An action ("add nvidia to my watchlist") mentions "my", which sets the portfolio flag; company names still have to resolve.
+  const acting = Object.values(ACT).some((rx) => rx.test(q));
+  const symbols = await agent.resolveSymbols(q, symbol, { names: !f.portfolio || acting }).catch(() => []);
   const kind = symbols.length ? "company" : f.portfolio ? "portfolio" : f.macro ? "macro" : "general";
   const calls = callsFor(q, symbols, f);
   const guidance = [];

@@ -97,5 +97,5 @@ assert.equal(S.quote({timestamp:null}).timestamp, null);
   assert.strictEqual(sec.buildStatements(t, "V", "annual")[0].leaseLiabilities, 43, "total operating 40 plus finance 3");
   const n = JSON.parse(JSON.stringify(v)); for (const k of ["OperatingLeaseLiabilityCurrent", "OperatingLeaseLiabilityNoncurrent", "FinanceLeaseLiability"]) delete n.facts["us-gaap"][k];
   assert.strictEqual(sec.buildStatements(n, "V", "annual")[0].leaseLiabilities, null);
-  assert.strictEqual(sec.STATEMENT_SCHEMA, "v4-valuation-fields", "schema bumped so rows without the new fields are not served from cache");
+  assert.strictEqual(sec.STATEMENT_SCHEMA, "v5-ifrs", "schema bumped so rows without the new fields are not served from cache");
 }

@@ -67,9 +67,15 @@ function Evidence({ items }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((e) => (
-        <Badge key={e.id} variant="secondary" title={[e.label, e.source, e.asOf].filter(Boolean).join(" · ")}>
-          {e.id} {e.label || e.tool}
-        </Badge>
+        e.url ? (
+          <a key={e.id} href={e.url} target="_blank" rel="noopener noreferrer" title={[e.label, e.source, e.asOf].filter(Boolean).join(" · ")} className="no-underline">
+            <Badge variant="secondary">{e.id} {e.label || e.tool}</Badge>
+          </a>
+        ) : (
+          <Badge key={e.id} variant="secondary" title={[e.label, e.source, e.asOf].filter(Boolean).join(" · ")}>
+            {e.id} {e.label || e.tool}
+          </Badge>
+        )
       ))}
     </div>
   )

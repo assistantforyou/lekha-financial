@@ -8,3 +8,7 @@ node_modules
 # macOS AppleDouble files from external drives
 ._*
 .env
+
+# agent evaluation output
+api/_fin/eval/report.json
+api/_fin/eval/report.md

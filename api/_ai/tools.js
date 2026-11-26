@@ -3,6 +3,8 @@
 // and normalises every result into numbered evidence the model may cite.
 const agent = require("../_fin/agent");
 const svc = require("../_fin/service");
+const actions = require("./actions");
+const memory = require("./memory");
 
 const TYPES = {
   string: { type: "string" },
@@ -68,6 +70,8 @@ function catalog() {
   const out = {};
   for (const [name, t] of Object.entries(agent.TOOLS)) out[name] = { desc: t.desc, args: t.args };
   for (const [name, t] of Object.entries(EXTRA)) out[name] = { desc: t.desc, args: t.args };
+  for (const [name, t] of Object.entries(actions.TOOLS)) if (!out[name]) out[name] = { desc: t.desc, args: t.args };
+  for (const [name, t] of Object.entries(memory.TOOLS)) if (!out[name]) out[name] = { desc: t.desc, args: t.args };
   return out;
 }
 
@@ -95,13 +99,13 @@ function clean(text) {
 }
 
 // One tool call, bounded, with failures returned as data instead of thrown.
-async function run(name, args, { timeoutMs = 25000 } = {}) {
-  const t = (agent.TOOLS && agent.TOOLS[name]) || EXTRA[name];
+async function run(name, args, { timeoutMs = 25000, userId = null } = {}) {
+  const t = (agent.TOOLS && agent.TOOLS[name]) || EXTRA[name] || actions.TOOLS[name] || memory.TOOLS[name];
   if (!t) return { ok: false, name, error: "unknown_tool", lines: [`Unknown tool ${name}.`], label: name, source: "tool", kind: "calculated" };
   const input = parseArgs(args);
   try {
     const r = await Promise.race([
-      t.run(input),
+      t.run(input, { userId }),
       new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("timeout"), { code: "timeout" })), timeoutMs)),
     ]);
     const lines = (Array.isArray(r.lines) ? r.lines : []).map(clean).filter(Boolean).slice(0, 24).map((l) => l.slice(0, 400));
