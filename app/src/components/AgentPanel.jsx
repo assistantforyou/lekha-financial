@@ -22,6 +22,16 @@ import { cn } from "@/lib/utils"
 
 const TOOL_LABEL = { running: "Working", done: "Done", failed: "Failed" }
 
+/* Seconds spent so far, ticking while the answer is being built, so a long retrieval never looks stuck. */
+function Clock({ from }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 100)
+    return () => clearInterval(t)
+  }, [])
+  return <span className="tabular-nums">{Math.max(0, (now - from) / 1000).toFixed(1)} s</span>
+}
+
 function Reasoning({ text, live }) {
   const [open, setOpen] = useState(true)
   if (!text) return null
@@ -92,6 +102,7 @@ function Answer({ m, live }) {
   const charts = (m.parts || []).filter((p) => p.type === "chart")
   const notices = (m.parts || []).filter((p) => p.type === "notice")
   const step = [...(m.parts || [])].reverse().find((p) => p.type === "step")
+  const finish = (m.parts || []).find((p) => p.type === "finish")
   return (
     <div className="space-y-2">
       <Reasoning text={reasoning} live={live && !m.content} />
@@ -99,11 +110,19 @@ function Answer({ m, live }) {
       {m.content ? (
         <Markdown text={m.content} cites={cites} />
       ) : live ? (
-        <div className="flex items-center gap-2 text-sm text-[var(--muted)]"><Loader2 className="size-4 animate-spin" /> {step ? step.label : "Working"}</div>
+        <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
+          <Loader2 className="size-4 animate-spin" /> {step ? step.label : "Working"} <span className="opacity-60">·</span> <Clock from={m.at || Date.now()} />
+        </div>
       ) : null}
       {charts.map((c, i) => <ChartCard key={`${c.kind || "c"}-${c.symbol || c.title || ""}-${i}`} chart={c} />)}
       {notices.map((n, i) => <Alert key={i} variant="warn"><AlertDescription>{n.message}</AlertDescription></Alert>)}
       <Evidence items={evidence} />
+      {!live && finish && Number.isFinite(Number(finish.ms)) && (
+        <div className="text-[11px] tabular-nums text-[var(--muted)]">
+          {(Number(finish.ms) / 1000).toFixed(1)} s
+          {finish.steps ? ` · ${finish.steps} ${finish.steps === 1 ? "step" : "steps"}` : ""}
+        </div>
+      )}
       {error && <Alert variant="warn"><AlertDescription>{error.message}</AlertDescription></Alert>}
     </div>
   )
@@ -190,6 +209,7 @@ export default function AgentPanel({ symbol, initial }) {
             else parts.push({ ...p })
             return { ...m, parts }
           })
+          else if (p.type === "leg") { /* a chained request, the answer continues in place */ }
           else patch(base + 1, (m) => ({ ...m, parts: [...m.parts, p] }))
         },
       })

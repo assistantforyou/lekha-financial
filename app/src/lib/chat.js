@@ -29,37 +29,46 @@ function frame(block) {
 }
 
 export async function streamChat({ message, threadId, mode = "fast", symbol, lang, attachments, signal, onPart }) {
-  const body = { message, mode, threadId: threadId || undefined, symbol: symbol || undefined, lang: lang || undefined, attachments: attachments && attachments.length ? attachments : undefined };
   const headers = { "Content-Type": "application/json", Accept: "text/event-stream" };
   if (window.PT_DEMO_MODE) { const id = demoId(); if (id) headers["X-Demo-Id"] = id; }
-  const r = await send("/api/ai/chat", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    throw Object.assign(new Error(j.error || `Request failed (${r.status})`), { status: r.status, code: j.code, need: j.need });
-  }
-  if (!r.body) throw new Error("This browser cannot stream the answer.");
-  const reader = r.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "", out = { threadId: null };
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let cut;
-    while ((cut = buf.indexOf("\n\n")) >= 0) {
-      const part = frame(buf.slice(0, cut));
-      buf = buf.slice(cut + 2);
-      if (!part) continue;
-      if (part.type === "start" && part.threadId) out.threadId = part.threadId;
-      if (part.type === "done" && part.threadId) out.threadId = part.threadId;
-      onPart && onPart(part);
+  const first = { message, mode, threadId: threadId || undefined, symbol: symbol || undefined, lang: lang || undefined, attachments: attachments && attachments.length ? attachments : undefined };
+
+  // A long Deep answer is handed over between invocations by the server. Each leg stays inside the
+  // platform limit; the client chains them so the reader sees one continuous answer.
+  const out = { threadId: null, legs: 0, paused: false };
+  let cursor = null;
+  for (let leg = 0; leg < 8; leg++) {
+    const body = leg === 0 ? first : { mode, threadId: out.threadId || threadId || undefined, resume: cursor };
+    const r = await send("/api/ai/chat", { method: "POST", headers, body: JSON.stringify(body), signal });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw Object.assign(new Error(j.error || `Request failed (${r.status})`), { status: r.status, code: j.code, need: j.need });
     }
+    if (!r.body) throw new Error("This browser cannot stream the answer.");
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", next = null;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let cut;
+      while ((cut = buf.indexOf("\n\n")) >= 0) {
+        const part = frame(buf.slice(0, cut));
+        buf = buf.slice(cut + 2);
+        if (!part) continue;
+        if (part.type === "start" && part.threadId) out.threadId = part.threadId;
+        if (part.type === "done" && part.threadId) out.threadId = part.threadId;
+        if (part.type === "paused" && part.cursor) next = part.cursor;
+        onPart && onPart(part);
+      }
+    }
+    out.legs = leg + 1;
+    if (!next) return out;
+    cursor = next;
+    onPart && onPart({ type: "leg", leg: leg + 2 });
   }
+  out.paused = true;
   return out;
 }
 

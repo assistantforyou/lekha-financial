@@ -51,7 +51,25 @@ async function loadThread(userId, id) {
   } catch (e) { return null; }
 }
 
+// A long Deep answer is split across invocations: the function stops before the platform limit and saves
+// the turn under ai/run/<id>, then the client asks again with that id and the next leg carries on.
+async function loadRun(userId, id) {
+  try {
+    const rows = await listState(userId);
+    const row = rows.find((r) => r.key === `ai/run/${id}`);
+    return row && row.data && typeof row.data === "object" ? row.data : null;
+  } catch (e) { return null; }
+}
+
+// How long the platform lets this function run. Vercel Hobby stops it at 60 s; Pro allows up to 300 s when
+// vercel.json asks for it. The default works on every plan and hands a long turn to the next invocation a
+// few seconds before the limit, so nothing is cut off mid-sentence. Set AI_FUNCTION_MS (for example
+// 295000) only when the deployment really has the larger maxDuration.
+const PLATFORM_MS = Math.max(30000, Number(process.env.AI_FUNCTION_MS) || 55000);
+const HANDOVER_MS = 6000;
+
 module.exports = async function handler(req, res) {
+  const t0 = Date.now();
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
 
@@ -59,14 +77,18 @@ module.exports = async function handler(req, res) {
   if (!p) return;
 
   const b = req.body || {};
+  const resumeId = typeof b.resume === "string" && /^[A-Za-z0-9._:-]{1,60}$/.test(b.resume) ? b.resume : null;
+  const saved = resumeId && !p.demo ? await loadRun(p.user_id, resumeId) : null;
+  // A cursor is only valid for the account that wrote it: the document is read from that user's state.
+  const resume = saved && saved.userId === p.user_id ? saved : null;
   const message = String(b.message == null ? "" : b.message).slice(0, 8000).trim();
-  if (message.length < 2) return res.status(400).json({ error: "Type a message first.", code: "empty_message" });
+  if (message.length < 2 && !resume) return res.status(400).json({ error: "Type a message first.", code: "empty_message" });
 
   // tierOf() maps a demo profile to "free" (it only knows the subscription plans), so the anonymous
   // case has to be named first or the demo quota would silently become the free quota.
   const tier = p.demo ? "demo" : tierOf(p) || "free";
   const lim = p.demo ? DEMO_LIMIT : { turns: quota("chatTurnsPerDay", tier), deep: quota("chatDeepTurnsPerDay", tier) };
-  const mode = b.mode === "deep" ? "deep" : "fast";
+  const mode = resume ? (resume.mode === "deep" ? "deep" : "fast") : b.mode === "deep" ? "deep" : "fast";
   if (mode === "deep" && !lim.deep) {
     return res.status(402).json({ error: "Deep thinking is part of the paid plans.", code: "deep_unavailable", need: ["paid", "premium"] });
   }
@@ -77,21 +99,24 @@ module.exports = async function handler(req, res) {
   const who = p.demo ? "d-" + demoId(req, b) : p.user_id;
   const day = Math.floor(Date.now() / DAY);
   const key = `ai/chat/${who}/${day}`;
-  const under = await rateHit(key, lim.turns).catch(() => false);
-  if (!under) {
-    if (p.demo) return res.status(429).json({ error: "That was your free question. Create a free account to keep asking.", code: "signup_required", need_signup: true });
-    return res.status(429).json({ error: "Daily AI limit reached. It resets at midnight UTC.", code: "ai_limit" });
-  }
-  if (mode === "deep") {
-    const deepOk = await rateHit(`ai/chat-deep/${who}/${day}`, lim.deep).catch(() => false);
-    if (!deepOk) return res.status(429).json({ error: "Deep-thinking limit reached for today.", code: "deep_limit" });
+  // A continuation is part of a question already counted, so it must not spend a second turn.
+  if (!resume) {
+    const under = await rateHit(key, lim.turns).catch(() => false);
+    if (!under) {
+      if (p.demo) return res.status(429).json({ error: "That was your free question. Create a free account to keep asking.", code: "signup_required", need_signup: true });
+      return res.status(429).json({ error: "Daily AI limit reached. It resets at midnight UTC.", code: "ai_limit" });
+    }
+    if (mode === "deep") {
+      const deepOk = await rateHit(`ai/chat-deep/${who}/${day}`, lim.deep).catch(() => false);
+      if (!deepOk) return res.status(429).json({ error: "Deep-thinking limit reached for today.", code: "deep_limit" });
+    }
   }
 
   const attachments = Array.isArray(b.attachments) ? b.attachments.slice(0, 6) : [];
   const lang = langOf(b.lang);
   const langHint = lang && lang !== "en" ? "\n" + withLang("", lang).trim() : "";
 
-  const id = threadIdOf(b.threadId);
+  const id = threadIdOf(resume ? resume.threadId || b.threadId : b.threadId);
   const persisted = !p.demo && !!p.user_id;
   const existing = persisted ? await loadThread(p.user_id, id) : null;
   const history = existing ? existing.messages.slice(-6) : [];
@@ -100,7 +125,7 @@ module.exports = async function handler(req, res) {
   // Answers are never served from cache: every question retrieves live data first, so a repeated question
   // gets a fresh answer built on current prices and headlines.
   sse(res);
-  send(res, { type: "start", threadId: id, mode, tier });
+  send(res, { type: "start", threadId: id, mode, tier, resumed: !!resume });
 
   let aborted = false;
   const ctl = new AbortController();
@@ -110,7 +135,7 @@ module.exports = async function handler(req, res) {
   let answer = "";
   try {
     for await (const part of loop.run({
-      question: message,
+      question: resume ? resume.question : message,
       mode,
       userId: p.demo ? "demo" : p.user_id,
       demo: !!p.demo,
@@ -120,7 +145,13 @@ module.exports = async function handler(req, res) {
       langHint,
       observability,
       signal: ctl.signal,
-      budgetMs: mode === "deep" ? 150000 : 60000,
+      resume,
+      deadlineAt: t0 + PLATFORM_MS - HANDOVER_MS,
+      budgetMs: mode === "deep" ? Math.min(280000, PLATFORM_MS - HANDOVER_MS) : 60000,
+      work: persisted ? {
+        id,
+        save: (doc) => putState(p.user_id, [{ key: `ai/run/${id}`, data: { ...doc, userId: p.user_id, threadId: id } }]).then(() => true).catch(() => false),
+      } : null,
     })) {
       if (part.type === "text") answer += part.text;
       send(res, part);
@@ -141,16 +172,22 @@ module.exports = async function handler(req, res) {
   if (persisted && !aborted) {
     try {
       const now = new Date().toISOString();
+      const prior = existing ? existing.messages.map((m) => ({ ...m })) : [];
+      if (resume) {
+        // A continuation extends the answer already stored for this turn rather than starting a new one.
+        const last = prior[prior.length - 1];
+        if (last && last.role === "assistant") last.content = `${last.content || ""}${answer}`;
+        else if (answer) prior.push({ role: "assistant", content: answer, at: now, mode });
+      } else {
+        prior.push({ role: "user", content: message, at: now });
+        if (answer) prior.push({ role: "assistant", content: answer, at: now, mode });
+      }
       const doc = trimThread({
         id,
-        title: (existing && existing.title) || message.slice(0, 60),
+        title: (existing && existing.title) || (resume ? String(resume.question || "").slice(0, 60) : message.slice(0, 60)),
         createdAt: (existing && existing.createdAt) || now,
         updatedAt: now,
-        messages: [
-          ...(existing ? existing.messages : []),
-          { role: "user", content: message, at: now },
-          ...(answer ? [{ role: "assistant", content: answer, at: now, mode }] : []),
-        ],
+        messages: prior,
       });
       if (doc.messages.length) await putState(p.user_id, [{ key: `chat/${id}`, data: doc }]);
     } catch (e) { /* a lost thread is not worth failing the answer */ }
