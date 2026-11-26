@@ -148,8 +148,8 @@ async function* run(opts) {
       if (plan && Array.isArray(plan.calls)) for (const c of plan.calls) {
         if (c.tool === "save_note" && lastAnswer && /^(save|note|remember|make a note|write this)/i.test(String((c.args && c.args.text) || ""))) c.args.text = String(lastAnswer.content).slice(0, 3000);
       }
-      // The demo is a frozen point in time: live web pages would contradict the dated data around them.
-      if (opts.demo) plan.calls = plan.calls.filter((c) => c.tool !== "web_search");
+      // Demo market data stays frozen at its past date, but the web is live and dated by publisher,
+      // so a demo visitor still gets a sourced answer instead of a refusal.
       // Explicit statements the user asked to keep ("remember that ..."), never inferred ones.
       for (const m of memory.capture(question)) memory.add(opts.userId, m).catch(() => null);
       yield { type: "plan", symbols: plan.symbols, kind: plan.kind };
