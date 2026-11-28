@@ -58,6 +58,14 @@ module.exports = async (req, res) => {
       return res.status(503).json({ error: `Checkout for the ${PLANS[plan].label} plan is paused while its price is updated. Nothing was charged.`, code: "price_mismatch" });
     }
     let customer = p.stripe_customer_id;
+    // The profile only learns of a subscription from the webhook. If that is slow or failing, someone who has just paid
+    // still reads Free here, so Stripe is asked before a returning customer is sent to pay a second time.
+    if (customer) {
+      const held = await stripe("GET", "subscriptions", { customer, status: "all", limit: 100 });
+      if (held.data.some((s) => !["canceled", "incomplete_expired"].includes(s.status))) {
+        return res.status(409).json({ error: "Stripe already holds a subscription for this account. If you have just paid, reload in a minute. Otherwise use Manage subscription.", code: "already_subscribed" });
+      }
+    }
     if (!customer) {
       const c = await stripe("POST", "customers", { email: u.email, metadata: { user_id: u.id } }, "lekha-customer-" + u.id);
       customer = c.id;

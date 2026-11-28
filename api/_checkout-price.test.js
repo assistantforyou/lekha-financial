@@ -16,7 +16,7 @@ const prices = {
   price_paid_399: { active: true, currency: "thb", unit_amount: 39900, recurring: { interval: "month", interval_count: 1, usage_type: "licensed" } },
   price_premium_599: { active: true, currency: "thb", unit_amount: 59900, recurring: { interval: "month", interval_count: 1, usage_type: "licensed" } },
 };
-let profile, stripeCalls, stripeDown = false, sub = null;
+let profile, stripeCalls, stripeDown = false, sub = null, listed = [], listDown = false;
 global.fetch = async (url, options = {}) => {
   const u = new URL(url), path = u.pathname;
   if (u.hostname === "fixture.invalid") {
@@ -37,6 +37,10 @@ global.fetch = async (url, options = {}) => {
     if (path === "/v1/checkout/sessions") return Response.json({ url: "https://checkout.stripe.test/" + new URLSearchParams(options.body).get("line_items[0][price]") });
     if (path === "/v1/billing_portal/sessions") return Response.json({ url: "https://portal.stripe.test/", return_url: new URLSearchParams(options.body).get("return_url") });
     if (path.startsWith("/v1/subscriptions/")) return Response.json(sub);
+    if (path === "/v1/subscriptions") {
+      assert.equal(u.searchParams.get("customer"), "cus_a"); assert.equal(u.searchParams.get("status"), "all");
+      return listDown ? Response.json({ error: { code: "api_error" } }, { status: 500 }) : Response.json({ data: listed });
+    }
   }
   throw new Error("unexpected request " + url);
 };
@@ -105,6 +109,23 @@ const subOf = (price, status = "active") => ({ id: "sub_a", status, customer: "c
   Object.assign(profile, { plan: "free", sub_status: "canceled" });
   r = await call(checkout, { plan: "premium" });
   assert.equal(r.code, 200);
+
+  // Paid at Stripe but the webhook has not arrived (slow or failing): the profile still reads Free, and a second
+  // Checkout would charge the same person twice. Stripe is asked before a returning customer is sent to pay.
+  for (const status of ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"]) {
+    fresh(); Object.assign(profile, { stripe_customer_id: "cus_a" }); listed = [{ id: "sub_unseen", status }];
+    r = await call(checkout, { plan: "premium" });
+    assert.equal(r.code, 409, status); assert.equal(r.data.code, "already_subscribed", status);
+    assert.ok(!stripeCalls.includes("/v1/checkout/sessions"), "no second session for " + status);
+  }
+  fresh(); Object.assign(profile, { stripe_customer_id: "cus_a" }); listed = [{ status: "canceled" }, { status: "incomplete_expired" }];
+  assert.equal((await call(checkout, { plan: "premium" })).code, 200, "ended subscriptions do not block buying again");
+  listed = [];
+  fresh(); Object.assign(profile, { stripe_customer_id: "cus_a" }); listDown = true;
+  r = await call(checkout, { plan: "paid" });
+  assert.equal(r.code, 502, "an unverifiable customer is not sent to pay");
+  assert.ok(!stripeCalls.includes("/v1/checkout/sessions"));
+  listDown = false;
 
   // Entitlements change only through the signed webhook and always follow Stripe's current price
   fresh(); Object.assign(profile, { stripe_customer_id: "cus_a" });

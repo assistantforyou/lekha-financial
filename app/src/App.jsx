@@ -31,6 +31,7 @@ import { billingStep } from "@/lib/billingReturn"
 import PAGES from "@/pages"
 
 const START = "ptpub.v1.v3.start"
+const SEEN_TIER = "ptpub.v1.app.tierSeen"
 /* demo visitors see real market data as of a fixed past date (the server enforces it); say so */
 const demoAsOf = () => { try { const d = window.PT_DEMO && window.PT_DEMO.DEMO_DATE; return d ? "Simulated portfolio as of " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) + " close" : "" } catch (e) { return "" } }
 function initialHash() {
@@ -86,6 +87,8 @@ export default function App() {
   /* back from Stripe Checkout or the billing portal: the redirect proves nothing, so poll the verified plan until the webhook lands */
   const [billingResult] = useState(() => new URLSearchParams(location.search).get("billing"))   // read before the effect below clears the address
   const [confirming, setConfirming] = useState(() => billingResult === "success" || billingResult === "portal")
+  const [before] = useState(() => { try { return sessionStorage.getItem(SEEN_TIER) } catch (e) { return null } })   // the plan this tab showed before leaving for Stripe
+  useEffect(() => { if (!confirming && tier && tier !== "demo") try { sessionStorage.setItem(SEEN_TIER, tier) } catch (e) {} }, [confirming, tier])
   useEffect(() => {
     const b = new URLSearchParams(location.search).get("billing"); if (!b) return
     try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {}
@@ -104,7 +107,7 @@ export default function App() {
     if (!confirming || !tier) return
     const first = firstTier.current
     if (first === undefined) firstTier.current = tier
-    const step = billingStep({ result: billingResult, tier, firstTier: first, unlocked: !!(feature && gated === false) })
+    const step = billingStep({ result: billingResult, tier, firstTier: first, unlocked: !!(feature && gated === false), before })
     if (!step) return
     if (step.activated) { const pp = planParams(tier); if (pp) { track("Subscribe", { ...pp, predicted_ltv: pp.value * 12 }, "sub-" + tier); track("Purchase", pp, "buy-" + tier) } capture("plan_activated", { plan: tier }) }
     setConfirming(false); toast.success(`Your account is on the ${tier[0].toUpperCase() + tier.slice(1)} plan.`)
