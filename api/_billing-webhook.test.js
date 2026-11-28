@@ -18,6 +18,7 @@ function fixture(t) {
   };
   const requests = [];
   const store = {
+    read: (rows) => Response.json(rows),
     write(url, body, headers) {
       const key = sub.metadata.user_id ? "user_id" : "stripe_customer_id";
       assert.equal(url.searchParams.get(key), "eq." + account[key]);
@@ -39,7 +40,11 @@ function fixture(t) {
       return Response.json(sub);
     }
     assert.equal(url.href.split("?")[0], "https://db.invalid/rest/v1/pt_profiles");
-    if (!init.method) return Response.json([account]);
+    if (!init.method) {
+      const wanted = url.searchParams.get("stripe_customer_id") || url.searchParams.get("user_id");
+      const found = wanted === "eq." + account.stripe_customer_id || wanted === "eq." + account.user_id;
+      return store.read(found ? [account] : []);
+    }
     assert.equal(init.method, "PATCH");
     return store.write(url, JSON.parse(init.body), init.headers);
   });
@@ -123,4 +128,42 @@ test("a superseded subscription cancellation leaves the replacement entitlement 
   assert.equal(await deliver("customer.subscription.deleted"), 200);
   assert.equal(account.plan, "premium");
   assert.equal(account.stripe_subscription_id, "sub_replacement");
+});
+
+// Another product sells subscriptions on the same Stripe account, so its events reach this endpoint too.
+const foreign = (sub) => Object.assign(sub, { customer: "cus_elsewhere", metadata: { line_user_id: "U1" }, items: { data: [{ price: { id: "price_elsewhere" } }] } });
+
+for (const status of ["active", "past_due", "canceled"]) {
+  test("another product's " + status + " subscription is acknowledged and changes nothing", async t => {
+    const { account, sub, store, deliver } = fixture(t);
+    foreign(sub).status = status;
+    store.write = () => assert.fail("a foreign subscription must never write a profile");
+    const before = { ...account };
+    for (const type of ["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"]) {
+      assert.equal(await deliver(type), 200, type);
+    }
+    assert.deepEqual(account, before);
+  });
+}
+
+test("an unrecognised price on a subscription this site created is still retried", async t => {
+  const { account, sub, deliver } = fixture(t);
+  sub.items.data[0].price.id = "price_not_configured";
+  assert.equal(await deliver("customer.subscription.updated"), 500);
+  assert.equal(account.plan, "free");
+});
+
+test("an unrecognised price for a known billing customer is still retried", async t => {
+  const { account, sub, deliver } = fixture(t);
+  delete sub.metadata.user_id;
+  sub.items.data[0].price.id = "price_not_configured";
+  assert.equal(await deliver("customer.subscription.updated"), 500);
+  assert.equal(account.plan, "free");
+});
+
+test("a failed ownership lookup is retried rather than ignored", async t => {
+  const { sub, store, deliver } = fixture(t);
+  foreign(sub);
+  store.read = () => new Response(null, { status: 503 });
+  assert.equal(await deliver("customer.subscription.updated"), 500);
 });

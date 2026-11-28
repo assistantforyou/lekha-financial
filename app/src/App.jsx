@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import LangPrompt from "@/components/LangPrompt"
 import { isDemo, reloadMe, useMe, useSession } from "@/lib/engine"
 import { pendingPlan, planPath } from "@/lib/planIntent"
+import { billingStep } from "@/lib/billingReturn"
 import PAGES from "@/pages"
 
 const START = "ptpub.v1.v3.start"
@@ -83,7 +84,8 @@ export default function App() {
   useEffect(() => { if (sess && sess.user_id) identify(sess.user_id, { plan: me && me.tier ? me.tier : undefined, admin: !!(me && me.is_admin), surface: "app" }) }, [sess && sess.user_id, me && me.tier, me && me.is_admin])
   useEffect(() => { if (gated) capture("paywall_viewed", { screen: route.key, feature, plan: tier }) }, [gated, route.key, feature, tier])
   /* back from Stripe Checkout or the billing portal: the redirect proves nothing, so poll the verified plan until the webhook lands */
-  const [confirming, setConfirming] = useState(() => /[?&]billing=(success|portal)(&|$)/.test(location.search))
+  const [billingResult] = useState(() => new URLSearchParams(location.search).get("billing"))   // read before the effect below clears the address
+  const [confirming, setConfirming] = useState(() => billingResult === "success" || billingResult === "portal")
   useEffect(() => {
     const b = new URLSearchParams(location.search).get("billing"); if (!b) return
     try { history.replaceState(null, "", location.pathname + location.hash) } catch (e) {}
@@ -100,13 +102,14 @@ export default function App() {
   const firstTier = useRef(undefined)
   useEffect(() => {
     if (!confirming || !tier) return
-    if (firstTier.current === undefined) { firstTier.current = tier; if (!(feature && gated === false)) return }
-    if (tier !== firstTier.current || (feature && gated === false)) {
-      if (tier !== firstTier.current && (tier === "paid" || tier === "premium")) { const pp = planParams(tier); if (pp) { track("Subscribe", { ...pp, predicted_ltv: pp.value * 12 }, "sub-" + tier); track("Purchase", pp, "buy-" + tier) } capture("plan_activated", { plan: tier }) }
-      setConfirming(false); toast.success(`Your account is on the ${tier[0].toUpperCase() + tier.slice(1)} plan.`)
-      // the classic engine, its data source and the feature modules read the plan once at load: reload so they start on the verified plan
-      if (tier !== firstTier.current) setTimeout(() => location.reload(), 1500)
-    }
+    const first = firstTier.current
+    if (first === undefined) firstTier.current = tier
+    const step = billingStep({ result: billingResult, tier, firstTier: first, unlocked: !!(feature && gated === false) })
+    if (!step) return
+    if (step.activated) { const pp = planParams(tier); if (pp) { track("Subscribe", { ...pp, predicted_ltv: pp.value * 12 }, "sub-" + tier); track("Purchase", pp, "buy-" + tier) } capture("plan_activated", { plan: tier }) }
+    setConfirming(false); toast.success(`Your account is on the ${tier[0].toUpperCase() + tier.slice(1)} plan.`)
+    // the classic engine, its data source and the feature modules read the plan once at load: reload so they start on the verified plan
+    if (step.reload) setTimeout(() => location.reload(), 1500)
   }, [confirming, gated, feature, tier])
   const group = BY_KEY[route.key] ? BY_KEY[route.key].groupTitle : ""
   const side = <Sidebar routeKey={route.key} isAdmin={admin} tier={tier} onNavigate={() => setMenu(false)} onSearch={() => { setMenu(false); setSearch(true) }} />

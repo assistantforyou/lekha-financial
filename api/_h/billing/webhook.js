@@ -18,7 +18,25 @@ function planOf(sub) {
   throw new Error("Unmapped subscription price");
 }
 
+/* The Stripe account also bills another product, whose events reach this endpoint. Answering them with an error would
+   make Stripe retry and eventually disable the endpoint. A subscription is somebody else's only when all three hold:
+   its price grants no plan here, checkout did not stamp our user id on it, and no profile holds its customer. An
+   unrecognised price on one of ours is a configuration error and is still retried. A failed lookup throws. */
+async function isForeign(sub) {
+  const price = sub.items?.data?.[0]?.price?.id;
+  const { grants } = priceMap();
+  if (!price || grants.paid.has(price) || grants.premium.has(price) || sub.metadata?.user_id || !sub.customer) return false;
+  const r = await sb(`pt_profiles?stripe_customer_id=eq.${encodeURIComponent(sub.customer)}&select=user_id&limit=1`);
+  const rows = r.ok && await r.json();
+  if (!Array.isArray(rows)) throw new Error(`Subscription ownership lookup failed (HTTP ${r.status})`);
+  return rows.length === 0;
+}
+
 async function applySub(sub, userId) {
+  if (await isForeign(sub)) {
+    console.log(JSON.stringify({ event: "billing_foreign_subscription_ignored", subscription: sub.id }));
+    return;
+  }
   const body = { stripe_subscription_id: sub.id, sub_status: sub.status, period_end: periodEnd(sub), plan: ["active", "trialing"].includes(sub.status) ? planOf(sub) : "free", stripe_customer_id: sub.customer };
   const key = userId ? "user_id" : "stripe_customer_id";
   const id = userId || sub.customer;
